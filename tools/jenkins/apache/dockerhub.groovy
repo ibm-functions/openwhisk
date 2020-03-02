@@ -24,8 +24,6 @@ node('cf_slave') {
   checkout scm
 
   stage("Build and Deploy to DockerHub") {
-//    def JAVA_JDK_8=tool name: 'JDK 1.8 (latest)', type: 'hudson.model.JDK'
-//    withEnv(["Path+JDK=$JAVA_JDK_8/bin","JAVA_HOME=$JAVA_JDK_8"]) {
       withCredentials([usernamePassword(credentialsId: 'openwhisk_dockerhub', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
           sh 'docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}'
       }
@@ -36,7 +34,6 @@ node('cf_slave') {
       sh "${PUSH_CMD} -PdockerImageTag=nightly"
       sh "${PUSH_CMD} -PdockerImageTag=${shortCommit}"
     }
-//  }
 
   stage("Clean") {
     sh "docker images"
@@ -45,9 +42,10 @@ node('cf_slave') {
   }
 
   stage("Notify") {
-    withCredentials([string(credentialsId: 'openwhisk_slack_token', variable: 'OPENWHISK_SLACK_TOKEN')]) {
-      sh "curl -X POST --data-urlencode 'payload={\"channel\": \"#dev\", \"username\": \"whiskbot\", \"text\": \"OpenWhisk Docker Images build and posted to https://hub.docker.com/u/openwhisk by Jenkins job ${BUILD_URL}\", \"icon_emoji\": \":openwhisk:\"}' https://hooks.slack.com/services/${OPENWHISK_SLACK_TOKEN}"
-    }
+//    withCredentials([string(credentialsId: 'openwhisk_slack_token', variable: 'OPENWHISK_SLACK_TOKEN')]) {
+//      sh "curl -X POST --data-urlencode 'payload={\"channel\": \"#dev\", \"username\": \"whiskbot\", \"text\": \"OpenWhisk Docker Images build and posted to https://hub.docker.com/u/openwhisk by Jenkins job ${BUILD_URL}\", \"icon_emoji\": \":openwhisk:\"}' https://hooks.slack.com/services/${OPENWHISK_SLACK_TOKEN}"
+//    }
+    sh "echo Done."
 
   }
 }
