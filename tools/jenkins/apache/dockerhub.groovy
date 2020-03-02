@@ -24,8 +24,8 @@ node('cf_slave') {
   checkout scm
 
   stage("Build and Deploy to DockerHub") {
-    def JAVA_JDK_8=tool name: 'JDK 1.8 (latest)', type: 'hudson.model.JDK'
-    withEnv(["Path+JDK=$JAVA_JDK_8/bin","JAVA_HOME=$JAVA_JDK_8"]) {
+//    def JAVA_JDK_8=tool name: 'JDK 1.8 (latest)', type: 'hudson.model.JDK'
+//    withEnv(["Path+JDK=$JAVA_JDK_8/bin","JAVA_HOME=$JAVA_JDK_8"]) {
       withCredentials([usernamePassword(credentialsId: 'openwhisk_dockerhub', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
           sh 'docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}'
       }
@@ -36,7 +36,7 @@ node('cf_slave') {
       sh "${PUSH_CMD} -PdockerImageTag=nightly"
       sh "${PUSH_CMD} -PdockerImageTag=${shortCommit}"
     }
-  }
+//  }
 
   stage("Clean") {
     sh "docker images"
