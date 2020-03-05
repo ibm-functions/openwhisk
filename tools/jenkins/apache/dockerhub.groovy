@@ -70,6 +70,9 @@ timeout(time: 30, unit: 'MINUTES') {
 
           sendPagerDutyEvent("OpenWhisk-DockerHub started - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
 
+          sh "echo "force fail"; exit 1"
+
+
           withCredentials([usernamePassword(credentialsId: 'openwhisk_dockerhub', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
               sh 'docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}'
           }
@@ -94,7 +97,7 @@ timeout(time: 30, unit: 'MINUTES') {
     } catch (e) {
 
       if ("${PagerDuty}" != 'false') {
-        println("Error: Problem during build, prepare and send a PagerDuty alert.")
+        println("Error: Problem during build, prepare and trigger a PagerDuty alert.")
         sendPagerDutyEvent("OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
       } else {
         println("PagerDuty alert skipped")
