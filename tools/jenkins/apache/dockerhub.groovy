@@ -27,7 +27,6 @@ def sendToPagerDuty(msg) {
       def pdRequest = [
           "event_type": "trigger",
           "incident_key": "WHISK/CICD/Images2Dockerhub",
-          "description": "OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}"
           "description": msg
       ]
 
