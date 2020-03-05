@@ -16,6 +16,49 @@
  * limitations under the License.
  */
 
+// Variables expected from Jenkins :
+// "${PagerDuty}", {"true","false"}
+// "${PagerDutyEndpointURL}", {"https://events.pagerduty.com/...."}
+
+def sendToPagerDuty(msg) {
+
+      // PagerDuty settings
+      def pdEndpoint = "${PagerDutyEndpointURL}"
+      def pdRequest = [
+          "event_type": "trigger",
+          "incident_key": "WHISK/CICD/Images2Dockerhub",
+          "description": "OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}"
+          "description": msg
+      ]
+
+      println("Sending PD event to ${pdEndpoint}")
+
+      println("pdRequest=" + pdRequest)
+
+      // get PD service key
+      withCredentials([[$class: 'StringBinding', credentialsId: 'PD_SERVICE_KEY_CICD', variable: 'pdServiceKey']]) {
+          pdRequest["service_key"] = env.pdServiceKey
+      }
+
+      // send request to PD api and get response
+/*
+      def response = httpRequest consoleLogResponseBody: true,
+                                 contentType: 'APPLICATION_JSON',
+                                 httpMode: 'POST',
+                                 requestBody: groovy.json.JsonOutput.toJson(pdRequest),
+                                 url: pdEndpoint
+
+      if (response.status != 200) {
+        println("Request to send PD alert failed rc=" + response.status + "text=" + response.content)
+      }
+*/
+
+
+
+} // end sendToPagerDuty
+
+
+
 node('cf_slave') {
   sh "env"
   sh "docker version"
@@ -23,25 +66,48 @@ node('cf_slave') {
 
   checkout scm
 
-  stage("Build and Deploy to DockerHub") {
-      withCredentials([usernamePassword(credentialsId: 'openwhisk_dockerhub', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
-          sh 'docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}'
-      }
-      def PUSH_CMD = "./gradlew :core:controller:distDocker :core:invoker:distDocker :core:standalone:distDocker :core:monitoring:user-events:distDocker :tools:ow-utils:distDocker :core:cosmos:cache-invalidator:distDocker -PdockerRegistry=docker.io -PdockerImagePrefix=ibmfunctions"
-      def gitCommit = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
-      def shortCommit = gitCommit.take(7)
-      sh "./gradlew clean"
-      sh "${PUSH_CMD} -PdockerImageTag=nightly"
-      sh "${PUSH_CMD} -PdockerImageTag=${shortCommit}"
+  try {
+
+    stage("Build and Deploy to DockerHub") {
+
+        println("PagerDuty=${PagerDuty}")
+
+        sendToPagerDuty("OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
+
+
+        withCredentials([usernamePassword(credentialsId: 'openwhisk_dockerhub', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
+            sh 'docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}'
+        }
+        def PUSH_CMD = "./gradlew :core:controller:distDocker :core:invoker:distDocker :core:standalone:distDocker :core:monitoring:user-events:distDocker :tools:ow-utils:distDocker :core:cosmos:cache-invalidator:distDocker -PdockerRegistry=docker.io -PdockerImagePrefix=ibmfunctions"
+        def gitCommit = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+        def shortCommit = gitCommit.take(7)
+        sh "./gradlew clean"
+        sh "${PUSH_CMD} -PdockerImageTag=nightly"
+        sh "${PUSH_CMD} -PdockerImageTag=${shortCommit}"
     }
 
-  stage("Clean") {
-    sh "docker images"
-    sh 'docker rmi -f $(docker images -f "reference=openwhisk/*" -q) || true'
-    sh "docker images"
-  }
+    stage("Clean") {
+      sh "docker images"
+      sh 'docker rmi -f $(docker images -f "reference=openwhisk/*" -q) || true'
+      sh "docker images"
+    }
 
-  stage("Notify") {
-    sh "echo Done."
-  }
+    stage("Notify") {
+      println("Done.")
+    }
+
+  } catch (e) {
+
+    if ("${PagerDuty}" != 'false') {
+
+      println("Error: Problem during build, prepare and send a PagerDuty alert.")
+
+      sendToPagerDuty("OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
+
+    } else {
+      println("PagerDuty alert skipped")
+    }
+
+  } /* end catch */
+
 }
