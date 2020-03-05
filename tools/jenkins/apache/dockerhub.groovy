@@ -16,10 +16,13 @@
  * limitations under the License.
  */
 
-// Variables expected from Jenkins :
+
+// Variables expected from Jenkins:
 // "${PagerDuty}", {"true","false"}
 // "${PagerDutyEndpointURL}", {"https://events.pagerduty.com/...."}
 
+
+// Trigger a PD event with message ${msg} using api endpoint ${PagerDutyEndpointURL}
 def sendPagerDutyEvent(msg) {
 
       // PagerDuty settings
@@ -39,8 +42,9 @@ def sendPagerDutyEvent(msg) {
           pdRequest["service_key"] = env.pdServiceKey
       }
 
+      println("pdRequest=" + pdRequest)
+
       // send request to PD api and get response
-/*
       def response = httpRequest consoleLogResponseBody: true,
                                  contentType: 'APPLICATION_JSON',
                                  httpMode: 'POST',
@@ -48,12 +52,14 @@ def sendPagerDutyEvent(msg) {
                                  url: pdEndpoint
 
       if (response.status != 200) {
-        println("Error: Request to send PD alert failed rc=" + response.status + "text=" + response.content)
+        println("Error: Request to send PD alert failed with response.status=" + response.status + "text=" + response.content)
+        println("       Full response" + response)
       }
-*/
+
 } // end sendPagerDutyEvent
 
 
+// start with the pipeline
 timeout(time: 30, unit: 'MINUTES') {
   node('cf_slave') {
     sh "env"
@@ -66,11 +72,8 @@ timeout(time: 30, unit: 'MINUTES') {
 
       stage("Build and Deploy to DockerHub") {
 
-          println("PagerDuty=${PagerDuty}")
 
-          sendPagerDutyEvent("OpenWhisk-DockerHub started - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
-
-          sh "echo "force fail"; exit 1"
+          sh "echo "force fail"; sleep 10; exit 1"
 
 
           withCredentials([usernamePassword(credentialsId: 'openwhisk_dockerhub', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
@@ -82,22 +85,22 @@ timeout(time: 30, unit: 'MINUTES') {
           sh "./gradlew clean"
           sh "${PUSH_CMD} -PdockerImageTag=nightly"
           sh "${PUSH_CMD} -PdockerImageTag=${shortCommit}"
-      }
+      } // stage
 
       stage("Clean") {
-        sh "docker images"
-        sh 'docker rmi -f $(docker images -f "reference=openwhisk/*" -q) || true'
-        sh "docker images"
-      }
+          sh "docker images"
+          sh 'docker rmi -f $(docker images -f "reference=openwhisk/*" -q) || true'
+          sh "docker images"
+      } // stage
 
       stage("Notify") {
-        println("Done.")
-      }
+          println("Done.")
+      } // stage
 
     } catch (e) {
 
       if ("${PagerDuty}" != 'false') {
-        println("Error: Problem during build, prepare and trigger a PagerDuty alert.")
+        println("Error: Problem during build, I prepare and trigger a PagerDuty alert.")
         sendPagerDutyEvent("OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
       } else {
         println("PagerDuty alert skipped")
@@ -105,7 +108,7 @@ timeout(time: 30, unit: 'MINUTES') {
 
       throw e // fails the build and prints stack trace
 
-    } /* end catch */
+    } // end catch
 
   } // node
 } // timeout
