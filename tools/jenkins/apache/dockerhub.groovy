@@ -23,12 +23,12 @@
 
 
 // Trigger a PD event with message ${msg} using api endpoint ${PagerDutyEndpointURL}
-def sendPagerDutyEvent(msg) {
+def sendPagerDutyEvent(event_type, msg) {
 
       // PagerDuty settings
       def pdEndpoint = "${PagerDutyEndpointURL}"
       def pdRequest = [
-          "event_type": "trigger",
+          "event_type": event_type,
           "incident_key": "WHISK/CICD/Images2Dockerhub",
           "description": msg
       ]
@@ -52,7 +52,7 @@ def sendPagerDutyEvent(msg) {
                                  url: pdEndpoint
 
       if (response.status != 200) {
-        println("Error: Request to send PD alert failed with response.status=" + response.status + "text=" + response.content)
+        println("Error: A request sent to PD failed with response.status=" + response.status + "text=" + response.content)
         println("       Full response" + response)
       }
 
@@ -94,16 +94,23 @@ timeout(time: 30, unit: 'MINUTES') {
       } // stage
 
       stage("Notify") {
-          println("Done.")
+
+          if ("${PagerDuty}" != 'false') {
+            println("Everythin is ok, I resolve a possible pending PD alert.")
+            sendPagerDutyEvent("resolve","OpenWhisk-DockerHub completed ok - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
+          } else {
+            println("PagerDuty alert resolve skipped.")
+          } // if
+
       } // stage
 
     } catch (e) {
 
       if ("${PagerDuty}" != 'false') {
         println("Error: Problem during build, I prepare and trigger a PagerDuty alert.")
-        sendPagerDutyEvent("OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
+        sendPagerDutyEvent("trigger","OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
       } else {
-        println("PagerDuty alert skipped")
+        println("PagerDuty alert trigger skipped.")
       }
 
       throw e // fails the build and prints stack trace
