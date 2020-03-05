@@ -84,7 +84,7 @@ timeout(time: 30, unit: 'MINUTES') {
 
       stage("Clean") {
           sh "docker images"
-          sh 'docker rmi -f $(docker images -f "reference=openwhisk/*" -q) || true'
+          sh 'docker rmi -f $(docker images -f "reference=ibmfunctions/*" -q) || true'
           sh "docker images"
       } // stage
 
