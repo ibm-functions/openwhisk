@@ -20,7 +20,7 @@
 // "${PagerDuty}", {"true","false"}
 // "${PagerDutyEndpointURL}", {"https://events.pagerduty.com/...."}
 
-def sendToPagerDuty(msg) {
+def sendPagerDutyEvent(msg) {
 
       // PagerDuty settings
       def pdEndpoint = "${PagerDutyEndpointURL}"
@@ -48,65 +48,61 @@ def sendToPagerDuty(msg) {
                                  url: pdEndpoint
 
       if (response.status != 200) {
-        println("Request to send PD alert failed rc=" + response.status + "text=" + response.content)
+        println("Error: Request to send PD alert failed rc=" + response.status + "text=" + response.content)
       }
 */
+} // end sendPagerDutyEvent
 
 
+timeout(time: 30, unit: 'MINUTES') {
+  node('cf_slave') {
+    sh "env"
+    sh "docker version"
+    sh "docker info"
 
-} // end sendToPagerDuty
+    checkout scm
 
+    try {
 
+      stage("Build and Deploy to DockerHub") {
 
-node('cf_slave') {
-  sh "env"
-  sh "docker version"
-  sh "docker info"
+          println("PagerDuty=${PagerDuty}")
 
-  checkout scm
+          sendPagerDutyEvent("OpenWhisk-DockerHub started - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
 
-  try {
+          withCredentials([usernamePassword(credentialsId: 'openwhisk_dockerhub', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
+              sh 'docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}'
+          }
+          def PUSH_CMD = "./gradlew :core:controller:distDocker :core:invoker:distDocker :core:standalone:distDocker :core:monitoring:user-events:distDocker :tools:ow-utils:distDocker :core:cosmos:cache-invalidator:distDocker -PdockerRegistry=docker.io -PdockerImagePrefix=ibmfunctions"
+          def gitCommit = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
+          def shortCommit = gitCommit.take(7)
+          sh "./gradlew clean"
+          sh "${PUSH_CMD} -PdockerImageTag=nightly"
+          sh "${PUSH_CMD} -PdockerImageTag=${shortCommit}"
+      }
 
-    stage("Build and Deploy to DockerHub") {
+      stage("Clean") {
+        sh "docker images"
+        sh 'docker rmi -f $(docker images -f "reference=openwhisk/*" -q) || true'
+        sh "docker images"
+      }
 
-        println("PagerDuty=${PagerDuty}")
+      stage("Notify") {
+        println("Done.")
+      }
 
-        sendToPagerDuty("OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
+    } catch (e) {
 
+      if ("${PagerDuty}" != 'false') {
+        println("Error: Problem during build, prepare and send a PagerDuty alert.")
+        sendPagerDutyEvent("OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
+      } else {
+        println("PagerDuty alert skipped")
+      }
 
-        withCredentials([usernamePassword(credentialsId: 'openwhisk_dockerhub', passwordVariable: 'DOCKER_PASSWORD', usernameVariable: 'DOCKER_USER')]) {
-            sh 'docker login -u ${DOCKER_USER} -p ${DOCKER_PASSWORD}'
-        }
-        def PUSH_CMD = "./gradlew :core:controller:distDocker :core:invoker:distDocker :core:standalone:distDocker :core:monitoring:user-events:distDocker :tools:ow-utils:distDocker :core:cosmos:cache-invalidator:distDocker -PdockerRegistry=docker.io -PdockerImagePrefix=ibmfunctions"
-        def gitCommit = sh(returnStdout: true, script: 'git rev-parse HEAD').trim()
-        def shortCommit = gitCommit.take(7)
-        sh "./gradlew clean"
-        sh "${PUSH_CMD} -PdockerImageTag=nightly"
-        sh "${PUSH_CMD} -PdockerImageTag=${shortCommit}"
-    }
+      throw e // fails the build and prints stack trace
 
-    stage("Clean") {
-      sh "docker images"
-      sh 'docker rmi -f $(docker images -f "reference=openwhisk/*" -q) || true'
-      sh "docker images"
-    }
+    } /* end catch */
 
-    stage("Notify") {
-      println("Done.")
-    }
-
-  } catch (e) {
-
-    if ("${PagerDuty}" != 'false') {
-
-      println("Error: Problem during build, prepare and send a PagerDuty alert.")
-
-      sendToPagerDuty("OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
-
-    } else {
-      println("PagerDuty alert skipped")
-    }
-
-  } /* end catch */
-
-}
+  } // node
+} // timeout
