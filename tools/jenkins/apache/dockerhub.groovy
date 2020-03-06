@@ -90,7 +90,7 @@ timeout(time: 30, unit: 'MINUTES') {
 
       stage("Notify") {
           if ("${PagerDuty}" != 'false') {
-            println("Everythin is ok, I resolve a possible pending PD alert.")
+            println("Everything is ok, I resolve a possible pending PD alert.")
             sendPagerDutyEvent("resolve","OpenWhisk-DockerHub completed ok - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
           } else {
             println("PagerDuty alert resolve skipped.")
