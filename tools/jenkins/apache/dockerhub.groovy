@@ -25,7 +25,7 @@
 // Trigger a PD event with message ${msg} using api endpoint ${PagerDutyEndpointURL}
 def sendPagerDutyEvent(event_type, msg) {
 
-
+    // We only do send to PD if varaible PagerDuty is not 'false'
     if ("${PagerDuty}" != 'false') {
 
       // PagerDuty settings
@@ -36,16 +36,13 @@ def sendPagerDutyEvent(event_type, msg) {
           "description": msg
       ]
 
-      println("Sending PD event ${event_type} to ${pdEndpoint}")
-
+      println("Sending PagerDuty event ${event_type} to ${pdEndpoint}")
       println("pdRequest=" + pdRequest)
 
       // get PD service key
       withCredentials([[$class: 'StringBinding', credentialsId: 'PD_SERVICE_KEY_CICD', variable: 'pdServiceKey']]) {
           pdRequest["service_key"] = env.pdServiceKey
       }
-
-      println("pdRequest=" + pdRequest)
 
       // send request to PD api and get response
       def response = httpRequest consoleLogResponseBody: true,
@@ -57,14 +54,11 @@ def sendPagerDutyEvent(event_type, msg) {
       if (response.status != 200) {
         println("Error: A request sent to PD failed with response.status=" + response.status + "text=" + response.content)
         println("       Full response" + response)
-      }
-
+      } // if
 
     } else {
-      println("PagerDuty alert ${event_type} trigger skipped.")
+      println("Sending PagerDuty event ${event_type} skipped (PagerDuty=${PagerDuty}).")
     } // if
-
-
 
 } // end sendPagerDutyEvent
 
