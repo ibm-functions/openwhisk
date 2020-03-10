@@ -25,6 +25,9 @@
 // Trigger a PD event with message ${msg} using api endpoint ${PagerDutyEndpointURL}
 def sendPagerDutyEvent(event_type, msg) {
 
+
+    if ("${PagerDuty}" != 'false') {
+
       // PagerDuty settings
       def pdEndpoint = "${PagerDutyEndpointURL}"
       def pdRequest = [
@@ -33,7 +36,7 @@ def sendPagerDutyEvent(event_type, msg) {
           "description": msg
       ]
 
-      println("Sending PD event to ${pdEndpoint}")
+      println("Sending PD event ${event_type} to ${pdEndpoint}")
 
       println("pdRequest=" + pdRequest)
 
@@ -55,6 +58,13 @@ def sendPagerDutyEvent(event_type, msg) {
         println("Error: A request sent to PD failed with response.status=" + response.status + "text=" + response.content)
         println("       Full response" + response)
       }
+
+
+    } else {
+      println("PagerDuty alert ${event_type} trigger skipped.")
+    } // if
+
+
 
 } // end sendPagerDutyEvent
 
@@ -89,22 +99,14 @@ timeout(time: 30, unit: 'MINUTES') {
       } // stage
 
       stage("Notify") {
-          if ("${PagerDuty}" != 'false') {
-            println("Everything is ok, I resolve a possible pending PD alert.")
-            sendPagerDutyEvent("resolve","OpenWhisk-DockerHub completed ok - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
-          } else {
-            println("PagerDuty alert resolve skipped.")
-          } // if
+          println("Everything is ok, I resolve a possible pending PD alert.")
+          sendPagerDutyEvent("resolve","OpenWhisk-DockerHub completed ok - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
       } // stage
 
     } catch (e) {
 
-      if ("${PagerDuty}" != 'false') {
-        println("Error: Problem during build, I prepare and trigger a PagerDuty alert.")
-        sendPagerDutyEvent("trigger","OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
-      } else {
-        println("PagerDuty alert trigger skipped.")
-      }
+      println("Error: Exception, problem during build!")
+      sendPagerDutyEvent("trigger","OpenWhisk-DockerHub is unstable / failed - See Build ${env.BUILD_NUMBER} for details - ${env.BUILD_URL}")
 
       throw e // fails the build and prints stack trace
 
