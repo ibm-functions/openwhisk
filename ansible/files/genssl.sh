@@ -42,7 +42,8 @@ function gen_csr(){
   openssl req -new \
       -key "$SCRIPTDIR/${NAME_PREFIX}openwhisk-server-key.pem" \
       -nodes \
-      -subj "/C=US/ST=NY/L=Yorktown/O=OpenWhisk/CN=$CN" \
+      -subj "/C=US/ST=NY/L=Yorktown/O=OpenWhisk/CN=openwhisk" \
+      -addext "subjectAltName=DNS:$CN" \
       -out "$SCRIPTDIR/${NAME_PREFIX}openwhisk-server-request.csr"
 }
 function gen_cert(){
@@ -101,7 +102,8 @@ else
     openssl req -new \
     -key "$SCRIPTDIR/openwhisk-client-ca-key.pem" \
     -passin pass:$PASSWORD \
-    -subj "/C=US/ST=NY/L=Yorktown/O=OpenWhisk/CN=$CN" \
+    -subj "/C=US/ST=NY/L=Yorktown/O=OpenWhisk/CN=openwhisk" \
+    -addext "subjectAltName=DNS:$CN" \
     -out "$SCRIPTDIR/openwhisk-client-ca.csr"
 
     echo generating client ca pem
