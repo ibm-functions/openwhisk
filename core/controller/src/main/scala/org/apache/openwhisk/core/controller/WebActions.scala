@@ -60,6 +60,11 @@ import org.apache.openwhisk.http.LenientSprayJsonSupport._
 import org.apache.openwhisk.spi.SpiLoader
 import org.apache.openwhisk.utils.JsHelpers._
 import org.apache.openwhisk.core.entity.Exec
+import pureconfig._
+import pureconfig.generic.auto._
+
+// the supported media types for action response
+final case class WebActionsConfig(filter: Boolean, headerField: String, domainSuffix: String, fallbackMediaType: String)
 
 protected[controller] sealed class WebApiDirectives(prefix: String = "__ow_") {
   // enforce the presence of an extension (e.g., .http) in the URI path
@@ -106,12 +111,15 @@ private case class Context(propertyMap: WebApiDirectives,
   // attach the body to the Context
   def withBody(b: Option[JsValue]) = Context(propertyMap, method, headers, path, query, b)
 
-  def metadata(user: Option[Identity]): Map[String, JsValue] = {
+  def metadata(user: Option[Identity], removeCookies: Boolean = false): Map[String, JsValue] = {
     Map(
       propertyMap.method -> method.value.toLowerCase.toJson,
       propertyMap.headers -> headers
         .collect {
-          case h if h.name != `Timeout-Access`.name => h.lowercaseName -> h.value
+          case h if h.name != `Timeout-Access`.name && (!removeCookies || h.lowercaseName != Cookie.lowercaseName) => {
+            //case h if h.name != `Timeout-Access`.name => {
+            h.lowercaseName -> h.value
+          }
         }
         .toMap
         .toJson,
@@ -119,7 +127,9 @@ private case class Context(propertyMap: WebApiDirectives,
       user.map(u => propertyMap.namespace -> u.namespace.name.asString.toJson)
   }
 
-  def toActionArgument(user: Option[Identity], boxQueryAndBody: Boolean): Map[String, JsValue] = {
+  def toActionArgument(user: Option[Identity],
+                       boxQueryAndBody: Boolean,
+                       removeCookies: Boolean = false): Map[String, JsValue] = {
     val queryParams = if (boxQueryAndBody) {
       Map(propertyMap.query -> JsString(query.toString))
     } else {
@@ -137,8 +147,11 @@ private case class Context(propertyMap: WebApiDirectives,
     }
 
     // precedence order is: query params -> body (last wins)
-    metadata(user) ++ queryParams ++ bodyParams
+    metadata(user, removeCookies) ++ queryParams ++ bodyParams
   }
+
+  private def removeCookieHeader(headers: List[RawHeader]) =
+    headers.filter(_.lowercaseName != Cookie.lowercaseName)
 }
 
 protected[core] object WhiskWebActionsApi extends Directives {
@@ -379,6 +392,16 @@ trait WhiskWebActionsApi
     with CorsSettings.WebActions {
   services: WhiskServices =>
 
+  private val blueAuthConfigNamespace = "whisk.blueauth"
+  private val webActionsConfig = loadConfig[WebActionsConfig](blueAuthConfigNamespace).toOption
+  private val filterWebActions = webActionsConfig.map(_.filter).getOrElse(true)
+  private val filterWebActionsHeaderField = webActionsConfig.map(_.headerField).getOrElse("host")
+  //private val filterWebActionsHostDomainSuffix = webActionsConfig.map(_.domainSuffix).getOrElse("cloud.ibm.com")
+  private val filterWebActionsHostDomainSuffix = webActionsConfig.map(_.domainSuffix).getOrElse("appdomain.cloud")
+  private val filterWebActionsFallbackMediaType = webActionsConfig.map(_.fallbackMediaType).getOrElse(".text")
+  System.out.println(
+    s"#########StR filterWebActions: ${filterWebActions}, filterWebActionsHeaderField: ${filterWebActionsHeaderField}, filterWebActionsHostDomainSuffix: ${filterWebActionsHostDomainSuffix}, filterWebActionsFallbackMediaType: ${filterWebActionsFallbackMediaType}")
+
   /** API path invocation path for posting activations directly through the host. */
   protected val webInvokePathSegments: Seq[String]
 
@@ -617,7 +640,7 @@ trait WhiskWebActionsApi
                              context: Context,
                              isRawHttpAction: Boolean)(implicit transid: TransactionId) = {
 
-    def queuedActivation = {
+    def queuedActivation(removeCookies: Boolean = false) = {
       // checks (1) if any of the query or body parameters override final action parameters
       // computes overrides if any relative to the reserved __ow_* properties, and (2) if
       // action is a raw http handler
@@ -627,14 +650,35 @@ trait WhiskWebActionsApi
       // they will be overwritten
       if (isRawHttpAction || context
             .overrides(webApiDirectives.reservedProperties ++ action.immutableParameters)) {
-        val content = context.toActionArgument(onBehalfOf, isRawHttpAction)
+
+        for ((k, v) <- context.metadata(onBehalfOf))
+          logging.info(this, s"#########StR context.metadata(onBehalfOf) key: $k, value: $v")
+
+        val content = context.toActionArgument(onBehalfOf, isRawHttpAction, removeCookies)
+
+        for ((k, v) <- content)
+          logging.info(this, s"#########StR action params key: $k, value: $v")
+
         invokeAction(actionOwnerIdentity, action, Some(JsObject(content)), maxWaitForWebActionResult, cause = None)
       } else {
         Future.failed(RejectRequest(BadRequest, Messages.parametersNotAllowed))
       }
     }
 
-    completeRequest(queuedActivation, responseType)
+    val originatedFromFilteredHostDomain =
+      if (filterWebActions) context.headers.find(_.lowercaseName == filterWebActionsHeaderField) match {
+        case Some(header) =>
+          header.value.endsWith((filterWebActionsHostDomainSuffix))
+        case None => false
+      } else false
+    System.out.println(s"#########StR originatedFromFilteredHostDomain: ${originatedFromFilteredHostDomain}")
+
+    //private val defaultMediaTranscoder: MediaExtension = mediaTranscoders.find(_.extension == ".http").get
+    val responseTypeOrFallback =
+      if (originatedFromFilteredHostDomain && responseType.extension == ".html")
+        WhiskWebActionsApi.mediaTranscoders.find(_.extension == filterWebActionsFallbackMediaType).get
+      else responseType
+    completeRequest(queuedActivation(originatedFromFilteredHostDomain), responseTypeOrFallback)
   }
 
   private def completeRequest(queuedActivation: Future[Either[ActivationId, WhiskActivation]],
