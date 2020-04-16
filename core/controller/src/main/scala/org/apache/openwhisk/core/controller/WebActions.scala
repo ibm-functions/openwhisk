@@ -695,27 +695,31 @@ trait WhiskWebActionsApi
       }
     }
 
-    val isOriginatedFromFilteredHostDomain =
-      if (filterWebActionsEnabled) context.headers.find(_.lowercaseName == filterWebActionsHeaderField) match {
+    // 1) filter out cookie field from request header if:
+    // - web actions filtering is enabled
+    // - request is originated from configured filtered domain (default is cloud.ibm.com)
+    // 2) fall back to configured response type (content-type), default is text/plain if:
+    // - web actions filtering is enabled
+    // - request is originated from configured filtered domain (default domain is cloud.ibm.com)
+    // - content-type text/html is requested by content extension .html
+    // - response body is interpreted as text/html for content extension .http
+
+    val filterWebAction =
+      filterWebActionsEnabled && (context.headers.find(_.lowercaseName == filterWebActionsHeaderField) match {
         case Some(header) =>
           header.value.endsWith((filterWebActionsHostDomainSuffix))
         case None => false
-      } else false
-    System.out.println(s"#########StR isOriginatedFromFilteredHostDomain: ${isOriginatedFromFilteredHostDomain}")
+      }) && !(filterWebActionsWhitelistedNamespaces
+        .split(",")
+        .exists(_.equals(actionOwnerIdentity.namespace.name.asString)))
+    System.out.println(s"#########StR filterWebAction: ${filterWebAction}")
 
-    // fall back to response type (content-type) applicaion/json if request is originated from filtered domain and
-    // either .html or .http is requested
-    // reason is taht for request type/extension .http not only the returned body is evaluated,
-    // but also the headers and the statusCode fields if returned by the action code
-    // depending on the values of these fields either text/html, application/json or HTTP/1.1 204 No Content is returned
-    // adapting also the way we handle responses requested by extension .http would be confusing
-    // the better approach is to return application/json for extensions .html and .http
     val responseTypeFallback =
-      if (isOriginatedFromFilteredHostDomain && (WhiskWebActionsApi.isHtmlExtension(responseType) || WhiskWebActionsApi
+      if (filterWebAction && (WhiskWebActionsApi.isHtmlExtension(responseType) || WhiskWebActionsApi
             .isHttpExtension(responseType)))
         Some(WhiskWebActionsApi.mediaTranscoderByExtension(filterWebActionsFallbackMediaType))
       else None
-    completeRequest(queuedActivation(isOriginatedFromFilteredHostDomain), responseType, responseTypeFallback)
+    completeRequest(queuedActivation(filterWebAction), responseType, responseTypeFallback)
   }
 
   private def completeRequest(queuedActivation: Future[Either[ActivationId, WhiskActivation]],
