@@ -40,7 +40,7 @@ import akka.http.scaladsl.model.headers.`Timeout-Access`
 import akka.http.scaladsl.model.ContentType
 import akka.http.scaladsl.model.ContentTypes
 import akka.http.scaladsl.model.FormData
-import akka.http.scaladsl.model.HttpMethods.OPTIONS
+import akka.http.scaladsl.model.HttpMethods.{OPTIONS}
 import akka.http.scaladsl.model.HttpCharsets
 import akka.http.scaladsl.model.HttpResponse
 import spray.json._
@@ -63,7 +63,6 @@ import org.apache.openwhisk.core.entity.Exec
 import pureconfig._
 import pureconfig.generic.auto._
 
-// the supported media types for action response
 final case class WebActionsFilterConfig(enabled: Boolean,
                                         headerField: String,
                                         domainSuffix: String,
@@ -115,13 +114,12 @@ private case class Context(propertyMap: WebApiDirectives,
   // attach the body to the Context
   def withBody(b: Option[JsValue]) = Context(propertyMap, method, headers, path, query, b)
 
-  def metadata(user: Option[Identity], removeCookies: Boolean = false): Map[String, JsValue] = {
+  def metadata(user: Option[Identity], keepCookies: Boolean = true): Map[String, JsValue] = {
     Map(
       propertyMap.method -> method.value.toLowerCase.toJson,
       propertyMap.headers -> headers
         .collect {
-          case h if h.name != `Timeout-Access`.name && (!removeCookies || h.lowercaseName != Cookie.lowercaseName) => {
-            //case h if h.name != `Timeout-Access`.name => {
+          case h if h.name != `Timeout-Access`.name && (keepCookies || h.lowercaseName != Cookie.lowercaseName) => {
             h.lowercaseName -> h.value
           }
         }
@@ -133,7 +131,7 @@ private case class Context(propertyMap: WebApiDirectives,
 
   def toActionArgument(user: Option[Identity],
                        boxQueryAndBody: Boolean,
-                       removeCookies: Boolean = false): Map[String, JsValue] = {
+                       keepCookies: Boolean = true): Map[String, JsValue] = {
     val queryParams = if (boxQueryAndBody) {
       Map(propertyMap.query -> JsString(query.toString))
     } else {
@@ -151,7 +149,7 @@ private case class Context(propertyMap: WebApiDirectives,
     }
 
     // precedence order is: query params -> body (last wins)
-    metadata(user, removeCookies) ++ queryParams ++ bodyParams
+    metadata(user, keepCookies) ++ queryParams ++ bodyParams
   }
 
   private def removeCookieHeader(headers: List[RawHeader]) =
@@ -423,14 +421,14 @@ trait WhiskWebActionsApi
 
   private val webActionsFilterConfigNamespace = "whisk.webactions.filter"
   private val webActionsFilterConfig = loadConfig[WebActionsFilterConfig](webActionsFilterConfigNamespace).toOption
-  private val filterWebActionsEnabled = webActionsFilterConfig.map(_.enabled).getOrElse(true)
+  private val filterWebActionsEnabled = webActionsFilterConfig.map(_.enabled).getOrElse(false)
   private val filterWebActionsHeaderField = webActionsFilterConfig.map(_.headerField).getOrElse("host")
-  //private val filterWebActionsHostDomainSuffix = webActionsConfig.map(_.domainSuffix).getOrElse("cloud.ibm.com")
-  private val filterWebActionsHostDomainSuffix = webActionsFilterConfig.map(_.domainSuffix).getOrElse("appdomain.cloud")
+  private val filterWebActionsHostDomainSuffix = webActionsFilterConfig.map(_.domainSuffix).getOrElse("cloud.ibm.com")
   private val filterWebActionsFallbackMediaType = webActionsFilterConfig.map(_.fallbackMediaType).getOrElse(".text")
   private val filterWebActionsWhitelistedNamespaces = webActionsFilterConfig.map(_.whitelistedNamespaces).getOrElse("")
-  System.out.println(
-    s"#########StR filterWebActionsEnabled: ${filterWebActionsEnabled}, filterWebActionsHeaderField: ${filterWebActionsHeaderField}, filterWebActionsHostDomainSuffix: ${filterWebActionsHostDomainSuffix}, filterWebActionsFallbackMediaType: ${filterWebActionsFallbackMediaType}, filterWebActionsWhitelistedNamespaces: ${filterWebActionsWhitelistedNamespaces}")
+  logging.info(
+    this,
+    s"filterWebActionsEnabled: ${filterWebActionsEnabled}, filterWebActionsHeaderField: ${filterWebActionsHeaderField}, filterWebActionsHostDomainSuffix: ${filterWebActionsHostDomainSuffix}, filterWebActionsFallbackMediaType: ${filterWebActionsFallbackMediaType}, filterWebActionsWhitelistedNamespaces: ${filterWebActionsWhitelistedNamespaces}")
 
   /** API path invocation path for posting activations directly through the host. */
   protected val webInvokePathSegments: Seq[String]
@@ -670,7 +668,7 @@ trait WhiskWebActionsApi
                              context: Context,
                              isRawHttpAction: Boolean)(implicit transid: TransactionId) = {
 
-    def queuedActivation(removeCookies: Boolean = false) = {
+    def queuedActivation(keepCookies: Boolean = true) = {
       // checks (1) if any of the query or body parameters override final action parameters
       // computes overrides if any relative to the reserved __ow_* properties, and (2) if
       // action is a raw http handler
@@ -680,15 +678,7 @@ trait WhiskWebActionsApi
       // they will be overwritten
       if (isRawHttpAction || context
             .overrides(webApiDirectives.reservedProperties ++ action.immutableParameters)) {
-
-        for ((k, v) <- context.metadata(onBehalfOf))
-          logging.info(this, s"#########StR context.metadata(onBehalfOf) key: $k, value: $v")
-
-        val content = context.toActionArgument(onBehalfOf, isRawHttpAction, removeCookies)
-
-        for ((k, v) <- content)
-          logging.info(this, s"#########StR action params key: $k, value: $v")
-
+        val content = context.toActionArgument(onBehalfOf, isRawHttpAction, keepCookies)
         invokeAction(actionOwnerIdentity, action, Some(JsObject(content)), maxWaitForWebActionResult, cause = None)
       } else {
         Future.failed(RejectRequest(BadRequest, Messages.parametersNotAllowed))
@@ -701,8 +691,8 @@ trait WhiskWebActionsApi
     // 2) fall back to configured response type (content-type), default is text/plain if:
     // - web actions filtering is enabled
     // - request is originated from configured filtered domain (default domain is cloud.ibm.com)
-    // - content-type text/html is requested by content extension .html
-    // - response body is interpreted as text/html for content extension .http
+    // - url extension is '.html' i.e. content-type text/html is requested
+    // - url extension is '.http' or -none- and the response body returned by the action code is interpreted as text/html
 
     val filterWebAction =
       filterWebActionsEnabled && (context.headers.find(_.lowercaseName == filterWebActionsHeaderField) match {
@@ -712,14 +702,12 @@ trait WhiskWebActionsApi
       }) && !(filterWebActionsWhitelistedNamespaces
         .split(",")
         .exists(_.equals(actionOwnerIdentity.namespace.name.asString)))
-    System.out.println(s"#########StR filterWebAction: ${filterWebAction}")
-
     val responseTypeFallback =
       if (filterWebAction && (WhiskWebActionsApi.isHtmlExtension(responseType) || WhiskWebActionsApi
             .isHttpExtension(responseType)))
         Some(WhiskWebActionsApi.mediaTranscoderByExtension(filterWebActionsFallbackMediaType))
       else None
-    completeRequest(queuedActivation(filterWebAction), responseType, responseTypeFallback)
+    completeRequest(queuedActivation(!filterWebAction), responseType, responseTypeFallback)
   }
 
   private def completeRequest(queuedActivation: Future[Either[ActivationId, WhiskActivation]],
