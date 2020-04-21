@@ -425,10 +425,14 @@ trait WhiskWebActionsApi
   private val filterWebActionsHeaderField = webActionsFilterConfig.map(_.headerField).getOrElse("host")
   private val filterWebActionsHostDomainSuffix = webActionsFilterConfig.map(_.domainSuffix).getOrElse("cloud.ibm.com")
   private val filterWebActionsFallbackMediaType = webActionsFilterConfig.map(_.fallbackMediaType).getOrElse(".text")
-  private val filterWebActionsWhitelistedNamespaces = webActionsFilterConfig.map(_.whitelistedNamespaces).getOrElse("")
+  private val filterWebActionsWhitelistedNamespacesFromEnvironment =
+    webActionsFilterConfig.map(_.whitelistedNamespaces).getOrElse("None")
+  private val filterWebActionsWhitelistedNamespaces =
+    if (filterWebActionsWhitelistedNamespacesFromEnvironment.equals("None")) ""
+    else filterWebActionsWhitelistedNamespacesFromEnvironment
   logging.info(
     this,
-    s"filterWebActionsEnabled: ${filterWebActionsEnabled}, filterWebActionsHeaderField: ${filterWebActionsHeaderField}, filterWebActionsHostDomainSuffix: ${filterWebActionsHostDomainSuffix}, filterWebActionsFallbackMediaType: ${filterWebActionsFallbackMediaType}, filterWebActionsWhitelistedNamespaces: ${filterWebActionsWhitelistedNamespaces}")
+    s"webActionsFilterConfigNamespace: ${webActionsFilterConfigNamespace}, webActionsFilterConfig: ${webActionsFilterConfig}, filterWebActionsEnabled: ${filterWebActionsEnabled}, filterWebActionsHeaderField: ${filterWebActionsHeaderField}, filterWebActionsHostDomainSuffix: ${filterWebActionsHostDomainSuffix}, filterWebActionsFallbackMediaType: ${filterWebActionsFallbackMediaType}, filterWebActionsWhitelistedNamespaces: ${filterWebActionsWhitelistedNamespaces}")
 
   /** API path invocation path for posting activations directly through the host. */
   protected val webInvokePathSegments: Seq[String]
