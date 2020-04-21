@@ -299,9 +299,7 @@ protected[core] object WhiskWebActionsApi extends Directives {
 
       body.collect {
         case JsString(str) if str.nonEmpty =>
-          if (responseTypeFallback.isEmpty) interpretHttpResponse(code.getOrElse(OK), headers, str, transid)
-          else
-            responseTypeFallback.get.transcoder(result, transid, rp, None)
+          interpretHttpResponse(code.getOrElse(OK), headers, str, result, transid, rp, responseTypeFallback)
         case JsString(str) /* str.isEmpty */ => respondWithEmptyEntity(code.getOrElse(NoContent), headers)
         case js if js != JsNull              => interpretHttpResponseAsJson(code.getOrElse(OK), headers, js, transid)
       } getOrElse respondWithEmptyEntity(code.getOrElse(NoContent), headers)
@@ -379,32 +377,44 @@ protected[core] object WhiskWebActionsApi extends Directives {
     }
   }
 
-  private def interpretHttpResponse(code: StatusCode, headers: List[RawHeader], str: String, transid: TransactionId) = {
-    findContentTypeInHeader(headers, transid, `text/html`).flatMap { mediaType =>
-      val ct = ContentType(mediaType, () => HttpCharsets.`UTF-8`)
-      ct match {
-        // TODO: remove this extract check for base64 on json response
-        // this is here for legacy reasons to not brake old webactions returning base64 json that have not migrated yet
-        case nonbinary: ContentType.NonBinary if (isJsonFamily(mediaType) && Exec.isBinaryCode(str)) =>
-          Try(Base64.getDecoder().decode(str)).map(HttpEntity(ct, _))
-        case nonbinary: ContentType.NonBinary => Success(HttpEntity(nonbinary, str))
+  private def interpretHttpResponse(code: StatusCode,
+                                    headers: List[RawHeader],
+                                    str: String,
+                                    result: JsValue,
+                                    transid: TransactionId,
+                                    rp: WebApiDirectives,
+                                    responseTypeFallback: Option[MediaExtension] = None) = {
+    val mt = findContentTypeInHeader(headers, transid, `text/html`)
+    // fallback to configured response type if set and internet media type is requested in action response or as default
+    if (mt.isSuccess && mt.get == `text/html` && responseTypeFallback.isDefined)
+      responseTypeFallback.get.transcoder(result, transid, rp, None)
+    else
+      mt.flatMap { mediaType =>
+        //findContentTypeInHeader(headers, transid, `text/html`).flatMap { mediaType =>
+        val ct = ContentType(mediaType, () => HttpCharsets.`UTF-8`)
+        ct match {
+          // TODO: remove this extract check for base64 on json response
+          // this is here for legacy reasons to not brake old webactions returning base64 json that have not migrated yet
+          case nonbinary: ContentType.NonBinary if (isJsonFamily(mediaType) && Exec.isBinaryCode(str)) =>
+            Try(Base64.getDecoder().decode(str)).map(HttpEntity(ct, _))
+          case nonbinary: ContentType.NonBinary => Success(HttpEntity(nonbinary, str))
 
-        // because of the default charset provided to the content type constructor
-        // the remaining content types to match against are binary at this point
-        case _ /* ContentType.Binary */ => Try(Base64.getDecoder().decode(str)).map(HttpEntity(ct, _))
-      }
-    } match {
-      case Success(entity) =>
-        respondWithHeaders(removeContentTypeHeader(headers)) {
-          complete(code, entity)
+          // because of the default charset provided to the content type constructor
+          // the remaining content types to match against are binary at this point
+          case _ /* ContentType.Binary */ => Try(Base64.getDecoder().decode(str)).map(HttpEntity(ct, _))
         }
+      } match {
+        case Success(entity) =>
+          respondWithHeaders(removeContentTypeHeader(headers)) {
+            complete(code, entity)
+          }
 
-      case Failure(RejectRequest(code, message)) =>
-        terminate(code, message)(transid, jsonPrettyPrinter)
+        case Failure(RejectRequest(code, message)) =>
+          terminate(code, message)(transid, jsonPrettyPrinter)
 
-      case _ =>
-        terminate(BadRequest, Messages.httpContentTypeError)(transid, jsonPrettyPrinter)
-    }
+        case _ =>
+          terminate(BadRequest, Messages.httpContentTypeError)(transid, jsonPrettyPrinter)
+      }
   }
 
   private def removeContentTypeHeader(headers: List[RawHeader]) =

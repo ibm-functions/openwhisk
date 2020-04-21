@@ -243,7 +243,7 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
 
       val response = RestAssured.given().header("accept", "application/json").config(sslconfig).get(url)
       response.statusCode shouldBe 406
-      response.body.asString should include("Resource representation is only available with these types:\\ntext/html")
+      response.body.asString should include("Resource representation is only available with these types:\\ntext/")
   }
 
   it should "support multiple response header values" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
