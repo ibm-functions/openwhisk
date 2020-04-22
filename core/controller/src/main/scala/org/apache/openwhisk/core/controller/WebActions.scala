@@ -151,9 +151,6 @@ private case class Context(propertyMap: WebApiDirectives,
     // precedence order is: query params -> body (last wins)
     metadata(user, keepCookies) ++ queryParams ++ bodyParams
   }
-
-  private def removeCookieHeader(headers: List[RawHeader]) =
-    headers.filter(_.lowercaseName != Cookie.lowercaseName)
 }
 
 protected[core] object WhiskWebActionsApi extends Directives {
@@ -209,7 +206,7 @@ protected[core] object WhiskWebActionsApi extends Directives {
                            transid: TransactionId,
                            rp: WebApiDirectives,
                            responseTypeFallback: Option[MediaExtension] = None) = {
-    if (responseTypeFallback.isEmpty) {
+    responseTypeFallback.map(_.transcoder(result, transid, rp, None)).getOrElse {
       val htmlResult = result match {
         case JsObject(fields) => fields.get("body").orElse(fields.get("html")).getOrElse(JsNull)
         case _                => result
@@ -219,7 +216,7 @@ protected[core] object WhiskWebActionsApi extends Directives {
         case JsString(html) => complete(HttpEntity(ContentTypes.`text/html(UTF-8)`, html))
         case _              => terminate(BadRequest, Messages.invalidMedia(`text/html`))(transid, jsonPrettyPrinter)
       }
-    } else responseTypeFallback.get.transcoder(result, transid, rp, None)
+    }
   }
 
   private def resultAsSvg(result: JsValue,
@@ -713,9 +710,9 @@ trait WhiskWebActionsApi
         case Some(header) =>
           header.value.endsWith((filterWebActionsHostDomainSuffix))
         case None => false
-      }) && !(filterWebActionsWhitelistedNamespaces
+      }) && filterWebActionsWhitelistedNamespaces
         .split(",")
-        .exists(_.equals(actionOwnerIdentity.namespace.name.asString)))
+        .forall(!_.equals(actionOwnerIdentity.namespace.name.asString))
     val responseTypeFallback =
       if (filterWebAction && (WhiskWebActionsApi.isHtmlExtension(responseType) || WhiskWebActionsApi
             .isHttpExtension(responseType)))
