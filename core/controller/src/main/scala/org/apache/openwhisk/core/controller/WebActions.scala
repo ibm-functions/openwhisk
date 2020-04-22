@@ -382,8 +382,9 @@ protected[core] object WhiskWebActionsApi extends Directives {
                                     rp: WebApiDirectives,
                                     responseTypeFallback: Option[MediaExtension] = None) = {
     val mt = findContentTypeInHeader(headers, transid, `text/html`)
-    // fallback to configured response type if set and internet media type is requested in action response or as default
-    if (mt.isSuccess && mt.get == `text/html` && responseTypeFallback.isDefined)
+    // fallback to configured response type if set and internet media type is requested
+    if (mt.isSuccess && responseTypeFallback.isDefined && (mt.get == `text/html` || mt.get.value.equals(
+          "application/xhtml+xml")))
       responseTypeFallback.get.transcoder(result, transid, rp, None)
     else
       mt.flatMap { mediaType =>
