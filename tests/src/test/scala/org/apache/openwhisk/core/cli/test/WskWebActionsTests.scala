@@ -102,9 +102,20 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
       }
 
       val response = RestAssured.given().header("cookie", "USER_TOKEN=yes;USER_TOKEN2=no").config(sslconfig).get(url)
+
       response.statusCode shouldBe 200
       response.header("Content-type") shouldBe "application/json"
-      println(s"response.body.asString: ${response.body.asString}")
+
+      val __ow_headers = response.body.asString.parseJson.asJsObject.fields("__ow_headers")
+      val __ow_method = response.body.asString.parseJson.asJsObject.fields("__ow_method")
+      val __ow_path = response.body.asString.parseJson.asJsObject.fields("__ow_path")
+      val env =
+        response.body.asString.parseJson.asJsObject
+          .fields("env")
+          .asJsObject
+          .fields
+          .filter(!_._1.equals("__OW_API_KEY"))
+      println(s"__ow_headers: ${__ow_headers}, __ow_method: ${__ow_method}, __ow_path: ${__ow_path}, env: ${env})")
       response.body.asString.parseJson.asJsObject
         .fields("__ow_headers")
         .asJsObject
