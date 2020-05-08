@@ -39,11 +39,31 @@ then
 fi
 function gen_csr(){
   echo generating server certificate request
-  openssl req -new \
-      -key "$SCRIPTDIR/${NAME_PREFIX}openwhisk-server-key.pem" \
-      -nodes \
-      -subj "/C=US/ST=NY/L=Yorktown/O=OpenWhisk/CN=$CN" \
-      -out "$SCRIPTDIR/${NAME_PREFIX}openwhisk-server-request.csr"
+
+  if [[ ${#CN} -le 64 ]]; then
+    echo "generate certificate for domain name <= 64 characters CN=${CN}."
+
+    openssl req -new \
+        -key "$SCRIPTDIR/${NAME_PREFIX}openwhisk-server-key.pem" \
+        -nodes \
+        -subj "/C=US/ST=NY/L=Yorktown/O=OpenWhisk/CN=$CN" \
+        -out "$SCRIPTDIR/${NAME_PREFIX}openwhisk-server-request.csr"
+
+  else
+
+    echo "generate certificate for domain name > 64 characters CN=${CN}."
+
+    openssl req -new \
+        -key "$SCRIPTDIR/${NAME_PREFIX}openwhisk-server-key.pem" \
+        -nodes \
+        -subj "/C=US/ST=NY/L=Yorktown/O=OpenWhisk" \
+        -reqexts SAN \
+        -config <(cat /etc/ssl/openssl.cnf \
+            <(echo -e "\n[SAN]\nsubjectAltName=DNS:$CN")) \
+        -out "$SCRIPTDIR/${NAME_PREFIX}openwhisk-server-request.csr"
+
+  fi
+
 }
 function gen_cert(){
   echo generating self-signed password-less server certificate
@@ -98,11 +118,31 @@ else
     openssl genrsa -aes256 -passout pass:$PASSWORD -out "$SCRIPTDIR/openwhisk-client-ca-key.pem" 2048
 
     echo generating client ca request
-    openssl req -new \
-    -key "$SCRIPTDIR/openwhisk-client-ca-key.pem" \
-    -passin pass:$PASSWORD \
-    -subj "/C=US/ST=NY/L=Yorktown/O=OpenWhisk/CN=$CN" \
-    -out "$SCRIPTDIR/openwhisk-client-ca.csr"
+
+    if [[ ${#CN} -le 64 ]]; then
+
+      echo "generating client ca request for domain name <= 64 characters CN=${CN}."
+
+      openssl req -new \
+      -key "$SCRIPTDIR/openwhisk-client-ca-key.pem" \
+      -passin pass:$PASSWORD \
+      -subj "/C=US/ST=NY/L=Yorktown/O=OpenWhisk/CN=$CN" \
+      -out "$SCRIPTDIR/openwhisk-client-ca.csr"
+
+    else
+
+      echo "generating client ca request for domain name > 64 characters CN=${CN}."
+
+      openssl req -new \
+      -key "$SCRIPTDIR/openwhisk-client-ca-key.pem" \
+      -passin pass:$PASSWORD \
+      -subj "/C=US/ST=NY/L=Yorktown/O=OpenWhisk" \
+      -reqexts SAN \
+      -config <(cat /etc/ssl/openssl.cnf \
+        <(echo -e "\n[SAN]\nsubjectAltName=DNS:$CN")) \
+      -out "$SCRIPTDIR/openwhisk-client-ca.csr"
+
+    fi
 
     echo generating client ca pem
     openssl x509 -req \
