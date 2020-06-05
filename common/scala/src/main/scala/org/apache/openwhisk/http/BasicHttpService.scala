@@ -180,7 +180,7 @@ object BasicHttpService {
 
   def attachActivityTracker(instance: AbstractActivityTracker): Unit = { activityTracker = instance }
   def getActivityTracker: AbstractActivityTracker = activityTracker
-  def isActivityTrackerActive: Boolean = if (activityTracker == null) false else getActivityTracker.isActive
+  def isActivityTrackerActive: Boolean = if (getActivityTracker == null) false else getActivityTracker.isActive
 
   /**
    * Starts an HTTP(S) route handler on given port and registers a shutdown hook.
