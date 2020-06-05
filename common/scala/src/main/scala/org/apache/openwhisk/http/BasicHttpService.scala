@@ -80,13 +80,13 @@ trait BasicHttpService extends Directives {
         DebuggingDirectives.logRequest(logRequestInfo _) {
           DebuggingDirectives.logRequestResult(logResponseInfo _) {
             BasicDirectives.mapRequest(req => {
-              if (BasicHttpService.activityTracker.isActive)
+              if (BasicHttpService.isActivityTrackerActive)
                 BasicHttpService.getActivityTracker.requestHandler(transid, req)
               req
             }) {
               BasicDirectives.mapRequest(_.removeHeader(OW_EXTRA_LOGGING_HEADER)) {
                 BasicDirectives.mapResponse(resp => {
-                  if (BasicHttpService.activityTracker.isActive)
+                  if (BasicHttpService.isActivityTrackerActive)
                     BasicHttpService.getActivityTracker.responseHandlerAsync(transid, resp)
                   resp
                 }) {
@@ -176,10 +176,11 @@ trait BasicHttpService extends Directives {
 
 object BasicHttpService {
 
-  private var activityTracker: AbstractActivityTracker = _
+  private var activityTracker: AbstractActivityTracker = null
 
   def attachActivityTracker(instance: AbstractActivityTracker): Unit = { activityTracker = instance }
   def getActivityTracker: AbstractActivityTracker = activityTracker
+  def isActivityTrackerActive: Boolean = if (activityTracker == null) false else getActivityTracker.isActive
 
   /**
    * Starts an HTTP(S) route handler on given port and registers a shutdown hook.

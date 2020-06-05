@@ -93,7 +93,7 @@ abstract class AbstractActivityTracker(actorSystem: ActorSystem,
   def isActive: Boolean = false
 }
 
-// ActivityTracker Implementation.
+// ActivityTracker Implementation
 //
 // The following implementation creates activity events that are based on the CADF
 // standard https://www.dmtf.org/sites/default/files/standards/documents/DSP0262_1.0.0.pdf
