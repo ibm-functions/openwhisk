@@ -24,8 +24,12 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.ActorMaterializer
 import kamon.Kamon
+import pureconfig._
+import pureconfig.generic.auto._
+
 import org.apache.openwhisk.common.{Logging, TransactionId}
 import org.apache.openwhisk.core.database.FileStorage
+import org.apache.openwhisk.core.ConfigKeys
 import org.apache.openwhisk.core.entity.{
   ActivityEvent,
   ActivityUtils,
@@ -155,10 +159,12 @@ class ActivityTracker(actorSystem: ActorSystem,
 
   private val fileStore = new FileStorage("activitylogs", Paths.get(logPath), materializer, logging)
   private val isCrudController = Kamon.environment.host.toLowerCase.contains("crudcontroller")
+  private val config = loadConfig[ActivityTrackerConfig](ConfigKeys.controller).toOption
+  private val runActivityTracker = config.exists(_.runActivityTracker)
 
   def store(line: String): Unit = fileStore.store(line)
 
-  override def isActive: Boolean = isCrudController
+  override def isActive: Boolean = runActivityTracker
 
   logging.info(this, "Activity Tracker instantiated, isActive=" + isActive)
 
