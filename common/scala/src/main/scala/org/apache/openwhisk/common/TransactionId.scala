@@ -27,19 +27,45 @@ import pureconfig._
 import pureconfig.generic.auto._
 import org.apache.openwhisk.common.tracing.WhiskTracerProvider
 import org.apache.openwhisk.common.WhiskInstants._
+import java.util.concurrent.ConcurrentHashMap
 
 import scala.util.Try
 
 /**
  * A transaction id for tracking operations in the system that are specific to a request.
  * An instance of TransactionId is implicitly received by all logging methods. The actual
- * metadata is stored indirectly in the referenced meta object.
+ * metadata is stored indirectly in the referenced meta object. In particular, meta.tags
+ * is a mutable map that can be used to store context data. Since transid is used in most
+ * classes, tags can be used along the path of the request. Note that tags are not serialized,
+ * i.e., tags are not transferred across component boundaries. The list of used tags is
+ * reflected by constants for tag names (tagXXXX).
  */
 case class TransactionId private (meta: TransactionMetadata) extends AnyVal {
   def id = meta.id
   override def toString = s"#tid_${meta.id}"
 
   def toHeader = RawHeader(TransactionId.generatorConfig.header, meta.id)
+
+  /**
+   * Get meta tag value or a default value if tag is undefined.
+   *
+   * @param name tag name
+   * @param defaultValue default value if tag name is undefined
+   * @return tag value
+   * @throws NullPointerException if name is null
+   */
+  def getTag(name: String, defaultValue: String = ""): String = meta.tags.getOrDefault(name, defaultValue)
+
+  /**
+   * Set a tag value. If value is null then nullValue is set (default: "null").
+   *
+   * @param name tagName
+   * @param value tagValue
+   * @param nullValue string that represents null value (default: "null")
+   * @throws NullPointerException if name is null, or if both value and nullValue are null
+   */
+  def setTag(name: String, value: String, nullValue: String = "null"): Unit =
+    meta.tags.put(name, if (value == null) nullValue else value)
 
   /**
    * Method to count events.
@@ -196,8 +222,12 @@ case class StartMarker(start: Instant, startMarker: LogMarkerToken)
  *           negative for system operation and zero when originator is not known
  * @param start the timestamp when the request processing commenced
  * @param extraLogging enables logging, if set to true
+ * @param tags mutable map of tags
  */
-protected case class TransactionMetadata(id: String, start: Instant, extraLogging: Boolean = false)
+protected case class TransactionMetadata(id: String,
+                                         start: Instant,
+                                         extraLogging: Boolean = false,
+                                         tags: ConcurrentHashMap[String, String] = new ConcurrentHashMap())
 
 case class MetricConfig(prometheusEnabled: Boolean,
                         kamonEnabled: Boolean,
@@ -225,6 +255,20 @@ object TransactionId {
   val invokerHealth = TransactionId(systemPrefix + "invokerHealth") // Invoker supervision
   val controller = TransactionId(systemPrefix + "controller") // Controller startup
   val dbBatcher = TransactionId(systemPrefix + "dbBatcher") // Database batcher
+
+  // constants for meta tag names
+  val tagGrantType = "grantType"
+  val tagHttpMethod = "httpMethod"
+  val tagInitiatorId = "initiatorId"
+  val tagInitiatorIp = "initiatorIp"
+  val tagInitiatorName = "initiatorName"
+  val tagNamespaceId = "namespaceId"
+  val tagRequestedStatus = "requestedStatus"
+  val tagResourceGroupId = "resourceGroupId"
+  val tagTargetId = "targetId"
+  val tagTargetIdEncoded = "targetIdEncoded"
+  val tagUri = "uri"
+  val tagUserAgent = "userAgent"
 
   def apply(tid: String, extraLogging: Boolean = false): TransactionId = {
     val now = Instant.now(Clock.systemUTC()).inMills

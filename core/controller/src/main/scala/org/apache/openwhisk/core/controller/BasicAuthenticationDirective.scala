@@ -28,6 +28,7 @@ import org.apache.openwhisk.core.entity.types.AuthStore
 
 import scala.concurrent.{ExecutionContext, Future}
 import scala.util.Try
+import spray.json.JsString
 
 object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
 
@@ -41,6 +42,15 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
         val authkey = BasicAuthenticationAuthKey(UUID(pw.username), Secret(pw.password))
         logging.info(this, s"authenticate: ${authkey.uuid}")
         val future = Identity.get(authStore, authkey) map { result =>
+          // store info for activity tracker
+          val name = result.subject.asString
+          transid.setTag(TransactionId.tagInitiatorId, name)
+          transid.setTag(TransactionId.tagInitiatorName, name)
+          transid.setTag(TransactionId.tagGrantType, "password")
+          val JsString(crnEncoded) =
+            result.authkey.toEnvironment.fields.getOrElse("namespace_crn_encoded", JsString.empty)
+          transid.setTag(TransactionId.tagTargetIdEncoded, crnEncoded)
+
           if (authkey == result.authkey) {
             logging.debug(this, s"authentication valid")
             Some(result)

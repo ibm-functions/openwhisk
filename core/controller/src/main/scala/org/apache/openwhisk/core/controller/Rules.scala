@@ -134,6 +134,9 @@ trait WhiskRulesApi extends WhiskCollectionAPI with ReferencedEntities {
     extractStatusRequest { requestedState =>
       val docid = entityName.toDocId
 
+      // save requested state for activity tracker
+      transid.setTag(TransactionId.tagRequestedStatus, requestedState.toString)
+
       getEntity(WhiskRule.get(entityStore, docid), Some {
         rule: WhiskRule =>
           val ruleName = rule.fullyQualifiedName(false)

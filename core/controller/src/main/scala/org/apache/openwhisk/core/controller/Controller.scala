@@ -40,7 +40,7 @@ import org.apache.openwhisk.core.entity.ActivationId.ActivationIdGenerator
 import org.apache.openwhisk.core.entity.ExecManifest.Runtimes
 import org.apache.openwhisk.core.entity._
 import org.apache.openwhisk.core.loadBalancer.{InvokerState, LoadBalancerProvider}
-import org.apache.openwhisk.http.{BasicHttpService, BasicRasService}
+import org.apache.openwhisk.http.{AbstractActivityTracker, ActivityTracker, BasicHttpService, BasicRasService}
 import org.apache.openwhisk.spi.SpiLoader
 
 import scala.concurrent.ExecutionContext.Implicits
@@ -121,6 +121,11 @@ class Controller(val instance: ControllerInstanceId,
   private implicit val logStore = SpiLoader.get[LogStoreProvider].instance(actorSystem)
   private implicit val activationStore =
     SpiLoader.get[ActivationStoreProvider].instance(actorSystem, materializer, logging)
+  private implicit val activityTracker: AbstractActivityTracker =
+    new ActivityTracker(actorSystem, materializer, logging)
+
+  // Defines the activity tracker instance for BasicHttpService
+  BasicHttpService.attachActivityTracker(activityTracker)
 
   // register collections
   Collection.initialize(entityStore)
