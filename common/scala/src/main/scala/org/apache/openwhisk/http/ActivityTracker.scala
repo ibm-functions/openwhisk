@@ -47,7 +47,7 @@ import scala.concurrent.Future
 /**
  * Base class for activity trackers that are called in BasicHttpService on the request path (requestHandler),
  * and on the response path (responseHandler). The method isActive determines whether the activity tracker
- * should activated.
+ * should used. If isActive returns false then requestHandler and responseHandlerAsync are not called.
  *
  * The Activity Tracker is instantiated in the Controller class. The related instance is stored in the companion
  * object of BasicHttpService. The Activity Tracker is not (yet) loaded as a SPI.
@@ -63,9 +63,9 @@ abstract class AbstractActivityTracker(actorSystem: ActorSystem,
                                        logPath: String) {
 
   /** requestHandler is called before each request is processed. It collects data that is required for
-   * creating activity events. No further processing should be performed in requestHandler.
-   * requestHandler is assumed to be fast, i.e. incoming requests are not slowed down. Therefore no separate
-   * future needs to be created. Should requestHandler have to contain long running parts then these parts
+   * creating activity events. No further processing should be performed in requestHandler. requestHandler
+   * should be fast, incoming requests should not be slowed down. No separate future is created for the
+   * requestHandler. Should a requestHandler have to contain long running parts then these parts
    * should run asynchronously (which in turn might have to be synchronized with responseHandlerAsync).
    *
    * @param transid transaction id
@@ -74,9 +74,9 @@ abstract class AbstractActivityTracker(actorSystem: ActorSystem,
   def requestHandler(transid: TransactionId, req: HttpRequest): Unit
 
   /**
-   * responseHandlerAsync creates activity events based on the collected data and writes the events to the activity log.
-   * responseHandlerAsync is considered a to be little more time consuming is therefore defined as a future.
-   * in order to not slow down the response for the API caller.
+   * responseHandlerAsync creates activity events based on the collected data and writes the events to the
+   * activity log. responseHandlerAsync is considered a to be little more time consuming and is therefore
+   * defined as a future in order to not slow down the response for the API caller.
    *
    * @param transid transaction id
    * @param resp outgoing http response
