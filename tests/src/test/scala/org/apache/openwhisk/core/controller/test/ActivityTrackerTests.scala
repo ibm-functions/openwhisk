@@ -214,7 +214,7 @@ class ActivityTrackerTests()
  },
  "severity":"warning",
  "logSourceCRN":"$logSourceCRN",
- "action":"functions.rule.read",
+ "action":"functions.rule.get",
  "initiator":{
     "name":"john.doe@acme.com",
     "host":{"address":"192.168.0.1"},
@@ -525,7 +525,7 @@ class ActivityTrackerTests()
       // sequences indexed by methodIndex
       val method = Seq("PUT", "GET", "DELETE")
       val operation = Seq("create", "get", "delete")
-      val actionType = Seq("create", "read", "delete")
+      val actionType = operation
       val reasonCode = 200 // // always 200
       val reasonType = getReasonType(reasonCode.toString)
 

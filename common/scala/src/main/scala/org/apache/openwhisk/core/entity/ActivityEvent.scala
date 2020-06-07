@@ -393,7 +393,7 @@ trait ActivityUtils {
           case "GET" =>
             Some(
               ApiMatcherResult(
-                actionTypePrefix + ".read",
+                actionTypePrefix + ".get",
                 messagePrefix + "get " + entityType + " " + targetName,
                 targetName,
                 targetType))
@@ -435,11 +435,7 @@ trait ActivityUtils {
         method match {
           case "GET" =>
             Some(
-              ApiMatcherResult(
-                thisService + ".rule.read",
-                messagePrefix + "get rule " + ruleName,
-                ruleName,
-                targetType))
+              ApiMatcherResult(thisService + ".rule.get", messagePrefix + "get rule " + ruleName, ruleName, targetType))
           case "PUT" =>
             Some(
               ApiMatcherResult(
