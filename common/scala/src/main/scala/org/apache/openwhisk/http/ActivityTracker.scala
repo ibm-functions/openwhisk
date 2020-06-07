@@ -85,10 +85,10 @@ abstract class AbstractActivityTracker(actorSystem: ActorSystem,
   def responseHandlerAsync(transid: TransactionId, resp: HttpResponse): Future[Unit]
 
   /**
-   * Check if requestHandler and responseHandler should be called (example: restrict activity logs
-   * to crudcontroller).
+   * Check if requestHandler and responseHandler should be called (example: create activity logs
+   * for crudcontroller only).
    *
-   * @return true if requestHandler and responseHandler should be called. Returns false, otherwise,
+   * @return true if requestHandler and responseHandler should be called. Returns false, otherwise.
    */
   def isActive: Boolean = false
 }
