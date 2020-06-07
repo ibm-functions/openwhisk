@@ -129,7 +129,11 @@ case class Reason(reasonCode: String, reasonType: String) extends ActivityUtils 
     JsObject(Map("reasonCode" -> getJsNumber(reasonCode), "reasonType" -> getJsString(reasonType)))
 }
 
-case class ApiMatcherResult(actionType: String, logMessage: String, targetName: String, targetType: String)
+case class ApiMatcherResult(actionType: String,
+                            logMessage: String,
+                            targetName: String,
+                            targetType: String,
+                            isDataEvent: Boolean)
 
 trait ActivityUtils {
 
@@ -364,13 +368,6 @@ trait ActivityUtils {
   private val packagesAPIMatcher = """/api/v1/namespaces/.*/packages/.*""".r
   private val rulesAPIMatcher = """/api/v1/namespaces/.*/rules/.*""".r
 
-  private val namespacePos = "/api/v1/namespaces/".length
-
-  private def getEntityName(path: String, entityType: String) = {
-    val pos = path.indexOf("/" + entityType + "/") + ("/" + entityType + "/").length
-    path.substring(pos)
-  }
-
   /**
    * a matcher used for the APIs of actions, triggers and packages
    *
@@ -396,21 +393,24 @@ trait ActivityUtils {
                 actionTypePrefix + ".get",
                 messagePrefix + "get " + entityType + " " + targetName,
                 targetName,
-                targetType))
+                targetType,
+                isDataEvent = true))
           case "PUT" =>
             Some(
               ApiMatcherResult(
                 actionTypePrefix + ".create",
                 messagePrefix + "create " + entityType + " " + targetName,
                 targetName,
-                targetType))
+                targetType,
+                isDataEvent = false))
           case "DELETE" =>
             Some(
               ApiMatcherResult(
                 actionTypePrefix + ".delete",
                 messagePrefix + "delete " + entityType + " " + targetName,
                 targetName,
-                targetType))
+                targetType,
+                isDataEvent = false))
           case _ => None
         }
       case _ =>
@@ -435,21 +435,28 @@ trait ActivityUtils {
         method match {
           case "GET" =>
             Some(
-              ApiMatcherResult(thisService + ".rule.get", messagePrefix + "get rule " + ruleName, ruleName, targetType))
+              ApiMatcherResult(
+                thisService + ".rule.get",
+                messagePrefix + "get rule " + ruleName,
+                ruleName,
+                targetType,
+                isDataEvent = true))
           case "PUT" =>
             Some(
               ApiMatcherResult(
                 thisService + ".rule.create",
                 messagePrefix + "create rule " + ruleName,
                 ruleName,
-                targetType))
+                targetType,
+                isDataEvent = false))
           case "DELETE" =>
             Some(
               ApiMatcherResult(
                 thisService + ".rule.delete",
                 messagePrefix + "delete rule " + ruleName,
                 ruleName,
-                targetType))
+                targetType,
+                isDataEvent = false))
           case "POST" =>
             val requestedStatus = transid.getTag(TransactionId.tagRequestedStatus)
             requestedStatus match {
@@ -459,14 +466,16 @@ trait ActivityUtils {
                     thisService + ".rule.enable",
                     messagePrefix + "enable rule " + ruleName,
                     ruleName,
-                    targetType))
+                    targetType,
+                    isDataEvent = false))
               case "inactive" =>
                 Some(
                   ApiMatcherResult(
                     thisService + ".rule.disable",
                     messagePrefix + "disable rule " + ruleName,
                     ruleName,
-                    targetType))
+                    targetType,
+                    isDataEvent = false))
               case _ =>
                 logger.error(this, "audit.log - rules API, POST: unexpected requested status: " + requestedStatus)(
                   id = transid)

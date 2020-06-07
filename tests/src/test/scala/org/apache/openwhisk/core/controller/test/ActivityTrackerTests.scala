@@ -190,7 +190,8 @@ class ActivityTrackerTests()
     targetId: String =
       "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:a88c0a24-853b-4477-82f8-6876e72bebf2::",
     logSourceCRN: String = "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
-    accountInResourceGroupId: String = "a/eb2e36585c91a27a709c44e2652a381a") =
+    accountInResourceGroupId: String = "a/eb2e36585c91a27a709c44e2652a381a",
+    dataEvent: Boolean = false) =
     s"""
 {"requestData":{
     "method":"GET",
@@ -222,7 +223,8 @@ class ActivityTrackerTests()
     "typeURI":"service/security/account/user",
     "credential":{"type":"$credType"}
  },
- "dataEvent":false,"responseData":{}
+ "dataEvent":$dataEvent,
+ "responseData":{}
 }
 """
 
@@ -525,6 +527,7 @@ class ActivityTrackerTests()
       // sequences indexed by methodIndex
       val method = Seq("PUT", "GET", "DELETE")
       val operation = Seq("create", "get", "delete")
+      val dataEvent = Seq(false, true, false)
       val actionType = operation
       val reasonCode = 200 // // always 200
       val reasonType = getReasonType(reasonCode.toString)
@@ -597,7 +600,7 @@ class ActivityTrackerTests()
          "type":"apikey"
      }
  },
- "dataEvent":false,
+ "dataEvent":${dataEvent(methodIndex)},
  "responseData":{}
 }
 """
@@ -782,7 +785,7 @@ class ActivityTrackerTests()
     eventString = null
     Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.OK)), waitTime)
 
-    val expectedString = getExpectedResultForInvalidValuesTests(credType = "unknown")
+    val expectedString = getExpectedResultForInvalidValuesTests(credType = "unknown", dataEvent = true)
     verifyEvent(eventString, expectedString)
   }
 
@@ -861,7 +864,8 @@ class ActivityTrackerTests()
       getExpectedResultForInvalidValuesTests(
         targetId = "INVALID",
         logSourceCRN = "INVALID",
-        accountInResourceGroupId = "unknown")
+        accountInResourceGroupId = "unknown",
+        dataEvent = true)
 
     verifyEvent(eventString, expectedString)
   }
@@ -901,7 +905,11 @@ class ActivityTrackerTests()
 
     // "NOTBASE64" cannot be decoded via base64 therefore both targetid and logSourceCRN are empty
     val expectedString =
-      getExpectedResultForInvalidValuesTests(targetId = "", logSourceCRN = "", accountInResourceGroupId = "unknown")
+      getExpectedResultForInvalidValuesTests(
+        targetId = "",
+        logSourceCRN = "",
+        accountInResourceGroupId = "unknown",
+        dataEvent = true)
 
     verifyEvent(eventString, expectedString)
   }

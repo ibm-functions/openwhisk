@@ -275,7 +275,7 @@ class ActivityTracker(actorSystem: ActorSystem,
             message = logMessage,
             logSourceCRN = convertToLogSourceCRN(targetId),
             saveServiceCopy = true,
-            dataEvent = false,
+            dataEvent = serviceAction.isDataEvent,
             id = transid.toString,
             requestData)
 
