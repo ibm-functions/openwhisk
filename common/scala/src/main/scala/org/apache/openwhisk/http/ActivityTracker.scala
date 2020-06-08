@@ -86,7 +86,7 @@ abstract class AbstractActivityTracker(actorSystem: ActorSystem,
 
   /**
    * Check if requestHandler and responseHandler should be called (example: create activity logs
-   * for crudcontroller only).
+   * for the crudcontroller only).
    *
    * @return true if requestHandler and responseHandler should be called. Returns false, otherwise.
    */
