@@ -47,7 +47,7 @@ import scala.concurrent.Future
 /**
  * Base class for activity trackers that are called in BasicHttpService on the request path (requestHandler),
  * and on the response path (responseHandler). The method isActive determines whether the activity tracker
- * should used. If isActive returns false then requestHandler and responseHandlerAsync are not called.
+ * should used. If isActive returns false then both requestHandler and responseHandlerAsync are not called.
  *
  * The Activity Tracker is instantiated in the Controller class. The related instance is stored in the companion
  * object of BasicHttpService. The Activity Tracker is not (yet) loaded as a SPI.
