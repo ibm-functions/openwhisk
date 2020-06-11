@@ -431,7 +431,7 @@ trait WhiskWebActionsApi
   private val webActionsFilterConfig = loadConfig[WebActionsFilterConfig](webActionsFilterConfigNamespace).toOption
   private val filterWebActionsEnabled = webActionsFilterConfig.map(_.enabled).getOrElse(false)
   private val filterWebActionsHeaderField = webActionsFilterConfig.map(_.headerField).getOrElse("host")
-  private val filterWebActionsHostDomainSuffix = webActionsFilterConfig.map(_.domainSuffix).getOrElse("cloud.ibm.com")
+  private val filterWebActionsHostDomainSuffix = webActionsFilterConfig.map(_.domainSuffix).getOrElse("appdomain.cloud")
   private val filterWebActionsFallbackMediaType = webActionsFilterConfig.map(_.fallbackMediaType).getOrElse(".text")
   private val filterWebActionsWhitelistedNamespacesFromEnvironment =
     webActionsFilterConfig.map(_.whitelistedNamespaces).getOrElse("None")
@@ -709,7 +709,8 @@ trait WhiskWebActionsApi
     val filterWebAction =
       filterWebActionsEnabled && (context.headers.find(_.lowercaseName == filterWebActionsHeaderField) match {
         case Some(header) =>
-          header.value.endsWith((filterWebActionsHostDomainSuffix))
+          // check if host domain suffix is not our whitelisted appdomain.cloud domain
+          !header.value.endsWith((filterWebActionsHostDomainSuffix))
         case None => false
       }) && filterWebActionsWhitelistedNamespaces
         .split(",")
