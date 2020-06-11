@@ -710,7 +710,7 @@ trait WhiskWebActionsApi
       filterWebActionsEnabled && (context.headers.find(_.lowercaseName == filterWebActionsHeaderField) match {
         case Some(header) =>
           // check if host domain suffix is not our whitelisted appdomain.cloud domain
-          !header.value.endsWith((filterWebActionsHostDomainSuffix))
+          !header.value.toLowerCase.endsWith((filterWebActionsHostDomainSuffix))
         case None => false
       }) && filterWebActionsWhitelistedNamespaces
         .split(",")
