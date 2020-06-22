@@ -47,7 +47,7 @@ import scala.util.{Failure, Random, Success, Try}
  * names in tests, and defer all cleanup to the end of a test suite.
  */
 trait DbUtils extends Assertions {
-  implicit val dbOpTimeout = 15 seconds
+  implicit val dbOpTimeout = 30 seconds
   val instance = ControllerInstanceId("0")
   val docsToDelete = ListBuffer[(ArtifactStore[_], DocInfo)]()
   case class RetryOp() extends Throwable
