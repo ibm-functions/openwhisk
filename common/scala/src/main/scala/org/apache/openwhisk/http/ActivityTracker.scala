@@ -60,8 +60,8 @@ abstract class AbstractActivityTracker(actorSystem: ActorSystem, materializer: A
   /** requestHandler is called before each request is processed. It collects data that is required for
    * creating activity events. No further processing should be performed in requestHandler. requestHandler
    * should be fast, incoming requests should not be slowed down. No separate future is created for the
-   * requestHandler. Should a requestHandler have to contain long running parts then these parts
-   * should run asynchronously (which in turn might have to be synchronized with responseHandlerAsync).
+   * requestHandler. When a requestHandler needs long running parts then these parts should run
+   * asynchronously (which in turn might have to be synchronized with responseHandlerAsync).
    *
    * @param transid transaction id
    * @param req incoming http request
@@ -80,8 +80,7 @@ abstract class AbstractActivityTracker(actorSystem: ActorSystem, materializer: A
   def responseHandlerAsync(transid: TransactionId, resp: HttpResponse): Future[Unit]
 
   /**
-   * Check if requestHandler and responseHandler should be called (example: create activity logs
-   * for the crudcontroller only).
+   * Check if requestHandler and responseHandler should be called
    *
    * @return true if requestHandler and responseHandler should be called. Returns false, otherwise.
    */
@@ -95,13 +94,13 @@ abstract class AbstractActivityTracker(actorSystem: ActorSystem, materializer: A
 // The implementation adds some more information in addition to the CADF standard, see
 // https://test.cloud.ibm.com/docs/Activity-Tracker-with-LogDNA?topic=Activity-Tracker-with-LogDNA-ibm_event_fields#eventTime
 // The implementation works for both BasicAuthenticationDirective and IAMAuthenticationDirective.
-// IAMAuthenticationDirective is an external component from IBM. It it not required to bind this
+// IAMAuthenticationDirective is an external component from IBM. It is not required to bind this
 // component or other external components to openwhisk in order to run the activity tracker implementation
 // with BasicAuthenticationDirective.
 
 /**
- * Configuration for the activity tracker implementation. All three values should be defined as the
- * defaults are just suited for quick testing. If auditLogMaxFileSize is not defined then ActivityTracker
+ * Configuration for the activity tracker implementation. All three values should be defined since the
+ * defaults are just good for quick testing. If auditLogMaxFileSize is not defined then ActivityTracker
  * stays inactive.
  *
  * @param auditLogFilePath file path for audit logs (default: /tmp)
@@ -180,7 +179,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
    * ActivityTracker is active for controller and crudcontroller but not for invoker.
    *
    * If auditLogMaxFileSize is not configured then ActivityTracker stays inactive.
-   * auditLogFilePath and auditLogFileNamePrefix should also be configured as the defaults
+   * auditLogFilePath and auditLogFileNamePrefix should also be configured since the defaults
    * are just good for quick testing.
    *
    * @return true if requestHandler and responseHandler should be called. Returns false, otherwise.
