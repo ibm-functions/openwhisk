@@ -112,9 +112,9 @@ class ActivityTrackerTests()
     // use /tmp instead of default path to ensure sufficient access rights for the file
     val logPath = "/tmp"
     val logFilePrefix = "testFileStorage"
-    val fileStore = new FileStorage(logFilePrefix, Paths.get(logPath), materializer, logging)
+    val logFileMaxSize = 1000000
+    val fileStore = new FileStorage(logFilePrefix, logFileMaxSize, Paths.get(logPath), materializer, logging)
     val line = "The quick brown fox jumps over the lazy dog. The five boxing wizards jump quickly."
-    val lineLength = line.length
     val dir = new File(logPath)
     val fileFilter = new FilenameFilter {
       override def accept(dir: File, name: String): Boolean = name.startsWith(logFilePrefix)
