@@ -25,7 +25,6 @@ import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.ActorMaterializer
 import kamon.Kamon
 import pureconfig._
-import pureconfig.generic.auto._
 
 import org.apache.openwhisk.common.{Logging, TransactionId}
 import org.apache.openwhisk.core.database.FileStorage
