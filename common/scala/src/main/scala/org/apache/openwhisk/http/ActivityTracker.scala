@@ -196,7 +196,8 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
 
   logging.info(
     this,
-    "Activity Tracker instantiated, isActive=" + isActive +
+    "Activity Tracker instantiated for component=" + componentName +
+      ", isActive=" + isActive +
       ", auditLogFilePath=" + auditLogFilePath +
       ", auditLogFileNamePrefix=" + auditLogFileNamePrefix +
       ", auditLogMaxFileSize=" + auditLogMaxFileSize)
