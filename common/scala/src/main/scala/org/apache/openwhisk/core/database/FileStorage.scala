@@ -31,7 +31,7 @@ import org.apache.openwhisk.common.Logging
 import scala.concurrent.duration._
 
 class FileStorage(logFilePrefix: String,
-                  logFileMaxLen: Long,
+                  logFileMaxSize: Long,
                   logPath: Path,
                   actorMaterializer: ActorMaterializer,
                   logging: Logging) {
@@ -39,7 +39,7 @@ class FileStorage(logFilePrefix: String,
   implicit val materializer = actorMaterializer
 
   private var logFile = logPath
-  private val bufferSize = logFileMaxLen
+  private val bufferSize = logFileMaxSize
   private val perms = EnumSet.of(OWNER_READ, OWNER_WRITE, GROUP_READ, GROUP_WRITE, OTHERS_READ, OTHERS_WRITE)
   private val writeToFile: Sink[ByteString, _] = MergeHub
     .source[ByteString]

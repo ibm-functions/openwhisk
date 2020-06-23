@@ -171,7 +171,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
     if (isController && auditLogMaxFileSize > 0)
       new FileStorage(
         logFilePrefix = auditLogFileNamePrefix,
-        logFileMaxLen = auditLogMaxFileSize,
+        logFileMaxSize = auditLogMaxFileSize,
         logPath = Paths.get(auditLogFilePath),
         actorMaterializer = materializer,
         logging = logging)
