@@ -611,7 +611,6 @@ class ActivityTrackerTests()
  "responseData":{}
 }
 """
-        println(eventString)
         verifyEvent(eventString, expectedString)
       }
     }
