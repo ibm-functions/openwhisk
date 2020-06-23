@@ -289,12 +289,12 @@ trait ActivityUtils {
       else {
         val method = if (httpMethod == null) "UNKNOWN" else httpMethod.toUpperCase
         if (isCrudController) // code is running as crudController
-          matchAPI("action", actionsAPIMatcher, method, urlPath) // actions API
+          matchAPI(transid, "action", actionsAPIMatcher, method, urlPath) // actions API
             .getOrElse(
-              matchAPI("package", packagesAPIMatcher, method, urlPath) // packages API
+              matchAPI(transid, "package", packagesAPIMatcher, method, urlPath) // packages API
                 .getOrElse(
                   matchRulesAPI(transid, method, urlPath, logger) // rules API
-                    .getOrElse(matchAPI("trigger", triggersAPIMatcher, method, urlPath) // triggers API
+                    .getOrElse(matchAPI(transid, "trigger", triggersAPIMatcher, method, urlPath) // triggers API
                       .getOrElse(matchOther(transid, method, urlPath, logger).orNull)))) // nothing to add to the log
         else // code is running  as controller (handles POST rule API call for enable/disable rule)
           matchRulesAPI(transid, method, urlPath, logger) // rules API
@@ -383,13 +383,18 @@ trait ActivityUtils {
   /**
    * a matcher used for the APIs of actions, triggers and packages
    *
+   * @param transid transaction id
    * @param entityType action, trigger, package
    * @param matcher actionsAPIMatcher, packagesAPIMatcher, triggersAPIMatcher
    * @param method http method of the request
    * @param uri uri of the request
    * @return Some(ApiMatcherResult) or None
    */
-  def matchAPI(entityType: String, matcher: Regex, method: String, uri: String): Option[ApiMatcherResult] = {
+  def matchAPI(transid: TransactionId,
+               entityType: String,
+               matcher: Regex,
+               method: String,
+               uri: String): Option[ApiMatcherResult] = {
     // ignored: invoke action, list all actions
     val entityTypePathSelector = entityType + "s" // plural of entityType
     val targetType = thisService + "/" + entityType
@@ -408,10 +413,12 @@ trait ActivityUtils {
                 targetType,
                 isDataEvent = true))
           case "PUT" =>
+            val isUpdate = !transid.getTag(TransactionId.tagUpdateInfo).isEmpty
+            val operation = if (isUpdate) "update" else "create"
             Some(
               ApiMatcherResult(
-                actionTypePrefix + ".create",
-                messagePrefix + "create " + entityType + " " + targetName,
+                actionTypePrefix + "." + operation,
+                messagePrefix + operation + " " + entityType + " " + targetName,
                 targetName,
                 targetType,
                 isDataEvent = false))
@@ -454,10 +461,12 @@ trait ActivityUtils {
                 targetType,
                 isDataEvent = true))
           case "PUT" =>
+            val isUpdate = !transid.getTag(TransactionId.tagUpdateInfo).isEmpty
+            val operation = if (isUpdate) "update" else "create"
             Some(
               ApiMatcherResult(
-                thisService + ".rule.create",
-                messagePrefix + "create rule " + ruleName,
+                thisService + ".rule." + operation,
+                messagePrefix + operation + " rule " + ruleName,
                 ruleName,
                 targetType,
                 isDataEvent = false))

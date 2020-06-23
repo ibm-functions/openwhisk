@@ -515,7 +515,7 @@ class ActivityTrackerTests()
     eventString shouldBe null
   }
 
-  it should "handle successful (create, get, delete) (action, package, rule, trigger) correctly (crudcontroller)" in {
+  it should "handle successful (create, get, delete, update) (action, package, rule, trigger) correctly (crudcontroller)" in {
 
     var eventString: String = null
 
@@ -527,15 +527,16 @@ class ActivityTrackerTests()
       }
     }
 
-    for (methodIndex <- 0 to 2) {
+    // sequences indexed by methodIndex
+    val method = Seq("PUT", "GET", "DELETE", "PUT")
+    val operation = Seq("create", "get", "delete", "update")
+    val dataEvent = Seq(false, true, false, false)
+    val actionType = operation
 
-      // sequences indexed by methodIndex
-      val method = Seq("PUT", "GET", "DELETE")
-      val operation = Seq("create", "get", "delete")
-      val dataEvent = Seq(false, true, false)
-      val actionType = operation
-      val reasonCode = 200 // // always 200
-      val reasonType = getReasonType(reasonCode.toString)
+    val reasonCode = 200 // // always 200
+    val reasonType = getReasonType(reasonCode.toString)
+
+    for (methodIndex <- 0 to 3) {
 
       for (entityType <- Seq("action", "package", "rule", "trigger")) {
 
@@ -557,6 +558,7 @@ class ActivityTrackerTests()
             TransactionId.tagTargetId,
             "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::"),
           (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
+          (TransactionId.tagUpdateInfo, if (operation(methodIndex) == "update") "true" else ""),
           (TransactionId.tagUri, url),
           (TransactionId.tagUserAgent, "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"))
 
@@ -609,6 +611,7 @@ class ActivityTrackerTests()
  "responseData":{}
 }
 """
+        println(eventString)
         verifyEvent(eventString, expectedString)
       }
     }

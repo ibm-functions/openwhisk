@@ -268,6 +268,7 @@ object TransactionId {
   val tagTargetId = "targetId"
   val tagTargetIdEncoded = "targetIdEncoded"
   val tagUri = "uri"
+  val tagUpdateInfo = "tagUpdateInfo"
   val tagUserAgent = "userAgent"
 
   def apply(tid: String, extraLogging: Boolean = false): TransactionId = {

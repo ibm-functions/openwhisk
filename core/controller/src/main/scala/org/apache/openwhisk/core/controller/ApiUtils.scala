@@ -253,9 +253,11 @@ trait WriteOps extends Directives {
     onComplete(factory.get(datastore, docid) flatMap { doc =>
       if (overwrite) {
         logging.debug(this, s"[PUT] entity exists, will try to update '$doc'")
+        transid.setTag(TransactionId.tagUpdateInfo, "overwrite enabled")
         update(doc).map(updatedDoc => (Some(doc), updatedDoc))
       } else if (treatExistsAsConflict) {
         logging.debug(this, s"[PUT] entity exists, but overwrite is not enabled, aborting")
+        transid.setTag(TransactionId.tagUpdateInfo, "overwrite disabled")
         Future failed RejectRequest(Conflict, "resource already exists")
       } else {
         Future failed IdentityPut(doc)
