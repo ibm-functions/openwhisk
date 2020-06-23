@@ -158,9 +158,6 @@ class ActivityTrackerTests()
 
   }
 
-  // Some of the following cases are not routed to the crudcontroller during normal operation
-  // but this test simulates and checks all api calls anyway.
-
   def verifyEvent(resultString: String, expectedString: String): Unit = {
     if (resultString != null || expectedString != null) {
       if (resultString == null) "ok" shouldBe "resultString is null but expectedString is " + expectedString
@@ -228,12 +225,15 @@ class ActivityTrackerTests()
 }
 """
 
-  it should "handle unsuccessful create action correctly" in {
+  // crudcontroller tests (getIsCrudController = true)
+
+  it should "handle unsuccessful create action correctly (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -312,12 +312,13 @@ class ActivityTrackerTests()
     verifyEvent(eventString, expectedString)
   }
 
-  it should "handle successful create action in classic namespace correctly" in {
+  it should "handle successful create action in classic namespace correctly (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -394,12 +395,13 @@ class ActivityTrackerTests()
     verifyEvent(eventString, expectedString)
   }
 
-  it should "create no activity event for get all (actions, packages, rules, triggers)" in {
+  it should "create no activity event for get all (actions, packages, rules, triggers) (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -435,12 +437,13 @@ class ActivityTrackerTests()
     }
   }
 
-  it should "create no activity event for get activation" in {
+  it should "create no activity event for get activation (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -473,12 +476,13 @@ class ActivityTrackerTests()
     eventString shouldBe null
   }
 
-  it should "create no activity event for get all namespaces" in {
+  it should "create no activity event for get all namespaces (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -511,12 +515,13 @@ class ActivityTrackerTests()
     eventString shouldBe null
   }
 
-  it should "handle successful (create, get, delete) (action, package, rule, trigger) correctly" in {
+  it should "handle successful (create, get, delete) (action, package, rule, trigger) correctly (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -609,109 +614,13 @@ class ActivityTrackerTests()
     }
   }
 
-  it should "handle successful (enable, disable) rule correctly" in {
+  it should "create no activity event for post method on (action, trigger) (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
-      override def store(line: String): Unit = {
-        eventString = line
-      }
-    }
-
-    for (operationIndex <- 0 to 1) {
-
-      // sequences indexed by operationIndex
-      val requestedStatus = Seq("active", "inactive")
-      val actionType = Seq("enable", "disable")
-
-      val reasonCode = 200 // // always 200
-      val reasonType = getReasonType(reasonCode.toString)
-      val entityName = "hello123"
-      val method = "POST"
-
-      for (entityType <- 0 to 1) {
-
-        val url =
-          s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/rules/$entityName"
-
-        val settings = Seq(
-          (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
-          (TransactionId.tagHttpMethod, method),
-          (TransactionId.tagInitiatorId, "IBMid-310000GN7M"),
-          (TransactionId.tagInitiatorIp, "192.168.0.1"),
-          (TransactionId.tagInitiatorName, "john.doe@acme.com"),
-          (TransactionId.tagNamespaceId, "a88c0a24-853b-4477-82f8-6876e72bebf2"),
-          (TransactionId.tagRequestedStatus, requestedStatus(operationIndex)), // only filled for rules
-          (TransactionId.tagResourceGroupId, "ca23a1a3f0a84e2ab6b70c22ec6b1324"),
-          (
-            TransactionId.tagTargetId,
-            "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::"),
-          (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
-          (TransactionId.tagUri, url),
-          (TransactionId.tagUserAgent, "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"))
-
-        val transid = TransactionId("test_api")
-        for (setting <- settings) transid.setTag(setting._1, setting._2)
-
-        eventString = null
-        Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.OK)), waitTime)
-
-        val expectedString =
-          s"""
-{"requestData":{
-    "method":"$method",
-    "url":"$url",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
-    "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324"
- },
- "observer":{
-    "name":"ActivityTracker"
- },
- "outcome":"success",
- "saveServiceCopy":true,
- "reason":{
-     "reasonCode":$reasonCode,
-     "reasonType":"$reasonType"
- },
- "id":"#tid_test_api",
- "eventTime":"2020-06-03T14:38:10.258+0000",
- "message":"IBM Cloud Functions: ${actionType(operationIndex)} rule $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
- "target":{
-     "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
-     "name":"$entityName",
-     "typeURI":"functions/rule"
- },
- "severity":"warning",
- "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
- "action":"functions.rule.${actionType(operationIndex)}",
- "initiator":{
-     "name":"john.doe@acme.com",
-     "host":{
-         "address":"192.168.0.1"
-     },
-     "id":"IBMid-310000GN7M",
-     "typeURI":"service/security/account/user",
-     "credential":{
-         "type":"apikey"
-     }
- },
- "dataEvent":false,
- "responseData":{}
-}
-"""
-        verifyEvent(eventString, expectedString)
-      }
-    }
-  }
-
-  it should "create no activity event for post method on (action, trigger)" in {
-
-    var eventString: String = null
-
-    val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
-      override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -750,12 +659,13 @@ class ActivityTrackerTests()
     }
   }
 
-  it should "handle invalid grantType correctly" in {
+  it should "handle invalid grantType correctly (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -789,7 +699,7 @@ class ActivityTrackerTests()
     verifyEvent(eventString, expectedString)
   }
 
-  it should "handle invalid httpMethod correctly" in {
+  it should "handle invalid httpMethod correctly (crudcontroller)" in {
 
     var eventString: String = null
 
@@ -827,12 +737,13 @@ class ActivityTrackerTests()
     eventString shouldBe null
   }
 
-  it should "handle invalid targetId correctly" in {
+  it should "handle invalid targetId correctly (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -870,12 +781,13 @@ class ActivityTrackerTests()
     verifyEvent(eventString, expectedString)
   }
 
-  it should "handle invalid targetIdEncoded correctly" in {
+  it should "handle invalid targetIdEncoded correctly (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -914,12 +826,13 @@ class ActivityTrackerTests()
     verifyEvent(eventString, expectedString)
   }
 
-  it should "handle invalid urls correctly" in {
+  it should "handle invalid urls correctly (crudcontroller)" in {
 
     var eventString: String = null
 
     val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
       override def isActive = true
+      override def getIsCrudController: Boolean = true
       override def store(line: String): Unit = {
         eventString = line
       }
@@ -950,7 +863,7 @@ class ActivityTrackerTests()
     eventString shouldBe null
   }
 
-  it should "handle the isActive flag correctly" in {
+  it should "handle the isActive flag correctly (crudcontroller)" in {
 
     // This is the create action test case with isActive = false and true.
     // The result should be empty if isActive = false. Otherwise, the expected event should
@@ -962,7 +875,7 @@ class ActivityTrackerTests()
 
       val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
         override def isActive = activeFlag
-
+        override def getIsCrudController: Boolean = true
         override def store(line: String): Unit = {
           eventString = line
         }
@@ -1054,4 +967,184 @@ class ActivityTrackerTests()
       }
     }
   }
+
+  // controller tests (getIsCrudController = false)
+  // only http POST is tested since all requests with PUT, GET, DELETE are directed to crudcontroller
+
+  it should "handle successful (enable, disable) rule correctly (controller)" in {
+
+    var eventString: String = null
+
+    val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
+      override def isActive = true
+      override def getIsCrudController: Boolean = false
+      override def store(line: String): Unit = {
+        eventString = line
+      }
+    }
+
+    for (operationIndex <- 0 to 1) {
+
+      // sequences indexed by operationIndex
+      val requestedStatus = Seq("active", "inactive")
+      val actionType = Seq("enable", "disable")
+
+      val reasonCode = 200 // // always 200
+      val reasonType = getReasonType(reasonCode.toString)
+      val entityName = "hello123"
+      val method = "POST"
+
+      for (entityType <- 0 to 1) {
+
+        val url =
+          s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/rules/$entityName"
+
+        val settings = Seq(
+          (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
+          (TransactionId.tagHttpMethod, method),
+          (TransactionId.tagInitiatorId, "IBMid-310000GN7M"),
+          (TransactionId.tagInitiatorIp, "192.168.0.1"),
+          (TransactionId.tagInitiatorName, "john.doe@acme.com"),
+          (TransactionId.tagNamespaceId, "a88c0a24-853b-4477-82f8-6876e72bebf2"),
+          (TransactionId.tagRequestedStatus, requestedStatus(operationIndex)), // only filled for rules
+          (TransactionId.tagResourceGroupId, "ca23a1a3f0a84e2ab6b70c22ec6b1324"),
+          (
+            TransactionId.tagTargetId,
+            "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::"),
+          (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
+          (TransactionId.tagUri, url),
+          (TransactionId.tagUserAgent, "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"))
+
+        val transid = TransactionId("test_api")
+        for (setting <- settings) transid.setTag(setting._1, setting._2)
+
+        eventString = null
+        Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.OK)), waitTime)
+
+        val expectedString =
+          s"""
+{"requestData":{
+    "method":"$method",
+    "url":"$url",
+    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
+    "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324"
+ },
+ "observer":{
+    "name":"ActivityTracker"
+ },
+ "outcome":"success",
+ "saveServiceCopy":true,
+ "reason":{
+     "reasonCode":$reasonCode,
+     "reasonType":"$reasonType"
+ },
+ "id":"#tid_test_api",
+ "eventTime":"2020-06-03T14:38:10.258+0000",
+ "message":"IBM Cloud Functions: ${actionType(operationIndex)} rule $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
+ "target":{
+     "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
+     "name":"$entityName",
+     "typeURI":"functions/rule"
+ },
+ "severity":"warning",
+ "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
+ "action":"functions.rule.${actionType(operationIndex)}",
+ "initiator":{
+     "name":"john.doe@acme.com",
+     "host":{
+         "address":"192.168.0.1"
+     },
+     "id":"IBMid-310000GN7M",
+     "typeURI":"service/security/account/user",
+     "credential":{
+         "type":"apikey"
+     }
+ },
+ "dataEvent":false,
+ "responseData":{}
+}
+"""
+        verifyEvent(eventString, expectedString)
+      }
+    }
+  }
+
+  it should "create no event for an action invocation (controller)" in {
+
+    var eventString: String = null
+
+    val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
+      override def isActive = true
+      override def getIsCrudController: Boolean = false
+      override def store(line: String): Unit = {
+        eventString = line
+      }
+    }
+
+    val url =
+      s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123"
+
+    val settings = Seq(
+      (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
+      (TransactionId.tagHttpMethod, "POST"),
+      (TransactionId.tagInitiatorId, "IBMid-310000GN7M"),
+      (TransactionId.tagInitiatorIp, "192.168.0.1"),
+      (TransactionId.tagInitiatorName, "john.doe@acme.com"),
+      (TransactionId.tagNamespaceId, "a88c0a24-853b-4477-82f8-6876e72bebf2"),
+      (TransactionId.tagRequestedStatus, ""), // only filled for rules
+      (TransactionId.tagResourceGroupId, "ca23a1a3f0a84e2ab6b70c22ec6b1324"),
+      (
+        TransactionId.tagTargetId,
+        "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::"),
+      (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
+      (TransactionId.tagUri, url),
+      (TransactionId.tagUserAgent, "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"))
+
+    val transid = TransactionId("test_api")
+    for (setting <- settings) transid.setTag(setting._1, setting._2)
+
+    Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.OK)), waitTime)
+
+    eventString shouldBe null
+  }
+
+  it should "create no event for firing a trigger (controller)" in {
+
+    var eventString: String = null
+
+    val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
+      override def isActive = true
+      override def getIsCrudController: Boolean = false
+      override def store(line: String): Unit = {
+        eventString = line
+      }
+    }
+
+    val url =
+      s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/triggers/hello123"
+
+    val settings = Seq(
+      (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
+      (TransactionId.tagHttpMethod, "POST"),
+      (TransactionId.tagInitiatorId, "IBMid-310000GN7M"),
+      (TransactionId.tagInitiatorIp, "192.168.0.1"),
+      (TransactionId.tagInitiatorName, "john.doe@acme.com"),
+      (TransactionId.tagNamespaceId, "a88c0a24-853b-4477-82f8-6876e72bebf2"),
+      (TransactionId.tagRequestedStatus, ""), // only filled for rules
+      (TransactionId.tagResourceGroupId, "ca23a1a3f0a84e2ab6b70c22ec6b1324"),
+      (
+        TransactionId.tagTargetId,
+        "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::"),
+      (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
+      (TransactionId.tagUri, url),
+      (TransactionId.tagUserAgent, "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"))
+
+    val transid = TransactionId("test_api")
+    for (setting <- settings) transid.setTag(setting._1, setting._2)
+
+    Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.OK)), waitTime)
+
+    eventString shouldBe null
+  }
+
 }

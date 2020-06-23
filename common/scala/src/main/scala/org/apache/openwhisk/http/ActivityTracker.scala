@@ -194,6 +194,13 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
    */
   def store(line: String): Unit = fileStore.store(line)
 
+  /**
+   * Function for isCrudController (defined for supporting the unit test).
+   *
+   * @return isCrudController
+   */
+  def getIsCrudController: Boolean = isCrudController
+
   logging.info(
     this,
     "Activity Tracker instantiated for component=" + componentName +
@@ -257,7 +264,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
       if (!isIgnoredUser(initiatorName)) {
 
         val serviceAction: ApiMatcherResult =
-          getServiceAction(transid, isCrudController, httpMethod, uri, logging)
+          getServiceAction(transid, getIsCrudController, httpMethod, uri, logging)
 
         if (serviceAction != null) {
 
