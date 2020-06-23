@@ -55,12 +55,8 @@ import scala.concurrent.Future
  * @param actorSystem actor system
  * @param materializer materializer
  * @param logging logging
- * @param logPath path for the activity logs
  */
-abstract class AbstractActivityTracker(actorSystem: ActorSystem,
-                                       materializer: ActorMaterializer,
-                                       logging: Logging,
-                                       logPath: String) {
+abstract class AbstractActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer, logging: Logging) {
 
   /** requestHandler is called before each request is processed. It collects data that is required for
    * creating activity events. No further processing should be performed in requestHandler. requestHandler
@@ -105,11 +101,15 @@ abstract class AbstractActivityTracker(actorSystem: ActorSystem,
 // with BasicAuthenticationDirective.
 
 /**
- * Configuration for the activity tracker implementation.
+ * Configuration for the activity tracker implementation. All three values should be defined as the
+ * defaults are just suited for quick testing. If auditLogMaxFileSize is not defined then ActivityTracker
+ * stays inactive.
  *
- * @param runActivityTracker flag that decides whether the acitivity tracker is active or inactive.
+ * @param auditLogFilePath file path for audit logs (default: /tmp)
+ * @param auditLogFileNamePrefix name prefix for audit log files (prefix + timestamp + '.log') (default: component name)
+ * @param auditLogMaxFileSize max file size for an audit log file (default: 0)
  */
-case class ActivityTrackerConfig(runActivityTracker: Boolean)
+case class ActivityTrackerConfig(auditLogFilePath: String, auditLogFileNamePrefix: String, auditLogMaxFileSize: Long)
 
 /**
  * The Activity Tracker collects information about user activities and stores the data in activity log files
@@ -120,6 +120,8 @@ case class ActivityTrackerConfig(runActivityTracker: Boolean)
  * The collected data comprises information about the initiator, the activity, the target service, and the outcome.
  * The entries in the activity log files must follow a specific schema:
  * https://github.ibm.com/activity-tracker/helloATv3/blob/master/eventLinter/events_schema_logdna.json
+ *
+ * The ActivityTracker is activated for the controller and crudcontroller and disabled for invoker.
  *
  * Data collection details:
  *
@@ -148,25 +150,57 @@ case class ActivityTrackerConfig(runActivityTracker: Boolean)
  * @param actorSystem actor system
  * @param materializer materializer
  * @param logging logging
- * @param logPath path for the activity logs
  */
-class ActivityTracker(actorSystem: ActorSystem,
-                      materializer: ActorMaterializer,
-                      logging: Logging,
-                      logPath: String = "/atlogs")
-    extends AbstractActivityTracker(actorSystem, materializer, logging, logPath)
+class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer, logging: Logging)
+    extends AbstractActivityTracker(actorSystem, materializer, logging)
     with ActivityUtils {
 
-  private val fileStore = new FileStorage("activitylogs", Paths.get(logPath), materializer, logging)
-  private val isCrudController = Kamon.environment.host.toLowerCase.contains("crudcontroller")
-  private val config = loadConfig[ActivityTrackerConfig](ConfigKeys.controller).toOption
-  private val runActivityTracker = config.exists(_.runActivityTracker)
+  private val componentName = Kamon.environment.host.toLowerCase
+  private val isCrudController = componentName.contains("crudcontroller")
+  private val isController = componentName.contains("controller") // controller or crudcontroller
 
+  private val auditLogFilePath =
+    loadConfig[String](ConfigKeys.controller + ".auditLogFilePath").toOption.getOrElse("/tmp")
+  private val auditLogFileNamePrefix =
+    loadConfig[String](ConfigKeys.controller + ".auditLogFileNamePrefix").toOption.getOrElse(componentName)
+  // if auditLogMaxFileSize is not configured (> 0) then ActivityTracker stays inactive
+  private val auditLogMaxFileSize =
+    loadConfig[Int](ConfigKeys.controller + ".auditLogMaxFileSize").toOption.getOrElse(0)
+
+  private val fileStore =
+    if (isController && auditLogMaxFileSize > 0)
+      new FileStorage(
+        logFilePrefix = auditLogFileNamePrefix,
+        logFileMaxLen = auditLogMaxFileSize,
+        logPath = Paths.get(auditLogFilePath),
+        actorMaterializer = materializer,
+        logging = logging)
+    else null
+
+  /**
+   * ActivityTracker is active for controller and crudcontroller but not for invoker.
+   *
+   * If auditLogMaxFileSize is not configured then ActivityTracker stays inactive.
+   * auditLogFilePath and auditLogFileNamePrefix should also be configured as the defaults
+   * are just good for quick testing.
+   *
+   * @return true if requestHandler and responseHandler should be called. Returns false, otherwise.
+   */
+  override def isActive: Boolean = isController && auditLogMaxFileSize > 0
+
+  /**
+   * Stores a line in the file store. An end-of-line is automatically added.
+   *
+   * @param line string that represents a line in the log
+   */
   def store(line: String): Unit = fileStore.store(line)
 
-  override def isActive: Boolean = runActivityTracker
-
-  logging.info(this, "Activity Tracker instantiated, isActive=" + isActive)
+  logging.info(
+    this,
+    "Activity Tracker instantiated, isActive=" + isActive +
+      ", auditLogFilePath=" + auditLogFilePath +
+      ", auditLogFileNamePrefix=" + auditLogFileNamePrefix +
+      ", auditLogMaxFileSize=" + auditLogMaxFileSize)
 
   /**
    * Collects data from the request for the activity tracker. Data are stored in transid meta tags
@@ -222,7 +256,8 @@ class ActivityTracker(actorSystem: ActorSystem,
 
       if (!isIgnoredUser(initiatorName)) {
 
-        val serviceAction: ApiMatcherResult = getServiceAction(transid, httpMethod, uri, logging)
+        val serviceAction: ApiMatcherResult =
+          getServiceAction(transid, isCrudController, httpMethod, uri, logging)
 
         if (serviceAction != null) {
 

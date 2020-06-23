@@ -27,23 +27,26 @@ import akka.stream.alpakka.file.scaladsl.LogRotatorSink
 import akka.stream.scaladsl.{MergeHub, RestartSink, Sink, Source}
 import akka.util.ByteString
 import org.apache.openwhisk.common.Logging
-import org.apache.openwhisk.core.entity.size._
 
 import scala.concurrent.duration._
 
-class FileStorage(logFilePrefix: String, logPath: Path, actorMaterializer: ActorMaterializer, logging: Logging) {
+class FileStorage(logFilePrefix: String,
+                  logFileMaxLen: Long,
+                  logPath: Path,
+                  actorMaterializer: ActorMaterializer,
+                  logging: Logging) {
 
   implicit val materializer = actorMaterializer
 
   private var logFile = logPath
-  private val bufferSize = 25.MB
+  private val bufferSize = logFileMaxLen
   private val perms = EnumSet.of(OWNER_READ, OWNER_WRITE, GROUP_READ, GROUP_WRITE, OTHERS_READ, OTHERS_WRITE)
   private val writeToFile: Sink[ByteString, _] = MergeHub
     .source[ByteString]
-    .batchWeighted(bufferSize.toBytes, _.length, identity)(_ ++ _)
+    .batchWeighted(bufferSize, _.length, identity)(_ ++ _)
     .to(RestartSink.withBackoff(minBackoff = 1.seconds, maxBackoff = 60.seconds, randomFactor = 0.2) { () =>
       LogRotatorSink(() => {
-        val maxSize = bufferSize.toBytes
+        val maxSize = bufferSize
         var bytesRead = maxSize
         element =>
           {
