@@ -100,7 +100,7 @@ abstract class AbstractActivityTracker(actorSystem: ActorSystem, materializer: A
 
 /**
  * Configuration for the activity tracker implementation. All three values should be defined since the
- * defaults are just good for quick testing. If auditLogMaxFileSize is not defined then ActivityTracker
+ * defaults are just good for quick testing. If auditLogMaxFileSize is zero then ActivityTracker
  * stays inactive.
  *
  * @param auditLogFilePath file path for audit logs (default: /tmp)
@@ -157,13 +157,13 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
   private val isCrudController = componentName.contains("crudcontroller")
   private val isController = componentName.contains("controller") // controller or crudcontroller
 
-  private val auditLogFilePath =
-    loadConfig[String](ConfigKeys.controller + ".auditLogFilePath").toOption.getOrElse("/tmp")
-  private val auditLogFileNamePrefix =
-    loadConfig[String](ConfigKeys.controller + ".auditLogFileNamePrefix").toOption.getOrElse(componentName)
-  // if auditLogMaxFileSize is not configured (> 0) then ActivityTracker stays inactive
-  private val auditLogMaxFileSize =
-    loadConfig[Int](ConfigKeys.controller + ".auditLogMaxFileSize").toOption.getOrElse(0)
+  // config
+  private val configNamespace = ConfigKeys.controller
+  private val config = loadConfig[ActivityTrackerConfig](configNamespace).toOption
+  private val auditLogFilePath = config.map(_.auditLogFilePath).getOrElse("/tmp")
+  private val auditLogFileNamePrefix = config.map(_.auditLogFileNamePrefix).getOrElse(componentName)
+  // if auditLogMaxFileSize == 0 then ActivityTracker stays inactive
+  private val auditLogMaxFileSize = config.map(_.auditLogMaxFileSize).getOrElse(0)
 
   private val fileStore =
     if (isController && auditLogMaxFileSize > 0)
