@@ -59,7 +59,7 @@ trait DatabaseScriptTestUtils extends ScalaFutures with Matchers with WaitFor wi
   /** Creates a new database with the given name */
   def createDatabase(name: String, designDocPath: Option[String])(implicit as: ActorSystem, logging: Logging) = {
     // Implicitly remove database for sanitization purposes
-    removeDatabase(name, ignoreFailure = true)
+    removeDatabase(name)
 
     println(s"Creating database: $name")
     val db = new ExtendedCouchDbRestClient(dbProtocol, dbHost, dbPort, dbUsername, dbPassword, name)
