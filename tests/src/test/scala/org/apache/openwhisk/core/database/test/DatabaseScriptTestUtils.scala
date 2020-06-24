@@ -67,6 +67,7 @@ trait DatabaseScriptTestUtils extends ScalaFutures with Matchers with WaitFor wi
       val create = db.createDb().futureValue
       // check in case of failure (left) if database already exists
       if (create.isLeft) {
+        println(s"Creating database: $name returned left: $create")
         create.left.map(statusCode => {
           statusCode.intValue() shouldBe StatusCodes.PreconditionFailed.intValue
           statusCode.reason should include("The database could not be created, the file already exists")
@@ -105,6 +106,7 @@ trait DatabaseScriptTestUtils extends ScalaFutures with Matchers with WaitFor wi
       if (!ignoreFailure)
         // check in case of failure (left) if database is already deleted
         if (delete.isLeft) {
+          println(s"Removing database: $name returned left: $delete")
           delete.left.map(statusCode => {
             statusCode.intValue() shouldBe StatusCodes.NotFound.intValue
             statusCode.reason should include("Database does not exist")
