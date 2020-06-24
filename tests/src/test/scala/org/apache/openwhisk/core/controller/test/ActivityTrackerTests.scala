@@ -205,14 +205,14 @@ class ActivityTrackerTests()
  },
  "id":"#tid_test_get_activation",
  "eventTime":"2020-06-04T15:02:20.663+0000",
- "message":"IBM Cloud Functions: get rule testrule for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
+ "message":"IBM Cloud Functions: read rule testrule for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"$targetId",
      "name":"testrule","typeURI":"functions/rule"
  },
  "severity":"warning",
  "logSourceCRN":"$logSourceCRN",
- "action":"functions.rule.get",
+ "action":"functions.rule.read",
  "initiator":{
     "name":"john.doe@acme.com",
     "host":{"address":"192.168.0.1"},
@@ -529,7 +529,7 @@ class ActivityTrackerTests()
 
     // sequences indexed by methodIndex
     val method = Seq("PUT", "GET", "DELETE", "PUT")
-    val operation = Seq("create", "get", "delete", "update")
+    val operation = Seq("create", "read", "delete", "update")
     val dataEvent = Seq(false, true, false, false)
     val actionType = operation
 
