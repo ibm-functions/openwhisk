@@ -161,10 +161,10 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
   // config
   private val configNamespace = ConfigKeys.controller
   private val config = loadConfig[ActivityTrackerConfig](configNamespace).toOption
-  private val auditLogFilePath = config.map(_.auditLogFilePath).getOrElse("/tmp")
-  private val auditLogFileNamePrefix = config.map(_.auditLogFileNamePrefix).getOrElse(componentName)
+  private val auditLogFilePath: String = config.map(_.auditLogFilePath).getOrElse("/tmp")
+  private val auditLogFileNamePrefix: String = config.map(_.auditLogFileNamePrefix).getOrElse(componentName)
   // if auditLogMaxFileSize == 0 then ActivityTracker stays inactive
-  private val auditLogMaxFileSize = config.map(_.auditLogMaxFileSize).getOrElse(0)
+  private val auditLogMaxFileSize: Long = config.map(_.auditLogMaxFileSize).getOrElse(0)
 
   private val fileStore =
     if (isController && auditLogMaxFileSize > 0)
