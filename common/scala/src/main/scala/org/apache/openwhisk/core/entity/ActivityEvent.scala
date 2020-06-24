@@ -407,8 +407,8 @@ trait ActivityUtils {
           case "GET" =>
             Some(
               ApiMatcherResult(
-                actionTypePrefix + ".get",
-                messagePrefix + "get " + entityType + " " + targetName,
+                actionTypePrefix + ".read",
+                messagePrefix + "read " + entityType + " " + targetName,
                 targetName,
                 targetType,
                 isDataEvent = true))
@@ -455,8 +455,8 @@ trait ActivityUtils {
           case "GET" =>
             Some(
               ApiMatcherResult(
-                thisService + ".rule.get",
-                messagePrefix + "get rule " + ruleName,
+                thisService + ".rule.read",
+                messagePrefix + "read rule " + ruleName,
                 ruleName,
                 targetType,
                 isDataEvent = true))
