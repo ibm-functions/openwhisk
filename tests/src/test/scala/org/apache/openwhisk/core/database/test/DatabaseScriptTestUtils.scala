@@ -65,13 +65,13 @@ trait DatabaseScriptTestUtils extends ScalaFutures with Matchers with WaitFor wi
     val db = new ExtendedCouchDbRestClient(dbProtocol, dbHost, dbPort, dbUsername, dbPassword, name)
     retry {
       val create = db.createDb().futureValue
-      //create should (be('right) or be(Left(StatusCodes.PreconditionFailed)))
-      create should (be('right) or be(
-        Left(
-          StatusCodes.custom(
-            StatusCodes.PreconditionFailed.intValue,
-            "The database could not be created, the file already exists.",
-            "file_exists"))))
+      if (create.isLeft) {
+        create.left.map(statusCode => {
+          statusCode.intValue() shouldBe StatusCodes.PreconditionFailed.intValue
+          statusCode.reason() shouldBe "The database could not be created, the file already exists."
+          statusCode.defaultMessage() shouldBe "file_exists"
+        })
+      }
     }
 
     retry {
@@ -105,8 +105,13 @@ trait DatabaseScriptTestUtils extends ScalaFutures with Matchers with WaitFor wi
       //if (!ignoreFailure) delete shouldBe 'right
       //if (!ignoreFailure) delete should (be('right) or be(Left(StatusCodes.NotFound)))
       if (!ignoreFailure)
-        delete should (be('right) or be(
-          Left(StatusCodes.custom(StatusCodes.NotFound.intValue, "Database does not exist.", "not_found"))))
+        if (delete.isLeft) {
+          delete.left.map(statusCode => {
+            statusCode.intValue() shouldBe StatusCodes.NotFound.intValue
+            statusCode.reason() shouldBe "Database does not exist.."
+            statusCode.defaultMessage() shouldBe "not_found"
+          })
+        }
     }
     // make sure database is deleted
     retry {
