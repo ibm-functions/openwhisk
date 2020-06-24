@@ -25,7 +25,7 @@ import org.apache.openwhisk.core.cli.{CommandMessages, Conf, WhiskAdmin}
 import org.apache.openwhisk.core.entity._
 
 import scala.collection.mutable.ListBuffer
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import scala.util.Try
 import org.apache.openwhisk.core.database.UserCommand.ExtendedAuth
 
@@ -35,11 +35,18 @@ class UserCommandTests extends FlatSpec with WhiskAdminCliTestBase {
 
   behavior of "create user"
 
-  it should "fail for subject less than length 5" in {
-    the[Exception] thrownBy {
-      new Conf(Seq("user", "create", "foo"))
-    } should have message CommandMessages.shortName
-  }
+  org.apache.openwhisk.utils.retry(
+    {
+      it should "fail for subject less than length 5" in {
+        the[Exception] thrownBy {
+          new Conf(Seq("user", "create", "foo"))
+        } should have message CommandMessages.shortName
+      }
+    },
+    10,
+    Some(1.second),
+    Some(
+      s"${this.getClass.getName} > create user should fail for subject less than length 5 not successful, retrying.."))
 
   it should "fail for short key" in {
     the[Exception] thrownBy {
@@ -225,19 +232,26 @@ class UserCommandTests extends FlatSpec with WhiskAdminCliTestBase {
   }
 
   it should "get key for existing user" in {
-    implicit val tid = transid()
-    val subject = newSubject()
+    org.apache.openwhisk.utils.retry(
+      {
+        cleanup()
+        implicit val tid = transid()
+        val subject = newSubject()
 
-    val ns1 = newNS()
-    val ns3 = newNS(EntityName(subject), BasicAuthenticationAuthKey())
+        val ns1 = newNS()
+        val ns3 = newNS(EntityName(subject), BasicAuthenticationAuthKey())
 
-    val auth = WhiskAuth(Subject(subject), Set(ns1, ns3))
-    put(authStore, auth)
+        val auth = WhiskAuth(Subject(subject), Set(ns1, ns3))
+        put(authStore, auth)
 
-    val result = resultOk("user", "whois", ns1.authkey.compact)
+        val result = resultOk("user", "whois", ns1.authkey.compact)
 
-    result should include(subject)
-    result should include(ns1.namespace.name.asString)
+        result should include(subject)
+        result should include(ns1.namespace.name.asString)
+      },
+      10,
+      Some(1.second),
+      Some(s"${this.getClass.getName} > whois should get key for existing user not successful, retrying.."))
   }
 
   behavior of "list"
