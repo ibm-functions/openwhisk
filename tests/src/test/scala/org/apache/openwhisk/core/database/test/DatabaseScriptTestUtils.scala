@@ -23,6 +23,7 @@ import org.scalatest.Matchers
 import org.scalatest.concurrent.IntegrationPatience
 import org.scalatest.concurrent.ScalaFutures
 import akka.actor.ActorSystem
+import akka.http.scaladsl.model.StatusCodes
 import common.WaitFor
 import common.WhiskProperties
 import pureconfig._
@@ -62,7 +63,16 @@ trait DatabaseScriptTestUtils extends ScalaFutures with Matchers with WaitFor wi
 
     println(s"Creating database: $name")
     val db = new ExtendedCouchDbRestClient(dbProtocol, dbHost, dbPort, dbUsername, dbPassword, name)
-    retry(db.createDb().futureValue shouldBe 'right)
+    retry {
+      val create = db.createDb().futureValue
+      //create should (be('right) or be(Left(StatusCodes.PreconditionFailed)))
+      create should (be('right) or be(
+        Left(
+          StatusCodes.custom(
+            StatusCodes.PreconditionFailed.intValue,
+            "The database could not be created, the file already exists.",
+            "file_exists"))))
+    }
 
     retry {
       val list = db.dbs().futureValue.right.get
@@ -92,7 +102,11 @@ trait DatabaseScriptTestUtils extends ScalaFutures with Matchers with WaitFor wi
     val db = new ExtendedCouchDbRestClient(dbProtocol, dbHost, dbPort, dbUsername, dbPassword, name)
     retry {
       val delete = db.deleteDb().futureValue
-      if (!ignoreFailure) delete shouldBe 'right
+      //if (!ignoreFailure) delete shouldBe 'right
+      //if (!ignoreFailure) delete should (be('right) or be(Left(StatusCodes.NotFound)))
+      if (!ignoreFailure)
+        delete should (be('right) or be(
+          Left(StatusCodes.custom(StatusCodes.NotFound.intValue, "Database does not exist.", "not_found"))))
     }
     // make sure database is deleted
     retry {
