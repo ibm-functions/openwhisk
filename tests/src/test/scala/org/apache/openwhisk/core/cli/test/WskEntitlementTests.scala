@@ -48,9 +48,6 @@ abstract class WskEntitlementTests()
     with WskTestHelpers
     with BeforeAndAfterAll {
 
-  //implicit val system = ActorSystem()
-  //implicit val executor = system.dispatcher
-
   private implicit val materializer = ActorMaterializer()
   val wsk: WskOperations
   lazy val defaultWskProps = WskProps()
@@ -88,11 +85,11 @@ abstract class WskEntitlementTests()
     //      "id": "anon-sdFOhq4kiknbYM33deFb7SSJ9vA",
     //      "key": [
     //        "58b9a982-e9ab-4010-8dc9-87650a123bc1",
-    //        "iX8oqsvqtfF5YTnzKgbikS0n5qrkztrOS7coawkGaGYyDOwPeydvi4s8ijgkfb16"
+    //        "iX8***fb16"
     //      ],
     //      "value": {
     //        "_id": "anon-sdFOhq4kiknbYM33deFb7SSJ9vA/limits",
-    //        "key": "iX8oqsvqtfF5YTnzKgbikS0n5qrkztrOS7coawkGaGYyDOwPeydvi4s8ijgkfb16",
+    //        "key": "iX8***b16",
     //        "namespace": "anon-sdFOhq4kiknbYM33deFb7SSJ9vA",
     //        "uuid": "58b9a982-e9ab-4010-8dc9-87650a123bc1"
     //      }
