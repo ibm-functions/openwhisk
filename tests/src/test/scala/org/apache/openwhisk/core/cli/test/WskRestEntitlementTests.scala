@@ -25,10 +25,9 @@ import org.scalatest.junit.JUnitRunner
 import common.rest.WskRestOperations
 import common.rest.RestResult
 import common.TestUtils.RunResult
-import common.WskActorSystem
 
 @RunWith(classOf[JUnitRunner])
-class WskRestEntitlementTests extends WskEntitlementTests with WskActorSystem {
+class WskRestEntitlementTests extends WskEntitlementTests {
   override lazy val wsk = new WskRestOperations
   override lazy val forbiddenCode = Forbidden.intValue
   override lazy val timeoutCode = BadGateway.intValue
