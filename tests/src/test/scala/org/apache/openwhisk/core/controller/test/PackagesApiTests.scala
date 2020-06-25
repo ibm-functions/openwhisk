@@ -22,6 +22,7 @@ import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.Route
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
+import scala.concurrent.duration._
 import spray.json.DefaultJsonProtocol._
 import spray.json._
 import org.apache.openwhisk.core.controller.WhiskPackagesApi
@@ -72,155 +73,210 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
 
   //// GET /packages
   it should "list all packages/references" in {
-    implicit val tid = transid()
-    // create packages and package bindings, and confirm API lists all of them
-    val providers = (1 to 4).map { i =>
-      if (i % 2 == 0) {
-        WhiskPackage(namespace, aname(), None)
-      } else {
-        val binding = Some(Binding(namespace.root, aname()))
-        WhiskPackage(namespace, aname(), binding)
-      }
-    }.toList
-    providers foreach { put(entityStore, _) }
-    waitOnView(entityStore, WhiskPackage, namespace, providers.length)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          // create packages and package bindings, and confirm API lists all of them
+          val providers = (1 to 4).map { i =>
+            if (i % 2 == 0) {
+              WhiskPackage(namespace, aname(), None)
+            } else {
+              val binding = Some(Binding(namespace.root, aname()))
+              WhiskPackage(namespace, aname(), binding)
+            }
+          }.toList
+          providers foreach { put(entityStore, _) }
+          waitOnView(entityStore, WhiskPackage, namespace, providers.length)
 
-    checkCount(expected = providers.length)
-    org.apache.openwhisk.utils.retry {
-      Get(s"$collectionPath") ~> Route.seal(routes(creds)) ~> check {
-        status should be(OK)
-        val response = responseAs[List[JsObject]]
-        providers.length should be(response.length)
-        response should contain theSameElementsAs providers.map(_.summaryAsJson)
-      }
-    }
+          checkCount(expected = providers.length)
+          org.apache.openwhisk.utils.retry {
+            Get(s"$collectionPath") ~> Route.seal(routes(creds)) ~> check {
+              status should be(OK)
+              val response = responseAs[List[JsObject]]
+              providers.length should be(response.length)
+              response should contain theSameElementsAs providers.map(_.summaryAsJson)
+            }
+          }
 
-    {
-      val path = s"/$namespace/${collection.path}"
-      val auser = WhiskAuthHelpers.newIdentity()
-      checkCount(path, 0, auser)
-      Get(path) ~> Route.seal(routes(auser)) ~> check {
-        val response = responseAs[List[JsObject]]
-        response should be(List.empty) // cannot list packages that are private in another namespace
-      }
-    }
+          {
+            val path = s"/$namespace/${collection.path}"
+            val auser = WhiskAuthHelpers.newIdentity()
+            checkCount(path, 0, auser)
+            Get(path) ~> Route.seal(routes(auser)) ~> check {
+              val response = responseAs[List[JsObject]]
+              response should be(List.empty) // cannot list packages that are private in another namespace
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(s"${this.getClass.getName} > Packages API should list all packages/references not successful, retrying.."))
   }
 
   it should "list all public packages in explicit namespace excluding bindings" in {
-    implicit val tid = transid()
-    // create packages and package bindings, set some public and confirm API lists only public packages
-    val namespaces = Seq(namespace, EntityPath(aname().toString), EntityPath(aname().toString))
-    val providers = Seq(
-      WhiskPackage(namespaces(0), aname(), None, publish = true),
-      WhiskPackage(namespaces(1), aname(), None, publish = true),
-      WhiskPackage(namespaces(2), aname(), None, publish = true))
-    val references = Seq(
-      WhiskPackage(namespaces(0), aname(), providers(0).bind, publish = true),
-      WhiskPackage(namespaces(0), aname(), providers(0).bind, publish = false),
-      WhiskPackage(namespaces(0), aname(), providers(1).bind, publish = true),
-      WhiskPackage(namespaces(0), aname(), providers(1).bind, publish = false))
-    (providers ++ references) foreach { put(entityStore, _) }
-    waitOnView(entityStore, WhiskPackage, namespaces(1), 1)
-    waitOnView(entityStore, WhiskPackage, namespaces(2), 1)
-    waitOnView(entityStore, WhiskPackage, namespaces(0), 1 + 4)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          // create packages and package bindings, set some public and confirm API lists only public packages
+          val namespaces = Seq(namespace, EntityPath(aname().toString), EntityPath(aname().toString))
+          val providers = Seq(
+            WhiskPackage(namespaces(0), aname(), None, publish = true),
+            WhiskPackage(namespaces(1), aname(), None, publish = true),
+            WhiskPackage(namespaces(2), aname(), None, publish = true))
+          val references = Seq(
+            WhiskPackage(namespaces(0), aname(), providers(0).bind, publish = true),
+            WhiskPackage(namespaces(0), aname(), providers(0).bind, publish = false),
+            WhiskPackage(namespaces(0), aname(), providers(1).bind, publish = true),
+            WhiskPackage(namespaces(0), aname(), providers(1).bind, publish = false))
+          (providers ++ references) foreach { put(entityStore, _) }
+          waitOnView(entityStore, WhiskPackage, namespaces(1), 1)
+          waitOnView(entityStore, WhiskPackage, namespaces(2), 1)
+          waitOnView(entityStore, WhiskPackage, namespaces(0), 1 + 4)
 
-    {
-      val expected = providers.filter(_.namespace == namespace) ++ references
-      checkCount(expected = expected.length)
-      Get(s"$collectionPath") ~> Route.seal(routes(creds)) ~> check {
-        status should be(OK)
-        val response = responseAs[List[JsObject]]
-        response should have size expected.size
-        response should contain theSameElementsAs expected.map(_.summaryAsJson)
-      }
-    }
+          {
+            val expected = providers.filter(_.namespace == namespace) ++ references
+            checkCount(expected = expected.length)
+            Get(s"$collectionPath") ~> Route.seal(routes(creds)) ~> check {
+              status should be(OK)
+              val response = responseAs[List[JsObject]]
+              response should have size expected.size
+              response should contain theSameElementsAs expected.map(_.summaryAsJson)
+            }
+          }
 
-    {
-      val path = s"/$namespace/${collection.path}"
-      val auser = WhiskAuthHelpers.newIdentity()
-      val expected = providers.filter(p => p.namespace == namespace && p.publish) ++
-        references.filter(p => p.publish && p.binding == None)
+          {
+            val path = s"/$namespace/${collection.path}"
+            val auser = WhiskAuthHelpers.newIdentity()
+            val expected = providers.filter(p => p.namespace == namespace && p.publish) ++
+              references.filter(p => p.publish && p.binding == None)
 
-      checkCount(path, expected.length, auser)
-      Get(path) ~> Route.seal(routes(auser)) ~> check {
-        status should be(OK)
-        val response = responseAs[List[JsObject]]
-        response should have size expected.size
-        response should contain theSameElementsAs expected.map(_.summaryAsJson)
-      }
-    }
+            checkCount(path, expected.length, auser)
+            Get(path) ~> Route.seal(routes(auser)) ~> check {
+              status should be(OK)
+              val response = responseAs[List[JsObject]]
+              response should have size expected.size
+              response should contain theSameElementsAs expected.map(_.summaryAsJson)
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should list all public packages in explicit namespace excluding bindings not successful, retrying.."))
   }
 
   it should "reject list when limit is greater than maximum allowed value" in {
-    implicit val tid = transid()
-    val exceededMaxLimit = Collection.MAX_LIST_LIMIT + 1
-    val response = Get(s"$collectionPath?limit=$exceededMaxLimit") ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-      responseAs[String] should include {
-        Messages.listLimitOutOfRange(Collection.PACKAGES, exceededMaxLimit, Collection.MAX_LIST_LIMIT)
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val exceededMaxLimit = Collection.MAX_LIST_LIMIT + 1
+          val response = Get(s"$collectionPath?limit=$exceededMaxLimit") ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+            responseAs[String] should include {
+              Messages.listLimitOutOfRange(Collection.PACKAGES, exceededMaxLimit, Collection.MAX_LIST_LIMIT)
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject list when limit is greater than maximum allowed value not successful, retrying.."))
   }
 
   it should "reject list when limit is not an integer" in {
-    implicit val tid = transid()
-    val notAnInteger = "string"
-    val response = Get(s"$collectionPath?limit=$notAnInteger") ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-      responseAs[String] should include {
-        Messages.argumentNotInteger(Collection.PACKAGES, notAnInteger)
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val notAnInteger = "string"
+          val response = Get(s"$collectionPath?limit=$notAnInteger") ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+            responseAs[String] should include {
+              Messages.argumentNotInteger(Collection.PACKAGES, notAnInteger)
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject list when limit is not an integer not successful, retrying.."))
   }
 
   it should "reject list when skip is negative" in {
-    implicit val tid = transid()
-    val negativeSkip = -1
-    val response = Get(s"$collectionPath?skip=$negativeSkip") ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-      responseAs[String] should include {
-        Messages.listSkipOutOfRange(Collection.PACKAGES, negativeSkip)
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val negativeSkip = -1
+          val response = Get(s"$collectionPath?skip=$negativeSkip") ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+            responseAs[String] should include {
+              Messages.listSkipOutOfRange(Collection.PACKAGES, negativeSkip)
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject list when skip is negative not successful, retrying.."))
   }
 
   it should "reject list when skip is not an integer" in {
-    implicit val tid = transid()
-    val notAnInteger = "string"
-    val response = Get(s"$collectionPath?skip=$notAnInteger") ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-      responseAs[String] should include {
-        Messages.argumentNotInteger(Collection.PACKAGES, notAnInteger)
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val notAnInteger = "string"
+          val response = Get(s"$collectionPath?skip=$notAnInteger") ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+            responseAs[String] should include {
+              Messages.argumentNotInteger(Collection.PACKAGES, notAnInteger)
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject list when skip is not an integer not successful, retrying.."))
   }
 
   ignore should "list all public packages excluding bindings" in {
-    implicit val tid = transid()
-    // create packages and package bindings, set some public and confirm API lists only public packages
-    val namespaces = Seq(namespace, EntityPath(aname().toString), EntityPath(aname().toString))
-    val providers = Seq(
-      WhiskPackage(namespaces(0), aname(), None, publish = false),
-      WhiskPackage(namespaces(1), aname(), None, publish = true),
-      WhiskPackage(namespaces(2), aname(), None, publish = true))
-    val references = Seq(
-      WhiskPackage(namespaces(0), aname(), providers(0).bind, publish = true),
-      WhiskPackage(namespaces(0), aname(), providers(0).bind, publish = false),
-      WhiskPackage(namespaces(0), aname(), providers(1).bind, publish = true),
-      WhiskPackage(namespaces(0), aname(), providers(1).bind, publish = false))
-    (providers ++ references) foreach { put(entityStore, _) }
-    waitOnView(entityStore, WhiskPackage, namespaces(1), 1)
-    waitOnView(entityStore, WhiskPackage, namespaces(2), 1)
-    waitOnView(entityStore, WhiskPackage, namespaces(0), 1 + 4)
-    Get(s"$collectionPath?public=true") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[List[JsObject]]
-      val expected = providers filter { _.publish }
-      response.length should be >= (expected.length)
-      expected forall { p =>
-        (response contains p.summaryAsJson) && p.binding == None
-      } should be(true)
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          // create packages and package bindings, set some public and confirm API lists only public packages
+          val namespaces = Seq(namespace, EntityPath(aname().toString), EntityPath(aname().toString))
+          val providers = Seq(
+            WhiskPackage(namespaces(0), aname(), None, publish = false),
+            WhiskPackage(namespaces(1), aname(), None, publish = true),
+            WhiskPackage(namespaces(2), aname(), None, publish = true))
+          val references = Seq(
+            WhiskPackage(namespaces(0), aname(), providers(0).bind, publish = true),
+            WhiskPackage(namespaces(0), aname(), providers(0).bind, publish = false),
+            WhiskPackage(namespaces(0), aname(), providers(1).bind, publish = true),
+            WhiskPackage(namespaces(0), aname(), providers(1).bind, publish = false))
+          (providers ++ references) foreach { put(entityStore, _) }
+          waitOnView(entityStore, WhiskPackage, namespaces(1), 1)
+          waitOnView(entityStore, WhiskPackage, namespaces(2), 1)
+          waitOnView(entityStore, WhiskPackage, namespaces(0), 1 + 4)
+          Get(s"$collectionPath?public=true") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[List[JsObject]]
+            val expected = providers filter { _.publish }
+            response.length should be >= (expected.length)
+            expected forall { p =>
+              (response contains p.summaryAsJson) && p.binding == None
+            } should be(true)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should list all public packages excluding bindings not successful, retrying.."))
   }
 
   // ?public disabled
@@ -250,31 +306,39 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
 
   // confirm ?public disabled
   it should "ignore ?public on list all packages" in {
-    implicit val tid = transid()
-    Get(s"$collectionPath?public=true") ~> Route.seal(routes(creds)) ~> check {
-      implicit val tid = transid()
-      // create packages and package bindings, set some public and confirm API lists only public packages
-      val namespaces = Seq(namespace, EntityPath(aname().toString), EntityPath(aname().toString))
-      val pkgname = aname()
-      val providers = Seq(
-        WhiskPackage(namespaces(0), pkgname, None, publish = true),
-        WhiskPackage(namespaces(1), pkgname, None, publish = true),
-        WhiskPackage(namespaces(2), pkgname, None, publish = true))
-      providers foreach { put(entityStore, _) }
-      waitOnView(entityStore, WhiskPackage, namespaces(0), 1)
-      waitOnView(entityStore, WhiskPackage, namespaces(1), 1)
-      waitOnView(entityStore, WhiskPackage, namespaces(2), 1)
-      val expected = providers filter (_.namespace == creds.namespace.name.toPath)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          Get(s"$collectionPath?public=true") ~> Route.seal(routes(creds)) ~> check {
+            implicit val tid = transid()
+            // create packages and package bindings, set some public and confirm API lists only public packages
+            val namespaces = Seq(namespace, EntityPath(aname().toString), EntityPath(aname().toString))
+            val pkgname = aname()
+            val providers = Seq(
+              WhiskPackage(namespaces(0), pkgname, None, publish = true),
+              WhiskPackage(namespaces(1), pkgname, None, publish = true),
+              WhiskPackage(namespaces(2), pkgname, None, publish = true))
+            providers foreach { put(entityStore, _) }
+            waitOnView(entityStore, WhiskPackage, namespaces(0), 1)
+            waitOnView(entityStore, WhiskPackage, namespaces(1), 1)
+            waitOnView(entityStore, WhiskPackage, namespaces(2), 1)
+            val expected = providers filter (_.namespace == creds.namespace.name.toPath)
 
-      Get(s"$collectionPath?public=true") ~> Route.seal(routes(creds)) ~> check {
-        status should be(OK)
-        val response = responseAs[List[JsObject]]
-        response.length should be >= (expected.length)
-        expected forall { p =>
-          (response contains p.summaryAsJson) && p.binding == None
-        } should be(true)
-      }
-    }
+            Get(s"$collectionPath?public=true") ~> Route.seal(routes(creds)) ~> check {
+              status should be(OK)
+              val response = responseAs[List[JsObject]]
+              response.length should be >= (expected.length)
+              expected forall { p =>
+                (response contains p.summaryAsJson) && p.binding == None
+              } should be(true)
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should ignore ?public on list all packages not successful, retrying.."))
   }
 
   // ?public disabled
@@ -287,601 +351,887 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
 
   //// GET /packages/name
   it should "get package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None)
-    put(entityStore, provider)
-    Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[WhiskPackageWithActions]
-      response should be(provider withActions ())
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None)
+          put(entityStore, provider)
+          Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[WhiskPackageWithActions]
+            response should be(provider withActions ())
+          }
+        },
+        10,
+        Some(1.second),
+        Some(s"${this.getClass.getName} > Packages API should get package not successful, retrying.."))
   }
 
   it should "get package with updated field" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None)
-    put(entityStore, provider)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None)
+          put(entityStore, provider)
 
-    // `updated` field should be compared with a document in DB
-    val pkg = get(entityStore, provider.docid, WhiskPackage)
+          // `updated` field should be compared with a document in DB
+          val pkg = get(entityStore, provider.docid, WhiskPackage)
 
-    Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[WhiskPackageWithActions]
-      response should be(provider copy (updated = pkg.updated) withActions ())
-    }
+          Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[WhiskPackageWithActions]
+            response should be(provider copy (updated = pkg.updated) withActions ())
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should get package with updated field not successful, retrying.."))
   }
 
   it should "get package reference for private package in same namespace" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None, Parameters("a", "A") ++ Parameters("b", "B"))
-    val reference = WhiskPackage(namespace, aname(), provider.bind, Parameters("b", "b") ++ Parameters("c", "C"))
-    put(entityStore, provider)
-    put(entityStore, reference)
-    Get(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[WhiskPackageWithActions]
-      response should be(reference inherit provider.parameters withActions ())
-      // this is redundant in case the precedence orders on inherit are changed incorrectly
-      response.wp.parameters should be(Parameters("a", "A") ++ Parameters("b", "b") ++ Parameters("c", "C"))
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None, Parameters("a", "A") ++ Parameters("b", "B"))
+          val reference = WhiskPackage(namespace, aname(), provider.bind, Parameters("b", "b") ++ Parameters("c", "C"))
+          put(entityStore, provider)
+          put(entityStore, reference)
+          Get(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[WhiskPackageWithActions]
+            response should be(reference inherit provider.parameters withActions ())
+            // this is redundant in case the precedence orders on inherit are changed incorrectly
+            response.wp.parameters should be(Parameters("a", "A") ++ Parameters("b", "b") ++ Parameters("c", "C"))
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should get package reference for private package in same namespace not successful, retrying.."))
   }
 
   it should "not get package reference for a private package in other namespace" in {
-    implicit val tid = transid()
-    val privateCreds = WhiskAuthHelpers.newIdentity()
-    val privateNamespace = EntityPath(privateCreds.subject.asString)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val privateCreds = WhiskAuthHelpers.newIdentity()
+          val privateNamespace = EntityPath(privateCreds.subject.asString)
 
-    val provider = WhiskPackage(privateNamespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    put(entityStore, provider)
-    put(entityStore, reference)
-    Get(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(Forbidden)
-    }
+          val provider = WhiskPackage(privateNamespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          put(entityStore, provider)
+          put(entityStore, reference)
+          Get(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should not get package reference for a private package in other namespace not successful, retrying.."))
   }
 
   it should "get package with its actions and feeds" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val action = WhiskAction(provider.namespace.addPath(provider.name), aname(), jsDefault("??"))
-    val feed = WhiskAction(
-      provider.namespace.addPath(provider.name),
-      aname(),
-      jsDefault("??"),
-      annotations = Parameters(Parameters.Feed, "true"))
-    put(entityStore, provider)
-    put(entityStore, action)
-    put(entityStore, feed)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val action = WhiskAction(provider.namespace.addPath(provider.name), aname(), jsDefault("??"))
+          val feed = WhiskAction(
+            provider.namespace.addPath(provider.name),
+            aname(),
+            jsDefault("??"),
+            annotations = Parameters(Parameters.Feed, "true"))
+          put(entityStore, provider)
+          put(entityStore, action)
+          put(entityStore, feed)
 
-    // it should "reject get private package from other subject" in {
-    val auser = WhiskAuthHelpers.newIdentity()
-    Get(s"/$namespace/${collection.path}/${provider.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+          // it should "reject get private package from other subject" in {
+          val auser = WhiskAuthHelpers.newIdentity()
+          Get(s"/$namespace/${collection.path}/${provider.name}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
 
-    Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[WhiskPackageWithActions]
-      response should be(provider withActions (List(action, feed)))
-    }
+          Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[WhiskPackageWithActions]
+            response should be(provider withActions (List(action, feed)))
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should get package with its actions and feeds not successful, retrying.."))
   }
 
   it should "get package reference with its actions and feeds" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    val action = WhiskAction(provider.namespace.addPath(provider.name), aname(), jsDefault("??"))
-    val feed = WhiskAction(
-      provider.namespace.addPath(provider.name),
-      aname(),
-      jsDefault("??"),
-      annotations = Parameters(Parameters.Feed, "true"))
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          val action = WhiskAction(provider.namespace.addPath(provider.name), aname(), jsDefault("??"))
+          val feed = WhiskAction(
+            provider.namespace.addPath(provider.name),
+            aname(),
+            jsDefault("??"),
+            annotations = Parameters(Parameters.Feed, "true"))
 
-    put(entityStore, provider)
-    put(entityStore, reference)
-    put(entityStore, action)
-    put(entityStore, feed)
+          put(entityStore, provider)
+          put(entityStore, reference)
+          put(entityStore, action)
+          put(entityStore, feed)
 
-    waitOnView(entityStore, WhiskAction, provider.fullPath, 2)
+          waitOnView(entityStore, WhiskAction, provider.fullPath, 2)
 
-    // it should "reject get package reference from other subject" in {
-    val auser = WhiskAuthHelpers.newIdentity()
-    Get(s"/$namespace/${collection.path}/${reference.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+          // it should "reject get package reference from other subject" in {
+          val auser = WhiskAuthHelpers.newIdentity()
+          Get(s"/$namespace/${collection.path}/${reference.name}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
 
-    Get(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[WhiskPackageWithActions]
-      response should be(reference withActions List(action, feed))
-    }
+          Get(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[WhiskPackageWithActions]
+            response should be(reference withActions List(action, feed))
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should get package reference with its actions and feeds not successful, retrying.."))
   }
 
   it should "not get package reference with its actions and feeds from private package" in {
-    implicit val tid = transid()
-    val privateCreds = WhiskAuthHelpers.newIdentity()
-    val privateNamespace = EntityPath(privateCreds.subject.asString)
-    val provider = WhiskPackage(privateNamespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    val action = WhiskAction(provider.namespace.addPath(provider.name), aname(), jsDefault("??"))
-    val feed = WhiskAction(
-      provider.namespace.addPath(provider.name),
-      aname(),
-      jsDefault("??"),
-      annotations = Parameters(Parameters.Feed, "true"))
-    put(entityStore, provider)
-    put(entityStore, reference)
-    put(entityStore, action)
-    put(entityStore, feed)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val privateCreds = WhiskAuthHelpers.newIdentity()
+          val privateNamespace = EntityPath(privateCreds.subject.asString)
+          val provider = WhiskPackage(privateNamespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          val action = WhiskAction(provider.namespace.addPath(provider.name), aname(), jsDefault("??"))
+          val feed = WhiskAction(
+            provider.namespace.addPath(provider.name),
+            aname(),
+            jsDefault("??"),
+            annotations = Parameters(Parameters.Feed, "true"))
+          put(entityStore, provider)
+          put(entityStore, reference)
+          put(entityStore, action)
+          put(entityStore, feed)
 
-    // it should "reject get package reference from other subject" in {
-    val auser = WhiskAuthHelpers.newIdentity()
-    Get(s"/$namespace/${collection.path}/${reference.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+          // it should "reject get package reference from other subject" in {
+          val auser = WhiskAuthHelpers.newIdentity()
+          Get(s"/$namespace/${collection.path}/${reference.name}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
 
-    Get(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(Forbidden)
-    }
+          Get(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should not get package reference with its actions and feeds from private package not successful, retrying.."))
   }
 
   //// PUT /packages/name
   it should "create package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None, annotations = Parameters("a", "b"))
-    // binding annotation should be removed
-    val someBindingAnnotation = Parameters(WhiskPackage.bindingFieldName, "???")
-    val content = WhiskPackagePut(annotations = Some(someBindingAnnotation ++ Parameters("a", "b")))
-    Put(s"$collectionPath/${provider.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      deletePackage(provider.docid)
-      status should be(OK)
-      val response = responseAs[WhiskPackage]
-      checkWhiskEntityResponse(response, provider)
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None, annotations = Parameters("a", "b"))
+          // binding annotation should be removed
+          val someBindingAnnotation = Parameters(WhiskPackage.bindingFieldName, "???")
+          val content = WhiskPackagePut(annotations = Some(someBindingAnnotation ++ Parameters("a", "b")))
+          Put(s"$collectionPath/${provider.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            deletePackage(provider.docid)
+            status should be(OK)
+            val response = responseAs[WhiskPackage]
+            checkWhiskEntityResponse(response, provider)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(s"${this.getClass.getName} > Packages API should create package not successful, retrying.."))
   }
 
   it should "reject create/update package when package name is reserved" in {
-    implicit val tid = transid()
-    Set(true, false) foreach { overwrite =>
-      RESERVED_NAMES foreach { reservedName =>
-        val provider = WhiskPackage(namespace, EntityName(reservedName), None)
-        val content = WhiskPackagePut()
-        Put(s"$collectionPath/${provider.name}?overwrite=$overwrite", content) ~> Route.seal(routes(creds)) ~> check {
-          status should be(BadRequest)
-          responseAs[ErrorResponse].error shouldBe Messages.packageNameIsReserved(reservedName)
-        }
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          Set(true, false) foreach { overwrite =>
+            RESERVED_NAMES foreach { reservedName =>
+              val provider = WhiskPackage(namespace, EntityName(reservedName), None)
+              val content = WhiskPackagePut()
+              Put(s"$collectionPath/${provider.name}?overwrite=$overwrite", content) ~> Route
+                .seal(routes(creds)) ~> check {
+                status should be(BadRequest)
+                responseAs[ErrorResponse].error shouldBe Messages.packageNameIsReserved(reservedName)
+              }
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject create/update package when package name is reserved not successful, retrying.."))
   }
 
   it should "not allow package update of pre-existing package with a reserved" in {
-    implicit val tid = transid()
-    RESERVED_NAMES foreach { reservedName =>
-      val provider = WhiskPackage(namespace, EntityName(reservedName), None)
-      put(entityStore, provider)
-      val content = WhiskPackagePut()
-      Put(s"$collectionPath/${provider.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
-        status should be(BadRequest)
-        responseAs[ErrorResponse].error shouldBe Messages.packageNameIsReserved(reservedName)
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          RESERVED_NAMES foreach { reservedName =>
+            val provider = WhiskPackage(namespace, EntityName(reservedName), None)
+            put(entityStore, provider)
+            val content = WhiskPackagePut()
+            Put(s"$collectionPath/${provider.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
+              status should be(BadRequest)
+              responseAs[ErrorResponse].error shouldBe Messages.packageNameIsReserved(reservedName)
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should not allow package update of pre-existing package with a reserved not successful, retrying.."))
   }
 
   it should "allow package get/delete for pre-existing package with a reserved name" in {
-    implicit val tid = transid()
-    RESERVED_NAMES foreach { reservedName =>
-      val provider = WhiskPackage(namespace, EntityName(reservedName), None)
-      put(entityStore, provider, garbageCollect = false)
-      val content = WhiskPackagePut()
-      Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
-        status should be(OK)
-        responseAs[WhiskPackage] shouldBe provider
-      }
-      Delete(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
-        status should be(OK)
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          RESERVED_NAMES foreach {
+            reservedName =>
+              val provider = WhiskPackage(namespace, EntityName(reservedName), None)
+              put(entityStore, provider, garbageCollect = false)
+              val content = WhiskPackagePut()
+              Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
+                status should be(OK)
+                responseAs[WhiskPackage] shouldBe provider
+              }
+              Delete(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
+                status should be(OK)
+              }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should allow package get/delete for pre-existing package with a reserved name not successful, retrying.."))
   }
 
   it should "create package reference with explicit namespace" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val reference = WhiskPackage(
-      namespace,
-      aname(),
-      provider.bind,
-      annotations = bindingAnnotation(provider.bind.get) ++ Parameters("a", "b"))
-    // binding annotation should be removed and set by controller
-    val someBindingAnnotation = Parameters(WhiskPackage.bindingFieldName, "???")
-    val content = WhiskPackagePut(reference.binding, annotations = Some(someBindingAnnotation ++ Parameters("a", "b")))
-    put(entityStore, provider)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val reference = WhiskPackage(
+            namespace,
+            aname(),
+            provider.bind,
+            annotations = bindingAnnotation(provider.bind.get) ++ Parameters("a", "b"))
+          // binding annotation should be removed and set by controller
+          val someBindingAnnotation = Parameters(WhiskPackage.bindingFieldName, "???")
+          val content =
+            WhiskPackagePut(reference.binding, annotations = Some(someBindingAnnotation ++ Parameters("a", "b")))
+          put(entityStore, provider)
 
-    // it should "reject create package reference in some other namespace" in {
-    val auser = WhiskAuthHelpers.newIdentity()
-    Put(s"/$namespace/${collection.path}/${reference.name}", content) ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+          // it should "reject create package reference in some other namespace" in {
+          val auser = WhiskAuthHelpers.newIdentity()
+          Put(s"/$namespace/${collection.path}/${reference.name}", content) ~> Route.seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
 
-    Put(s"/$namespace/${collection.path}/${reference.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      deletePackage(reference.docid)
-      status should be(OK)
-      val response = responseAs[WhiskPackage]
-      checkWhiskEntityResponse(response, reference)
-    }
+          Put(s"/$namespace/${collection.path}/${reference.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            deletePackage(reference.docid)
+            status should be(OK)
+            val response = responseAs[WhiskPackage]
+            checkWhiskEntityResponse(response, reference)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should create package reference with explicit namespace not successful, retrying.."))
   }
 
   it should "not create package reference from private package in another namespace" in {
-    implicit val tid = transid()
-    val privateCreds = WhiskAuthHelpers.newIdentity()
-    val privateNamespace = EntityPath(privateCreds.subject.asString)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val privateCreds = WhiskAuthHelpers.newIdentity()
+          val privateNamespace = EntityPath(privateCreds.subject.asString)
 
-    val provider = WhiskPackage(privateNamespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    // binding annotation should be removed and set by controller
-    val content = WhiskPackagePut(reference.binding)
-    put(entityStore, provider)
+          val provider = WhiskPackage(privateNamespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          // binding annotation should be removed and set by controller
+          val content = WhiskPackagePut(reference.binding)
+          put(entityStore, provider)
 
-    Put(s"/$namespace/${collection.path}/${reference.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(Forbidden)
-    }
+          Put(s"/$namespace/${collection.path}/${reference.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should not create package reference from private package in another namespace not successful, retrying.."))
   }
 
   it should "create package reference with implicit namespace" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val reference = WhiskPackage(namespace, aname(), Some(Binding(EntityPath.DEFAULT.root, provider.name)))
-    val content = WhiskPackagePut(reference.binding)
-    put(entityStore, provider)
-    Put(s"$collectionPath/${reference.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      deletePackage(reference.docid)
-      status should be(OK)
-      val response = responseAs[WhiskPackage]
-      checkWhiskEntityResponse(
-        response,
-        WhiskPackage(
-          reference.namespace,
-          reference.name,
-          provider.bind,
-          annotations = bindingAnnotation(provider.bind.get)))
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val reference = WhiskPackage(namespace, aname(), Some(Binding(EntityPath.DEFAULT.root, provider.name)))
+          val content = WhiskPackagePut(reference.binding)
+          put(entityStore, provider)
+          Put(s"$collectionPath/${reference.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            deletePackage(reference.docid)
+            status should be(OK)
+            val response = responseAs[WhiskPackage]
+            checkWhiskEntityResponse(
+              response,
+              WhiskPackage(
+                reference.namespace,
+                reference.name,
+                provider.bind,
+                annotations = bindingAnnotation(provider.bind.get)))
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should create package reference with implicit namespace not successful, retrying.."))
   }
 
   it should "reject create package reference when referencing non-existent package in same namespace" in {
-    implicit val tid = transid()
-    val binding = Some(Binding(namespace.root, aname()))
-    val content = WhiskPackagePut(binding)
-    Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-      responseAs[ErrorResponse].error should include(Messages.bindingDoesNotExist)
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val binding = Some(Binding(namespace.root, aname()))
+          val content = WhiskPackagePut(binding)
+          Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+            responseAs[ErrorResponse].error should include(Messages.bindingDoesNotExist)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject create package reference when referencing non-existent package in same namespace not successful, retrying.."))
   }
 
   it should "reject create package reference when referencing non-existent package in another namespace" in {
-    implicit val tid = transid()
-    val privateCreds = WhiskAuthHelpers.newIdentity()
-    val privateNamespace = EntityPath(privateCreds.subject.asString)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val privateCreds = WhiskAuthHelpers.newIdentity()
+          val privateNamespace = EntityPath(privateCreds.subject.asString)
 
-    val binding = Some(Binding(privateNamespace.root, aname()))
-    val content = WhiskPackagePut(binding)
-    Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(Forbidden)
-    }
+          val binding = Some(Binding(privateNamespace.root, aname()))
+          val content = WhiskPackagePut(binding)
+          Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > reject create package reference when referencing non-existent package in another namespace not successful, retrying.."))
   }
 
   it should "reject create package reference when referencing a non-package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    val content = WhiskPackagePut(Some(Binding(reference.namespace.root, reference.name)))
-    put(entityStore, provider)
-    put(entityStore, reference)
-    Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-      responseAs[ErrorResponse].error should include(Messages.bindingCannotReferenceBinding)
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          val content = WhiskPackagePut(Some(Binding(reference.namespace.root, reference.name)))
+          put(entityStore, provider)
+          put(entityStore, reference)
+          Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+            responseAs[ErrorResponse].error should include(Messages.bindingCannotReferenceBinding)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject create package reference when referencing a non-package not successful, retrying.."))
   }
 
   it should "reject create package reference when annotations are too big" in {
-    implicit val tid = transid()
-    val keys: List[Long] =
-      List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
-    val annotations = keys map { key =>
-      Parameters(key.toString, "a" * 10)
-    } reduce (_ ++ _)
-    val content = s"""{"annotations":$annotations}""".parseJson.asJsObject
-    Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(PayloadTooLarge)
-      responseAs[String] should include {
-        Messages.entityTooBig(SizeError(WhiskEntity.annotationsFieldName, annotations.size, Parameters.sizeLimit))
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val keys: List[Long] =
+            List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
+          val annotations = keys map { key =>
+            Parameters(key.toString, "a" * 10)
+          } reduce (_ ++ _)
+          val content = s"""{"annotations":$annotations}""".parseJson.asJsObject
+          Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(PayloadTooLarge)
+            responseAs[String] should include {
+              Messages.entityTooBig(SizeError(WhiskEntity.annotationsFieldName, annotations.size, Parameters.sizeLimit))
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject create package reference when annotations are too bigreject create package reference when annotations are too big not successful, retrying.."))
   }
 
   it should "reject create package reference when parameters are too big" in {
-    implicit val tid = transid()
-    val keys: List[Long] =
-      List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
-    val parameters = keys map { key =>
-      Parameters(key.toString, "a" * 10)
-    } reduce (_ ++ _)
-    val content = s"""{"parameters":$parameters}""".parseJson.asJsObject
-    Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(PayloadTooLarge)
-      responseAs[String] should include {
-        Messages.entityTooBig(SizeError(WhiskEntity.paramsFieldName, parameters.size, Parameters.sizeLimit))
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val keys: List[Long] =
+            List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
+          val parameters = keys map { key =>
+            Parameters(key.toString, "a" * 10)
+          } reduce (_ ++ _)
+          val content = s"""{"parameters":$parameters}""".parseJson.asJsObject
+          Put(s"$collectionPath/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(PayloadTooLarge)
+            responseAs[String] should include {
+              Messages.entityTooBig(SizeError(WhiskEntity.paramsFieldName, parameters.size, Parameters.sizeLimit))
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(s"${this.getClass.getName} > Packages API should list all packages/references not successful, retrying.."))
   }
 
   it should "reject update package reference when parameters are too big" in {
-    implicit val tid = transid()
-    val keys: List[Long] =
-      List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
-    val parameters = keys map { key =>
-      Parameters(key.toString, "a" * 10)
-    } reduce (_ ++ _)
-    val provider = WhiskPackage(namespace, aname())
-    val content = s"""{"parameters":$parameters}""".parseJson.asJsObject
-    put(entityStore, provider)
-    Put(s"$collectionPath/${aname()}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(PayloadTooLarge)
-      responseAs[String] should include {
-        Messages.entityTooBig(SizeError(WhiskEntity.paramsFieldName, parameters.size, Parameters.sizeLimit))
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val keys: List[Long] =
+            List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
+          val parameters = keys map { key =>
+            Parameters(key.toString, "a" * 10)
+          } reduce (_ ++ _)
+          val provider = WhiskPackage(namespace, aname())
+          val content = s"""{"parameters":$parameters}""".parseJson.asJsObject
+          put(entityStore, provider)
+          Put(s"$collectionPath/${aname()}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(PayloadTooLarge)
+            responseAs[String] should include {
+              Messages.entityTooBig(SizeError(WhiskEntity.paramsFieldName, parameters.size, Parameters.sizeLimit))
+            }
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject update package reference when parameters are too big not successful, retrying.."))
   }
 
   it should "update package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val content = WhiskPackagePut(publish = Some(true))
-    put(entityStore, provider)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val content = WhiskPackagePut(publish = Some(true))
+          put(entityStore, provider)
 
-    // it should "reject update package owned by different user" in {
-    val auser = WhiskAuthHelpers.newIdentity()
-    Put(s"/$namespace/${collection.path}/${provider.name}?overwrite=true", content) ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+          // it should "reject update package owned by different user" in {
+          val auser = WhiskAuthHelpers.newIdentity()
+          Put(s"/$namespace/${collection.path}/${provider.name}?overwrite=true", content) ~> Route
+            .seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
 
-    Put(s"$collectionPath/${provider.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
-      deletePackage(provider.docid)
-      val response = responseAs[WhiskPackage]
-      checkWhiskEntityResponse(
-        response,
-        WhiskPackage(namespace, provider.name, None, version = provider.version.upPatch, publish = true))
-    }
+          Put(s"$collectionPath/${provider.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
+            deletePackage(provider.docid)
+            val response = responseAs[WhiskPackage]
+            checkWhiskEntityResponse(
+              response,
+              WhiskPackage(namespace, provider.name, None, version = provider.version.upPatch, publish = true))
+          }
+        },
+        10,
+        Some(1.second),
+        Some(s"${this.getClass.getName} > Packages API should update package not successful, retrying.."))
   }
 
   it should "update package reference" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind, annotations = bindingAnnotation(provider.bind.get))
-    // create a bogus binding annotation which should be replaced by the PUT
-    val someBindingAnnotation = Some(Parameters(WhiskPackage.bindingFieldName, "???") ++ Parameters("a", "b"))
-    val content = WhiskPackagePut(publish = Some(true), annotations = someBindingAnnotation)
-    put(entityStore, provider)
-    put(entityStore, reference)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val reference =
+            WhiskPackage(namespace, aname(), provider.bind, annotations = bindingAnnotation(provider.bind.get))
+          // create a bogus binding annotation which should be replaced by the PUT
+          val someBindingAnnotation = Some(Parameters(WhiskPackage.bindingFieldName, "???") ++ Parameters("a", "b"))
+          val content = WhiskPackagePut(publish = Some(true), annotations = someBindingAnnotation)
+          put(entityStore, provider)
+          put(entityStore, reference)
 
-    // it should "reject update package reference owned by different user"
-    val auser = WhiskAuthHelpers.newIdentity()
-    Put(s"/$namespace/${collection.path}/${reference.name}?overwrite=true", content) ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+          // it should "reject update package reference owned by different user"
+          val auser = WhiskAuthHelpers.newIdentity()
+          Put(s"/$namespace/${collection.path}/${reference.name}?overwrite=true", content) ~> Route
+            .seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
 
-    Put(s"$collectionPath/${reference.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
-      deletePackage(reference.docid)
-      status should be(OK)
-      val response = responseAs[WhiskPackage]
-      checkWhiskEntityResponse(
-        response,
-        WhiskPackage(
-          reference.namespace,
-          reference.name,
-          reference.binding,
-          version = reference.version.upPatch,
-          publish = true,
-          annotations = reference.annotations ++ Parameters("a", "b")))
-    }
+          Put(s"$collectionPath/${reference.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
+            deletePackage(reference.docid)
+            status should be(OK)
+            val response = responseAs[WhiskPackage]
+            checkWhiskEntityResponse(
+              response,
+              WhiskPackage(
+                reference.namespace,
+                reference.name,
+                reference.binding,
+                version = reference.version.upPatch,
+                publish = true,
+                annotations = reference.annotations ++ Parameters("a", "b")))
+          }
+        },
+        10,
+        Some(1.second),
+        Some(s"${this.getClass.getName} > Packages API should update package reference not successful, retrying.."))
   }
 
   it should "reject update package with binding" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val content = WhiskPackagePut(provider.bind)
-    put(entityStore, provider)
-    Put(s"$collectionPath/${provider.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(Conflict)
-      responseAs[ErrorResponse].error should include(Messages.packageCannotBecomeBinding)
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val content = WhiskPackagePut(provider.bind)
+          put(entityStore, provider)
+          Put(s"$collectionPath/${provider.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(Conflict)
+            responseAs[ErrorResponse].error should include(Messages.packageCannotBecomeBinding)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject update package with binding not successful, retrying.."))
   }
 
   it should "reject update package reference when new binding refers to non-existent package in same namespace" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    val content = WhiskPackagePut(reference.binding)
-    put(entityStore, reference)
-    Put(s"$collectionPath/${reference.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-      responseAs[ErrorResponse].error should include(Messages.bindingDoesNotExist)
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          val content = WhiskPackagePut(reference.binding)
+          put(entityStore, reference)
+          Put(s"$collectionPath/${reference.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+            responseAs[ErrorResponse].error should include(Messages.bindingDoesNotExist)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject update package reference when new binding refers to non-existent package in same namespace not successful, retrying.."))
   }
 
   it should "reject update package reference when new binding refers to non-existent package in another namespace" in {
-    implicit val tid = transid()
-    val privateCreds = WhiskAuthHelpers.newIdentity()
-    val privateNamespace = EntityPath(privateCreds.subject.asString)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val privateCreds = WhiskAuthHelpers.newIdentity()
+          val privateNamespace = EntityPath(privateCreds.subject.asString)
 
-    val provider = WhiskPackage(privateNamespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    val content = WhiskPackagePut(reference.binding)
-    put(entityStore, reference)
-    Put(s"$collectionPath/${reference.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(Forbidden)
-    }
+          val provider = WhiskPackage(privateNamespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          val content = WhiskPackagePut(reference.binding)
+          put(entityStore, reference)
+          Put(s"$collectionPath/${reference.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject update package reference when new binding refers to non-existent package in another namespace not successful, retrying.."))
   }
 
   it should "reject update package reference when new binding refers to itself" in {
-    implicit val tid = transid()
-    // create package and valid reference binding to it
-    val provider = WhiskPackage(namespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    put(entityStore, provider)
-    put(entityStore, reference)
-    // manipulate package reference such that it attempts to bind to itself
-    val content = WhiskPackagePut(Some(Binding(namespace.root, reference.name)))
-    Put(s"$collectionPath/${reference.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-      responseAs[ErrorResponse].error should include(Messages.bindingCannotReferenceBinding)
-    }
-    // verify that the reference is still pointing to the original provider
-    Get(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[WhiskPackage]
-      response should be(reference)
-      response.binding should be(provider.bind)
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          // create package and valid reference binding to it
+          val provider = WhiskPackage(namespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          put(entityStore, provider)
+          put(entityStore, reference)
+          // manipulate package reference such that it attempts to bind to itself
+          val content = WhiskPackagePut(Some(Binding(namespace.root, reference.name)))
+          Put(s"$collectionPath/${reference.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+            responseAs[ErrorResponse].error should include(Messages.bindingCannotReferenceBinding)
+          }
+          // verify that the reference is still pointing to the original provider
+          Get(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[WhiskPackage]
+            response should be(reference)
+            response.binding should be(provider.bind)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject update package reference when new binding refers to itself not successful, retrying.."))
   }
 
   it should "reject update package reference when new binding refers to private package in another namespace" in {
-    implicit val tid = transid()
-    val privateCreds = WhiskAuthHelpers.newIdentity()
-    val privateNamespace = EntityPath(privateCreds.subject.asString)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val privateCreds = WhiskAuthHelpers.newIdentity()
+          val privateNamespace = EntityPath(privateCreds.subject.asString)
 
-    val provider = WhiskPackage(privateNamespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    val content = WhiskPackagePut(reference.binding)
-    put(entityStore, provider)
-    put(entityStore, reference)
-    Put(s"$collectionPath/${reference.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(Forbidden)
-    }
+          val provider = WhiskPackage(privateNamespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          val content = WhiskPackagePut(reference.binding)
+          put(entityStore, provider)
+          put(entityStore, reference)
+          Put(s"$collectionPath/${reference.name}?overwrite=true", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject update package reference when new binding refers to private package in another namespace not successful, retrying.."))
   }
 
   //// DEL /packages/name
   it should "delete package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    put(entityStore, provider)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          put(entityStore, provider)
 
-    // it should "reject deleting package owned by different user" in {
-    val auser = WhiskAuthHelpers.newIdentity()
-    Get(s"/$namespace/${collection.path}/${provider.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+          // it should "reject deleting package owned by different user" in {
+          val auser = WhiskAuthHelpers.newIdentity()
+          Get(s"/$namespace/${collection.path}/${provider.name}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
 
-    Delete(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[WhiskPackage]
-      response should be(provider)
-    }
+          Delete(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[WhiskPackage]
+            response should be(provider)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(s"${this.getClass.getName} > Packages API should delete package not successful, retrying.."))
   }
 
   it should "delete package reference regardless of package existence" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    put(entityStore, reference)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          put(entityStore, reference)
 
-    // it should "reject deleting package reference owned by different user" in {
-    val auser = WhiskAuthHelpers.newIdentity()
-    Get(s"/$namespace/${collection.path}/${reference.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+          // it should "reject deleting package reference owned by different user" in {
+          val auser = WhiskAuthHelpers.newIdentity()
+          Get(s"/$namespace/${collection.path}/${reference.name}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
 
-    Delete(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[WhiskPackage]
-      response should be(reference)
-    }
+          Delete(s"$collectionPath/${reference.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[WhiskPackage]
+            response should be(reference)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should delete package reference regardless of package existence not successful, retrying.."))
   }
 
   it should "reject delete non-empty package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val action = WhiskAction(provider.namespace.addPath(provider.name), aname(), jsDefault("??"))
-    put(entityStore, provider)
-    put(entityStore, action)
-    org.apache.openwhisk.utils.retry {
-      Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
-        status should be(OK)
-        val response = responseAs[JsObject]
-        response.fields("actions").asInstanceOf[JsArray].elements.length should be(1)
-      }
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val action = WhiskAction(provider.namespace.addPath(provider.name), aname(), jsDefault("??"))
+          put(entityStore, provider)
+          put(entityStore, action)
+          org.apache.openwhisk.utils.retry {
+            Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
+              status should be(OK)
+              val response = responseAs[JsObject]
+              response.fields("actions").asInstanceOf[JsArray].elements.length should be(1)
+            }
+          }
 
-    Delete(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(Conflict)
-      val response = responseAs[ErrorResponse]
-      response.error should include("Package not empty (contains 1 entity)")
-      response.code.id should not be empty
-    }
+          Delete(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(Conflict)
+            val response = responseAs[ErrorResponse]
+            response.error should include("Package not empty (contains 1 entity)")
+            response.code.id should not be empty
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should reject delete non-empty package not successful, retrying.."))
   }
 
   //// invalid resource
   it should "reject invalid resource" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    put(entityStore, provider)
-    Get(s"$collectionPath/${provider.name}/bar") ~> Route.seal(routes(creds)) ~> check {
-      status should be(NotFound)
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          put(entityStore, provider)
+          Get(s"$collectionPath/${provider.name}/bar") ~> Route.seal(routes(creds)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(s"${this.getClass.getName} > Packages API should reject invalid resource not successful, retrying.."))
   }
 
   it should "return empty list for invalid namespace" in {
-    implicit val tid = transid()
-    val path = s"/whisk.systsdf/${collection.path}"
-    Get(path) ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      responseAs[List[JsObject]] should be(List.empty)
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val path = s"/whisk.systsdf/${collection.path}"
+          Get(path) ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            responseAs[List[JsObject]] should be(List.empty)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should return empty list for invalid namespace not successful, retrying.."))
   }
 
   it should "reject bind to non-package" in {
-    implicit val tid = transid()
-    val action = WhiskAction(namespace, aname(), jsDefault("??"))
-    val reference = WhiskPackage(namespace, aname(), Some(Binding(action.namespace.root, action.name)))
-    val content = WhiskPackagePut(reference.binding)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val action = WhiskAction(namespace, aname(), jsDefault("??"))
+          val reference = WhiskPackage(namespace, aname(), Some(Binding(action.namespace.root, action.name)))
+          val content = WhiskPackagePut(reference.binding)
 
-    put(entityStore, action)
+          put(entityStore, action)
 
-    Put(s"$collectionPath/${reference.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(Conflict)
-      responseAs[ErrorResponse].error should include(Messages.requestedBindingIsNotValid)
-    }
+          Put(s"$collectionPath/${reference.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(Conflict)
+            responseAs[ErrorResponse].error should include(Messages.requestedBindingIsNotValid)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(s"${this.getClass.getName} > Packages API should reject bind to non-package not successful, retrying.."))
   }
 
   it should "report proper error when record is corrupted on delete" in {
-    implicit val tid = transid()
-    val entity = BadEntity(namespace, aname())
-    put(entityStore, entity)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val entity = BadEntity(namespace, aname())
+          put(entityStore, entity)
 
-    Delete(s"$collectionPath/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(InternalServerError)
-      responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
-    }
+          Delete(s"$collectionPath/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(InternalServerError)
+            responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should report proper error when record is corrupted on delete not successful, retrying.."))
   }
 
   it should "report proper error when record is corrupted on get" in {
-    implicit val tid = transid()
-    val entity = BadEntity(namespace, aname())
-    put(entityStore, entity)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val entity = BadEntity(namespace, aname())
+          put(entityStore, entity)
 
-    Get(s"$collectionPath/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(InternalServerError)
-    }
+          Get(s"$collectionPath/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(InternalServerError)
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should report proper error when record is corrupted on get not successful, retrying.."))
   }
 
   it should "report proper error when record is corrupted on put" in {
-    implicit val tid = transid()
-    val entity = BadEntity(namespace, aname())
-    put(entityStore, entity)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
+          val entity = BadEntity(namespace, aname())
+          put(entityStore, entity)
 
-    val content = WhiskPackagePut()
-    Put(s"$collectionPath/${entity.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(InternalServerError)
-      responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
-    }
+          val content = WhiskPackagePut()
+          Put(s"$collectionPath/${entity.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(InternalServerError)
+            responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
+          }
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Packages API should report proper error when record is corrupted on put not successful, retrying.."))
   }
 }
