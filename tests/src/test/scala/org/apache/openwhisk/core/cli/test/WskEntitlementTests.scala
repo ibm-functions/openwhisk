@@ -40,9 +40,6 @@ import org.apache.openwhisk.core.entity.WhiskPackage
 
 import scala.concurrent.duration._
 @RunWith(classOf[JUnitRunner])
-//abstract class WskEntitlementTests(implicit executor: ExecutionContext, system: ActorSystem, logging: Logging)
-//abstract class WskEntitlementTests(implicit executor: ExecutionContext, system: ActorSystem)
-//abstract class WskEntitlementTests(implicit system: ActorSystem)
 abstract class WskEntitlementTests()
     extends TestHelpers
     with WskActorSystem
@@ -82,23 +79,37 @@ abstract class WskEntitlementTests()
   val guestNamespace = guestWskProps.namespace
   println(s"guestWskProps: $guestWskProps, guestNamespace: $guestNamespace, authKey: ${guestWskProps.authKey}")
 
-  //def waitForEntriesToAppear(db: ExtendedCouchDbRestClient, authKey: String, expectedCount: Int): Unit = {}
   private def waitForEntriesToAppear(db: ExtendedCouchDbRestClient, authKey: String, expectedCount: Int): Unit = {
-    authKey.split(":")(0)
+    // query identities view by using authkey, if in view result will be as follows:
+    // {
+    //  "offset": 45,
+    //  "rows": [
+    //    {
+    //      "id": "anon-sdFOhq4kiknbYM33deFb7SSJ9vA",
+    //      "key": [
+    //        "58b9a982-e9ab-4010-8dc9-87650a123bc1",
+    //        "iX8oqsvqtfF5YTnzKgbikS0n5qrkztrOS7coawkGaGYyDOwPeydvi4s8ijgkfb16"
+    //      ],
+    //      "value": {
+    //        "_id": "anon-sdFOhq4kiknbYM33deFb7SSJ9vA/limits",
+    //        "key": "iX8oqsvqtfF5YTnzKgbikS0n5qrkztrOS7coawkGaGYyDOwPeydvi4s8ijgkfb16",
+    //        "namespace": "anon-sdFOhq4kiknbYM33deFb7SSJ9vA",
+    //        "uuid": "58b9a982-e9ab-4010-8dc9-87650a123bc1"
+    //      }
+    //    }
+    //  ],
+    //  "total_rows": 296
+    //}
     val key = List(authKey.split(":")(0), authKey.split(":")(1))
 
     def checkForEntriesToAppearInView() =
-      db.executeView("subjects.v2.0.0", "identities")(key, key, reduce = true).map {
+      db.executeView("subjects.v2.0.0", "identities")(key, key, reduce = false).map {
         case Right(doc) =>
-          val value = doc
+          val rows = doc
             .fields("rows")
             .convertTo[List[JsObject]]
-            .headOption
-            .getOrElse({ println("headOption returned empty option"); throw RetryOp() })
-            .fields("value")
-            .convertTo[Int]
-          if (value != expectedCount) {
-            println(s"unexpected value: $value, expected: $expectedCount")
+          if (rows.length != expectedCount) {
+            println(s"view rows length: ${rows.length} (doc: $doc), expected: $expectedCount")
             throw RetryOp()
           }
           true
