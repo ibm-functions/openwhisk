@@ -268,13 +268,16 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
 
         if (serviceAction != null) {
 
+          // take the first listed IP (there can be attached a second, cloudfare-based ip which we ignore)
+          val hostIp = transid.getTag(TransactionId.tagInitiatorIp).split(",")(0)
+
           val initiator =
             Initiator(
               transid.getTag(TransactionId.tagInitiatorId),
               transid.getTag(TransactionId.tagInitiatorName),
               "service/security/account/user",
               InitiatorCredential(getGrantType(transid.getTag(TransactionId.tagGrantType))),
-              InitiatorHost(transid.getTag(TransactionId.tagInitiatorIp)))
+              InitiatorHost(hostIp))
 
           val reasonCode = resp.status.value.split(" ")(0)
           val reasonCodeInt = Try { reasonCode.toInt }.getOrElse(0)
@@ -313,7 +316,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
             action = serviceAction.actionType,
             outcome = if (success) "success" else "failure",
             reason = Reason(reasonCode, reasonType),
-            severity = "warning",
+            severity = serviceAction.severity,
             message = logMessage,
             logSourceCRN = convertToLogSourceCRN(targetId),
             saveServiceCopy = true,

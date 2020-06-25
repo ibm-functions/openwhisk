@@ -210,7 +210,7 @@ class ActivityTrackerTests()
      "id":"$targetId",
      "name":"testrule","typeURI":"functions/rule"
  },
- "severity":"warning",
+ "severity":"normal",
  "logSourceCRN":"$logSourceCRN",
  "action":"functions.rule.read",
  "initiator":{
@@ -252,6 +252,7 @@ class ActivityTrackerTests()
         TransactionId.tagTargetId,
         "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:a88c0a24-853b-4477-82f8-6876e72bebf2::"),
       (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
+      (TransactionId.tagUpdateInfo, ""),
       (
         TransactionId.tagUri,
         "https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123?overwrite=false"),
@@ -291,7 +292,7 @@ class ActivityTrackerTests()
      "name":"hello123",
      "typeURI":"functions/action"
  },
- "severity":"warning",
+ "severity":"normal",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
  "action":"functions.action.create",
  "initiator":{
@@ -338,6 +339,7 @@ class ActivityTrackerTests()
       (
         TransactionId.tagTargetIdEncoded,
         "Y3JuOnYxOmJsdWVtaXg6cHVibGljOmZ1bmN0aW9uczp1cy1zb3V0aDphL2ViMmUzNjU4NWM5MWEyN2E3MDljNDRlMjY1MmEzODFhOnMtM2M5ZjJlZDgtNjQzNi00Mjg4LTkzYWQtMTgxNWI3ZWExMGE2Ojo="),
+      (TransactionId.tagUpdateInfo, ""),
       (
         TransactionId.tagUri,
         "https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/helloClassic1?overwrite=false"),
@@ -374,7 +376,7 @@ class ActivityTrackerTests()
      "name":"helloClassic1",
      "typeURI":"functions/action"
  },
- "severity":"warning",
+ "severity":"normal",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
  "action":"functions.action.create",
  "initiator":{
@@ -530,6 +532,7 @@ class ActivityTrackerTests()
     // sequences indexed by methodIndex
     val method = Seq("PUT", "GET", "DELETE", "PUT")
     val operation = Seq("create", "read", "delete", "update")
+    val severity = Seq("normal", "normal", "warning", "warning")
     val dataEvent = Seq(false, true, false, false)
     val actionType = operation
 
@@ -593,7 +596,7 @@ class ActivityTrackerTests()
      "name":"$entityName",
      "typeURI":"functions/$entityType"
  },
- "severity":"warning",
+ "severity":"${severity(methodIndex)}",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
  "action":"functions.$entityType.${actionType(methodIndex)}",
  "initiator":{
@@ -912,6 +915,7 @@ class ActivityTrackerTests()
               TransactionId.tagTargetId,
               "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::"),
             (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
+            (TransactionId.tagUpdateInfo, ""),
             (TransactionId.tagUri, url),
             (TransactionId.tagUserAgent, "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"))
 
@@ -943,7 +947,7 @@ class ActivityTrackerTests()
      "name":"$entityName",
      "typeURI":"functions/$entityType"
  },
- "severity":"warning",
+ "severity":"normal",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
  "action":"functions.$entityType.${actionType(methodIndex)}",
  "initiator":{
@@ -990,6 +994,7 @@ class ActivityTrackerTests()
       // sequences indexed by operationIndex
       val requestedStatus = Seq("active", "inactive")
       val actionType = Seq("enable", "disable")
+      val severity = Seq("normal", "warning")
 
       val reasonCode = 200 // // always 200
       val reasonType = getReasonType(reasonCode.toString)
@@ -1048,7 +1053,7 @@ class ActivityTrackerTests()
      "name":"$entityName",
      "typeURI":"functions/rule"
  },
- "severity":"warning",
+ "severity":"${severity(operationIndex)}",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
  "action":"functions.rule.${actionType(operationIndex)}",
  "initiator":{

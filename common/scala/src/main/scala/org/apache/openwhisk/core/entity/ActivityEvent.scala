@@ -133,6 +133,7 @@ case class ApiMatcherResult(actionType: String,
                             logMessage: String,
                             targetName: String,
                             targetType: String,
+                            severity: String,
                             isDataEvent: Boolean)
 
 trait ActivityUtils {
@@ -295,7 +296,8 @@ trait ActivityUtils {
                 .getOrElse(
                   matchRulesAPI(transid, method, urlPath, logger) // rules API
                     .getOrElse(matchAPI(transid, "trigger", triggersAPIMatcher, method, urlPath) // triggers API
-                      .getOrElse(matchOther(transid, method, urlPath, logger).orNull)))) // nothing to add to the log
+                      .getOrElse(matchNamespacesAPI(transid, method, urlPath)
+                        .getOrElse(matchOther(transid, method, urlPath, logger).orNull))))) // nothing to add to the log
         else // code is running  as controller (handles POST rule API call for enable/disable rule)
           matchRulesAPI(transid, method, urlPath, logger) // rules API
             .getOrElse(matchOther(transid, method, urlPath, logger).orNull) // nothing to add to the log
@@ -375,10 +377,45 @@ trait ActivityUtils {
 
   // uri example:
   // https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello10?blocking=true&result=false
-  private val actionsAPIMatcher = """/api/v1/namespaces/.*/actions/.*""".r
-  private val triggersAPIMatcher = """/api/v1/namespaces/.*/triggers/.*""".r
-  private val packagesAPIMatcher = """/api/v1/namespaces/.*/packages/.*""".r
-  private val rulesAPIMatcher = """/api/v1/namespaces/.*/rules/.*""".r
+  private val namespacesMatcher = """/api/v1/namespaces/[^/]+""".r
+  private val actionsAPIMatcher = """/api/v1/namespaces/.*/actions/.+""".r
+  private val triggersAPIMatcher = """/api/v1/namespaces/.*/triggers/.+""".r
+  private val packagesAPIMatcher = """/api/v1/namespaces/.*/packages/.+""".r
+  private val rulesAPIMatcher = """/api/v1/namespaces/.*/rules/.+""".r
+
+  /**
+   * a matcher used for handling namespaces. Only handles GET requests for a single namespace.
+   * Other methods are handled by the service broker.
+   *
+   * @param transid transaction id
+   * @param method http method of the request
+   * @param uri uri of the request
+   * @return Some(ApiMatcherResult) or None
+   */
+  def matchNamespacesAPI(transid: TransactionId, method: String, uri: String): Option[ApiMatcherResult] = {
+    val entityType = "namespace"
+    val entityTypePathSelector = entityType + "s" // plural of entityType
+    val targetType = thisService + "/" + entityType
+    val actionTypePrefix = thisService + "." + entityType
+    uri match {
+      case namespacesMatcher() =>
+        val pos = uri.indexOf("/" + entityTypePathSelector + "/") + ("/" + entityTypePathSelector + "/").length
+        val targetName = uri.substring(pos)
+        method match {
+          case "GET" =>
+            Some(
+              ApiMatcherResult(
+                actionType = actionTypePrefix + ".read",
+                logMessage = messagePrefix + "read " + entityType + " " + targetName,
+                targetName = targetName,
+                targetType = targetType,
+                severity = "normal",
+                isDataEvent = true))
+          case _ => None
+        }
+      case _ => None // other methods are handled by service broker
+    }
+  }
 
   /**
    * a matcher used for the APIs of actions, triggers and packages
@@ -407,28 +444,31 @@ trait ActivityUtils {
           case "GET" =>
             Some(
               ApiMatcherResult(
-                actionTypePrefix + ".read",
-                messagePrefix + "read " + entityType + " " + targetName,
-                targetName,
-                targetType,
+                actionType = actionTypePrefix + ".read",
+                logMessage = messagePrefix + "read " + entityType + " " + targetName,
+                targetName = targetName,
+                targetType = targetType,
+                severity = "normal",
                 isDataEvent = true))
           case "PUT" =>
             val isUpdate = !transid.getTag(TransactionId.tagUpdateInfo).isEmpty
             val operation = if (isUpdate) "update" else "create"
             Some(
               ApiMatcherResult(
-                actionTypePrefix + "." + operation,
-                messagePrefix + operation + " " + entityType + " " + targetName,
-                targetName,
-                targetType,
+                actionType = actionTypePrefix + "." + operation,
+                logMessage = messagePrefix + operation + " " + entityType + " " + targetName,
+                targetName = targetName,
+                targetType = targetType,
+                severity = if (isUpdate) "warning" else "normal",
                 isDataEvent = false))
           case "DELETE" =>
             Some(
               ApiMatcherResult(
-                actionTypePrefix + ".delete",
-                messagePrefix + "delete " + entityType + " " + targetName,
-                targetName,
-                targetType,
+                actionType = actionTypePrefix + ".delete",
+                logMessage = messagePrefix + "delete " + entityType + " " + targetName,
+                targetName = targetName,
+                targetType = targetType,
+                severity = "warning",
                 isDataEvent = false))
           case _ => None
         }
@@ -455,28 +495,31 @@ trait ActivityUtils {
           case "GET" =>
             Some(
               ApiMatcherResult(
-                thisService + ".rule.read",
-                messagePrefix + "read rule " + ruleName,
-                ruleName,
-                targetType,
+                actionType = thisService + ".rule.read",
+                logMessage = messagePrefix + "read rule " + ruleName,
+                targetName = ruleName,
+                targetType = targetType,
+                severity = "normal",
                 isDataEvent = true))
           case "PUT" =>
             val isUpdate = !transid.getTag(TransactionId.tagUpdateInfo).isEmpty
             val operation = if (isUpdate) "update" else "create"
             Some(
               ApiMatcherResult(
-                thisService + ".rule." + operation,
-                messagePrefix + operation + " rule " + ruleName,
-                ruleName,
-                targetType,
+                actionType = thisService + ".rule." + operation,
+                logMessage = messagePrefix + operation + " rule " + ruleName,
+                targetName = ruleName,
+                targetType = targetType,
+                severity = if (isUpdate) "warning" else "normal",
                 isDataEvent = false))
           case "DELETE" =>
             Some(
               ApiMatcherResult(
-                thisService + ".rule.delete",
-                messagePrefix + "delete rule " + ruleName,
-                ruleName,
-                targetType,
+                actionType = thisService + ".rule.delete",
+                logMessage = messagePrefix + "delete rule " + ruleName,
+                targetName = ruleName,
+                targetType = targetType,
+                severity = "warning",
                 isDataEvent = false))
           case "POST" =>
             val requestedStatus = transid.getTag(TransactionId.tagRequestedStatus)
@@ -484,18 +527,20 @@ trait ActivityUtils {
               case "active" =>
                 Some(
                   ApiMatcherResult(
-                    thisService + ".rule.enable",
-                    messagePrefix + "enable rule " + ruleName,
-                    ruleName,
-                    targetType,
+                    actionType = thisService + ".rule.enable",
+                    logMessage = messagePrefix + "enable rule " + ruleName,
+                    targetName = ruleName,
+                    targetType = targetType,
+                    severity = "normal",
                     isDataEvent = false))
               case "inactive" =>
                 Some(
                   ApiMatcherResult(
-                    thisService + ".rule.disable",
-                    messagePrefix + "disable rule " + ruleName,
-                    ruleName,
-                    targetType,
+                    actionType = thisService + ".rule.disable",
+                    logMessage = messagePrefix + "disable rule " + ruleName,
+                    targetName = ruleName,
+                    targetType = targetType,
+                    severity = "warning",
                     isDataEvent = false))
               case _ =>
                 logger.error(this, "audit.log - rules API, POST: unexpected requested status: " + requestedStatus)(
