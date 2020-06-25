@@ -36,7 +36,7 @@ import org.apache.openwhisk.core.entity.types.{AuthStore, EntityStore}
 
 import scala.collection.mutable.ListBuffer
 import scala.concurrent.{Await, ExecutionContext, Future}
-import scala.concurrent.duration.{Duration, DurationInt}
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
 import scala.language.postfixOps
 import scala.util.{Failure, Random, Success, Try}
 
@@ -64,8 +64,10 @@ trait DbUtils extends Assertions {
    * Attempt the operation up to 'count' times. The future from the
    * step is not aborted --- TODO fix this.
    */
-  def retry[T](step: () => Future[T], timeout: Duration, count: Int = 100): Try[T] = {
-    val graceBeforeRetry = 50.milliseconds
+  def retry[T](step: () => Future[T],
+               timeout: Duration,
+               count: Int = 100,
+               graceBeforeRetry: FiniteDuration = 50.milliseconds): Try[T] = {
     val future = step()
     if (count > 0) try {
       val result = Await.result(future, timeout)
@@ -74,15 +76,15 @@ trait DbUtils extends Assertions {
       case n: NoDocumentException =>
         println("no document exception, retrying")
         Thread.sleep(graceBeforeRetry.toMillis)
-        retry(step, timeout, count - 1)
+        retry(step, timeout, count - 1, graceBeforeRetry)
       case RetryOp() =>
         println("condition not met, retrying")
         Thread.sleep(graceBeforeRetry.toMillis)
-        retry(step, timeout, count - 1)
+        retry(step, timeout, count - 1, graceBeforeRetry)
       case t: TimeoutException =>
         println("timed out, retrying")
         Thread.sleep(graceBeforeRetry.toMillis)
-        retry(step, timeout, count - 1)
+        retry(step, timeout, count - 1, graceBeforeRetry)
       case t: Throwable =>
         println(s"unexpected failure $t")
         Failure(t)
