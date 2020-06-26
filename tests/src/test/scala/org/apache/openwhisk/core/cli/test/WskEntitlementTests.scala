@@ -22,10 +22,10 @@ import org.junit.runner.RunWith
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.junit.JUnitRunner
 import common.{
-  BlueProperties,
   StreamLogging,
   TestHelpers,
   TestUtils,
+  WhiskProperties,
   WskActorSystem,
   WskOperations,
   WskProps,
@@ -57,12 +57,12 @@ abstract class WskEntitlementTests()
   val notFoundCode: Int
 
   val subjectsDbClient = new ExtendedCouchDbRestClient(
-    protocol = BlueProperties.getProperty("db.protocol"),
-    host = BlueProperties.getProperty("db.host"),
-    port = BlueProperties.getProperty("db.port").toInt,
-    username = BlueProperties.getProperty("db.username"),
-    password = BlueProperties.getProperty("db.password"),
-    db = BlueProperties.getProperty("db.whisk.auths"))
+    protocol = WhiskProperties.getProperty("db.protocol"),
+    host = WhiskProperties.getProperty("db.host"),
+    port = WhiskProperties.getProperty("db.port").toInt,
+    username = WhiskProperties.getProperty("db.username"),
+    password = WhiskProperties.getProperty("db.password"),
+    db = WhiskProperties.getProperty("db.whisk.auths"))
 
   override def afterAll() = {
     disposeAdditionalTestSubject(guestWskProps.namespace)
