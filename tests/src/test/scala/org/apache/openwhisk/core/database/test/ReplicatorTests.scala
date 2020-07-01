@@ -462,28 +462,38 @@ class ReplicatorTests
   }
 
   it should "replay a database" in {
-    val now = Instant.now()
-    val dbName = testDbPrefix + "database_to_be_restored"
-    val backupPrefix = s"backup_${toEpochSeconds(now)}_"
-    val backupDbName = backupPrefix + dbName
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          //val now = Instant.now()
+          val dbName = testDbPrefix + "database_to_be_restored"
+          // use hardcoded prefix to allow deletion/cleanup also in case of errors
+          //val backupPrefix = s"backup_${toEpochSeconds(now)}_"
+          val backupPrefix = s"backup_(1593591021)_"
+          val backupDbName = backupPrefix + dbName // eg backup_1593591021_replicatortest_fn-dev-build_database_to_be_restored
 
-    // Create a database that looks like a backup
-    val backupClient = createDatabase(backupDbName, Some(designDocPath))
-    println(s"Creating testdocument")
-    backupClient.putDoc("testId", JsObject("testKey" -> "testValue".toJson)).futureValue
+          // Create a database that looks like a backup
+          val backupClient = createDatabase(backupDbName, Some(designDocPath))
+          println(s"Creating testdocument")
+          backupClient.putDoc("testId", JsObject("testKey" -> "testValue".toJson)).futureValue
 
-    // Run the replay script
-    val (_, _, replicationId) = runReplay(dbUrl, dbUrl, backupPrefix).head
+          // Run the replay script
+          val (_, _, replicationId) = runReplay(dbUrl, dbUrl, backupPrefix).head
 
-    // Wait for the replication to finish
-    waitForReplication(replicationId)
+          // Wait for the replication to finish
+          waitForReplication(replicationId)
 
-    // Verify the replicated database is equal to the original database
-    compareDatabases(backupDbName, dbName, filterUsed = false)
+          // Verify the replicated database is equal to the original database
+          compareDatabases(backupDbName, dbName, filterUsed = false)
 
-    // Cleanup databases
-    removeReplicationDoc(replicationId)
-    removeDatabase(backupDbName)
-    removeDatabase(dbName)
+          // Cleanup databases
+          removeReplicationDoc(replicationId)
+          removeDatabase(backupDbName)
+          removeDatabase(dbName)
+        },
+        10,
+        Some(1.second),
+        Some(
+          s"${this.getClass.getName} > Database replication script should replay a database not successful, retrying.."))
   }
 }
