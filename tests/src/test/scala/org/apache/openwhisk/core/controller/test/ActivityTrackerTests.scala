@@ -177,7 +177,7 @@ class ActivityTrackerTests()
 
       // expected format: YYY-MM-DDTHH:mm:ss.SS+0000, e.g. "2019-11-03T21:40:53.94+0000" (at least 2 digits for millis)
       val timestamp = resultFields("eventTime").convertTo[String]
-      val ok = timestamp.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{2,}+\\+0{4}")
+      val ok = timestamp.matches("\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d{2}\\+0{4}")
       "ok" shouldBe (if (ok) "ok" else "timestamp " + timestamp + " does not match YYYY-MM-DDTHH:mm:ss.SS+0000")
     }
   }
@@ -187,10 +187,10 @@ class ActivityTrackerTests()
     targetId: String =
       "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:a88c0a24-853b-4477-82f8-6876e72bebf2::",
     logSourceCRN: String = "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
-    accountInResourceGroupId: String = "a/eb2e36585c91a27a709c44e2652a381a",
-    dataEvent: Boolean = false) =
+    accountInResourceGroupId: String = "a/eb2e36585c91a27a709c44e2652a381a") =
     s"""
 {"requestData":{
+    "tid":"test_get_activation",
     "method":"GET",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/rules/testrule",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
@@ -203,9 +203,8 @@ class ActivityTrackerTests()
      "reasonCode":200,
      "reasonType":"OK"
  },
- "id":"#tid_test_get_activation",
  "eventTime":"2020-06-04T15:02:20.663+0000",
- "message":"IBM Cloud Functions: read rule testrule for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
+ "message":"Functions: read rule testrule for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"$targetId",
      "name":"testrule","typeURI":"functions/rule"
@@ -220,7 +219,7 @@ class ActivityTrackerTests()
     "typeURI":"service/security/account/user",
     "credential":{"type":"$credType"}
  },
- "dataEvent":$dataEvent,
+ "dataEvent":true,
  "responseData":{}
 }
 """
@@ -271,6 +270,7 @@ class ActivityTrackerTests()
     val expectedString =
       """
 {"requestData":{
+    "tid":"test_create_action_err",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123?overwrite=false",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
     "reasonForFailure":"Conflict",
@@ -284,9 +284,8 @@ class ActivityTrackerTests()
      "reasonCode":409,
      "reasonType":"Conflict"
  },
- "id":"#tid_test_create_action_err",
  "eventTime":"2020-06-02T18:42:55.149+0000",
- "message":"IBM Cloud Functions: create action hello123 for namespace a88c0a24-853b-4477-82f8-6876e72bebf2 -failure",
+ "message":"Functions: create action hello123 for namespace a88c0a24-853b-4477-82f8-6876e72bebf2 -failure",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:a88c0a24-853b-4477-82f8-6876e72bebf2::",
      "name":"hello123",
@@ -306,7 +305,7 @@ class ActivityTrackerTests()
           "type":"apikey"
       }
  },
- "dataEvent":false,
+ "dataEvent":true,
  "responseData":{}
 }
 """
@@ -354,6 +353,7 @@ class ActivityTrackerTests()
     val expectedString =
       """
 {"requestData":{
+    "tid":"test_create_action_classic",
     "method":"PUT",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/helloClassic1?overwrite=false",
     "resourceGroupId":"",
@@ -368,9 +368,8 @@ class ActivityTrackerTests()
      "reasonCode":200,
      "reasonType":"OK"
  },
- "id":"#tid_test_create_action_classic",
  "eventTime":"2020-06-03T00:47:51.818+0000",
- "message":"IBM Cloud Functions: create action helloClassic1 for namespace s-3c9f2ed8-6436-4288-93ad-1815b7ea10a6",
+ "message":"Functions: create action helloClassic1 for namespace s-3c9f2ed8-6436-4288-93ad-1815b7ea10a6",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:s-3c9f2ed8-6436-4288-93ad-1815b7ea10a6::",
      "name":"helloClassic1",
@@ -390,7 +389,7 @@ class ActivityTrackerTests()
          "type":"user"
      }
  },
- "dataEvent":false,
+ "dataEvent":true,
  "responseData":{}
 }
 """
@@ -532,8 +531,7 @@ class ActivityTrackerTests()
     // sequences indexed by methodIndex
     val method = Seq("PUT", "GET", "DELETE", "PUT")
     val operation = Seq("create", "read", "delete", "update")
-    val severity = Seq("normal", "normal", "warning", "warning")
-    val dataEvent = Seq(false, true, false, false)
+    val severity = Seq("normal", "normal", "critical", "warning")
     val actionType = operation
 
     val reasonCode = 200 // // always 200
@@ -574,6 +572,7 @@ class ActivityTrackerTests()
         val expectedString =
           s"""
 {"requestData":{
+    "tid":"test_api",
     "method":"${method(methodIndex)}",
     "url":"$url",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
@@ -588,9 +587,8 @@ class ActivityTrackerTests()
      "reasonCode":$reasonCode,
      "reasonType":"$reasonType"
  },
- "id":"#tid_test_api",
  "eventTime":"2020-06-03T14:38:10.258+0000",
- "message":"IBM Cloud Functions: ${operation(methodIndex)} $entityType $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
+ "message":"Functions: ${operation(methodIndex)} $entityType $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
      "name":"$entityName",
@@ -610,7 +608,7 @@ class ActivityTrackerTests()
          "type":"apikey"
      }
  },
- "dataEvent":${dataEvent(methodIndex)},
+ "dataEvent":true,
  "responseData":{}
 }
 """
@@ -700,7 +698,7 @@ class ActivityTrackerTests()
     eventString = null
     Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.OK)), waitTime)
 
-    val expectedString = getExpectedResultForInvalidValuesTests(credType = "unknown", dataEvent = true)
+    val expectedString = getExpectedResultForInvalidValuesTests(credType = "unknown")
     verifyEvent(eventString, expectedString)
   }
 
@@ -780,8 +778,7 @@ class ActivityTrackerTests()
       getExpectedResultForInvalidValuesTests(
         targetId = "INVALID",
         logSourceCRN = "INVALID",
-        accountInResourceGroupId = "unknown",
-        dataEvent = true)
+        accountInResourceGroupId = "unknown")
 
     verifyEvent(eventString, expectedString)
   }
@@ -822,11 +819,7 @@ class ActivityTrackerTests()
 
     // "NOTBASE64" cannot be decoded via base64 therefore both targetid and logSourceCRN are empty
     val expectedString =
-      getExpectedResultForInvalidValuesTests(
-        targetId = "",
-        logSourceCRN = "",
-        accountInResourceGroupId = "unknown",
-        dataEvent = true)
+      getExpectedResultForInvalidValuesTests(targetId = "", logSourceCRN = "", accountInResourceGroupId = "unknown")
 
     verifyEvent(eventString, expectedString)
   }
@@ -925,6 +918,7 @@ class ActivityTrackerTests()
           val expectedString =
             s"""
 {"requestData":{
+    "tid":"test_api",
     "method":"${method(methodIndex)}",
     "url":"$url",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
@@ -939,9 +933,8 @@ class ActivityTrackerTests()
      "reasonCode":$reasonCode,
      "reasonType":"$reasonType"
  },
- "id":"#tid_test_api",
  "eventTime":"2020-06-03T14:38:10.258+0000",
- "message":"IBM Cloud Functions: ${operation(methodIndex)} $entityType $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
+ "message":"Functions: ${operation(methodIndex)} $entityType $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
      "name":"$entityName",
@@ -961,7 +954,7 @@ class ActivityTrackerTests()
          "type":"apikey"
      }
  },
- "dataEvent":false,
+ "dataEvent":true,
  "responseData":{}
 }
 """
@@ -994,7 +987,6 @@ class ActivityTrackerTests()
       // sequences indexed by operationIndex
       val requestedStatus = Seq("active", "inactive")
       val actionType = Seq("enable", "disable")
-      val severity = Seq("normal", "warning")
 
       val reasonCode = 200 // // always 200
       val reasonType = getReasonType(reasonCode.toString)
@@ -1031,6 +1023,7 @@ class ActivityTrackerTests()
         val expectedString =
           s"""
 {"requestData":{
+    "tid":"test_api",
     "method":"$method",
     "url":"$url",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
@@ -1045,15 +1038,14 @@ class ActivityTrackerTests()
      "reasonCode":$reasonCode,
      "reasonType":"$reasonType"
  },
- "id":"#tid_test_api",
  "eventTime":"2020-06-03T14:38:10.258+0000",
- "message":"IBM Cloud Functions: ${actionType(operationIndex)} rule $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
+ "message":"Functions: ${actionType(operationIndex)} rule $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
      "name":"$entityName",
      "typeURI":"functions/rule"
  },
- "severity":"${severity(operationIndex)}",
+ "severity":"warning",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
  "action":"functions.rule.${actionType(operationIndex)}",
  "initiator":{
@@ -1067,7 +1059,7 @@ class ActivityTrackerTests()
          "type":"apikey"
      }
  },
- "dataEvent":false,
+ "dataEvent":true,
  "responseData":{}
 }
 """

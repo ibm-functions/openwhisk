@@ -297,6 +297,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
 
           val requestData =
             RequestData(
+              tid = transid.toString.substring("#tid_".length),
               method = transid.getTag(TransactionId.tagHttpMethod),
               url = uri,
               userAgent = transid.getTag(TransactionId.tagUserAgent),
@@ -320,14 +321,12 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
             message = logMessage,
             logSourceCRN = convertToLogSourceCRN(targetId),
             saveServiceCopy = true,
-            dataEvent = serviceAction.isDataEvent,
-            id = transid.toString,
+            dataEvent = true, // events that manage customer data are data events
             requestData)
 
           val line = event.toJson.compactPrint
           logging.info(this, "activity tracker event: " + line.replaceAll("\\{", "(").replaceAll("\\}", ")"))(
             id = transid)
-
           // write to activity log
           store(line)
         }

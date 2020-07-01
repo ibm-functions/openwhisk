@@ -17,14 +17,15 @@
 
 package org.apache.openwhisk.core.entity
 
-import java.text.SimpleDateFormat
-
 import org.apache.openwhisk.common.{Logging, TransactionId}
 
 import scala.collection.immutable
 import spray.json.{JsBoolean, JsNumber, JsObject, JsString}
 import java.net.URL
 import java.util.Base64
+import java.time.ZonedDateTime
+import java.time.format.DateTimeFormatter
+import java.time.Clock
 
 import scala.util.matching.Regex
 import scala.util.Try
@@ -45,11 +46,11 @@ case class ActivityEvent(initiator: Initiator,
                          logSourceCRN: String,
                          saveServiceCopy: Boolean,
                          dataEvent: Boolean,
-                         id: String,
                          requestData: RequestData)
     extends ActivityUtils {
 
-  private def eventTimeFormatter = new SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SS+0000")
+  // SimpleDateFormatter does not correctly format the milliseconds
+  private val eventTimeFormatter = DateTimeFormatter.ofPattern("yyyy-MM-dd'T'HH:mm:ss.SS+0000")
 
   def toJson =
     JsObject(
@@ -60,29 +61,35 @@ case class ActivityEvent(initiator: Initiator,
         "outcome" -> getJsString(outcome),
         "reason" -> reason.toJson,
         "severity" -> getJsString(severity), // normal, warning, critical
-        "eventTime" -> getJsString(eventTimeFormatter.format(System.currentTimeMillis)),
+        "eventTime" -> getJsString(eventTimeFormatter.format(ZonedDateTime.now(Clock.systemUTC()))),
         "message" -> getJsString(message),
         "logSourceCRN" -> getJsString(logSourceCRN),
         "saveServiceCopy" -> JsBoolean(saveServiceCopy),
         "observer" -> Observer().toJson,
         "dataEvent" -> JsBoolean(dataEvent),
-        "id" -> getJsString(id),
         "requestData" -> requestData.toJson,
         "responseData" -> JsObject()))
 }
 
-case class RequestData(method: String, url: String, userAgent: String, failure: String, resourceGroupCrn: String)
+case class RequestData(tid: String,
+                       method: String,
+                       url: String,
+                       userAgent: String,
+                       failure: String,
+                       resourceGroupCrn: String)
     extends ActivityUtils {
   def toJson =
     JsObject(
       if (failure.isEmpty)
         Map(
+          "tid" -> getJsString(tid),
           "method" -> getJsString(method),
           "url" -> getJsString(url),
           "userAgent" -> getJsString(userAgent),
           "resourceGroupId" -> getJsString(resourceGroupCrn)) // misleading field name, resourceGroupId is a CRN
       else
         Map(
+          "tid" -> getJsString(tid),
           "method" -> getJsString(method),
           "url" -> getJsString(url),
           "userAgent" -> getJsString(userAgent),
@@ -133,8 +140,7 @@ case class ApiMatcherResult(actionType: String,
                             logMessage: String,
                             targetName: String,
                             targetType: String,
-                            severity: String,
-                            isDataEvent: Boolean)
+                            severity: String)
 
 trait ActivityUtils {
 
@@ -143,6 +149,10 @@ trait ActivityUtils {
 
   // fast path from reasonCode to short description
   def getReasonType(reasonCode: String): String = reasonTypes.getOrElse(reasonCode, "Unassigned")
+
+  val severity_normal = "normal"
+  val severity_warning = "warning"
+  val severity_critical = "critical"
 
   private val reasonTypes = immutable.HashMap(
     "0" -> "Not Set",
@@ -296,8 +306,7 @@ trait ActivityUtils {
                 .getOrElse(
                   matchRulesAPI(transid, method, urlPath, logger) // rules API
                     .getOrElse(matchAPI(transid, "trigger", triggersAPIMatcher, method, urlPath) // triggers API
-                      .getOrElse(matchNamespacesAPI(transid, method, urlPath)
-                        .getOrElse(matchOther(transid, method, urlPath, logger).orNull))))) // nothing to add to the log
+                      .getOrElse(matchOther(transid, method, urlPath, logger).orNull)))) // nothing to add to the log
         else // code is running  as controller (handles POST rule API call for enable/disable rule)
           matchRulesAPI(transid, method, urlPath, logger) // rules API
             .getOrElse(matchOther(transid, method, urlPath, logger).orNull) // nothing to add to the log
@@ -307,7 +316,7 @@ trait ActivityUtils {
   }
 
   private val thisService = "functions"
-  private val messagePrefix = "IBM Cloud Functions: "
+  private val messagePrefix = "Functions: "
 
   /**
    * Converts a target crn to a logSourceCRN (removes all sections after account scope section)
@@ -377,45 +386,10 @@ trait ActivityUtils {
 
   // uri example:
   // https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello10?blocking=true&result=false
-  private val namespacesMatcher = """/api/v1/namespaces/[^/]+""".r
   private val actionsAPIMatcher = """/api/v1/namespaces/.*/actions/.+""".r
   private val triggersAPIMatcher = """/api/v1/namespaces/.*/triggers/.+""".r
   private val packagesAPIMatcher = """/api/v1/namespaces/.*/packages/.+""".r
   private val rulesAPIMatcher = """/api/v1/namespaces/.*/rules/.+""".r
-
-  /**
-   * a matcher used for handling namespaces. Only handles GET requests for a single namespace.
-   * Other methods are handled by the service broker.
-   *
-   * @param transid transaction id
-   * @param method http method of the request
-   * @param uri uri of the request
-   * @return Some(ApiMatcherResult) or None
-   */
-  def matchNamespacesAPI(transid: TransactionId, method: String, uri: String): Option[ApiMatcherResult] = {
-    val entityType = "namespace"
-    val entityTypePathSelector = entityType + "s" // plural of entityType
-    val targetType = thisService + "/" + entityType
-    val actionTypePrefix = thisService + "." + entityType
-    uri match {
-      case namespacesMatcher() =>
-        val pos = uri.indexOf("/" + entityTypePathSelector + "/") + ("/" + entityTypePathSelector + "/").length
-        val targetName = uri.substring(pos)
-        method match {
-          case "GET" =>
-            Some(
-              ApiMatcherResult(
-                actionType = actionTypePrefix + ".read",
-                logMessage = messagePrefix + "read " + entityType + " " + targetName,
-                targetName = targetName,
-                targetType = targetType,
-                severity = "normal",
-                isDataEvent = true))
-          case _ => None
-        }
-      case _ => None // other methods are handled by service broker
-    }
-  }
 
   /**
    * a matcher used for the APIs of actions, triggers and packages
@@ -448,8 +422,7 @@ trait ActivityUtils {
                 logMessage = messagePrefix + "read " + entityType + " " + targetName,
                 targetName = targetName,
                 targetType = targetType,
-                severity = "normal",
-                isDataEvent = true))
+                severity = severity_normal))
           case "PUT" =>
             val isUpdate = !transid.getTag(TransactionId.tagUpdateInfo).isEmpty
             val operation = if (isUpdate) "update" else "create"
@@ -459,8 +432,7 @@ trait ActivityUtils {
                 logMessage = messagePrefix + operation + " " + entityType + " " + targetName,
                 targetName = targetName,
                 targetType = targetType,
-                severity = if (isUpdate) "warning" else "normal",
-                isDataEvent = false))
+                severity = if (isUpdate) severity_warning else severity_normal))
           case "DELETE" =>
             Some(
               ApiMatcherResult(
@@ -468,8 +440,7 @@ trait ActivityUtils {
                 logMessage = messagePrefix + "delete " + entityType + " " + targetName,
                 targetName = targetName,
                 targetType = targetType,
-                severity = "warning",
-                isDataEvent = false))
+                severity = severity_critical))
           case _ => None
         }
       case _ =>
@@ -499,8 +470,7 @@ trait ActivityUtils {
                 logMessage = messagePrefix + "read rule " + ruleName,
                 targetName = ruleName,
                 targetType = targetType,
-                severity = "normal",
-                isDataEvent = true))
+                severity = severity_normal))
           case "PUT" =>
             val isUpdate = !transid.getTag(TransactionId.tagUpdateInfo).isEmpty
             val operation = if (isUpdate) "update" else "create"
@@ -510,8 +480,7 @@ trait ActivityUtils {
                 logMessage = messagePrefix + operation + " rule " + ruleName,
                 targetName = ruleName,
                 targetType = targetType,
-                severity = if (isUpdate) "warning" else "normal",
-                isDataEvent = false))
+                severity = if (isUpdate) severity_warning else severity_normal))
           case "DELETE" =>
             Some(
               ApiMatcherResult(
@@ -519,8 +488,7 @@ trait ActivityUtils {
                 logMessage = messagePrefix + "delete rule " + ruleName,
                 targetName = ruleName,
                 targetType = targetType,
-                severity = "warning",
-                isDataEvent = false))
+                severity = severity_critical))
           case "POST" =>
             val requestedStatus = transid.getTag(TransactionId.tagRequestedStatus)
             requestedStatus match {
@@ -531,8 +499,7 @@ trait ActivityUtils {
                     logMessage = messagePrefix + "enable rule " + ruleName,
                     targetName = ruleName,
                     targetType = targetType,
-                    severity = "normal",
-                    isDataEvent = false))
+                    severity = severity_warning))
               case "inactive" =>
                 Some(
                   ApiMatcherResult(
@@ -540,8 +507,7 @@ trait ActivityUtils {
                     logMessage = messagePrefix + "disable rule " + ruleName,
                     targetName = ruleName,
                     targetType = targetType,
-                    severity = "warning",
-                    isDataEvent = false))
+                    severity = severity_warning))
               case _ =>
                 logger.error(this, "audit.log - rules API, POST: unexpected requested status: " + requestedStatus)(
                   id = transid)
@@ -557,15 +523,13 @@ trait ActivityUtils {
    * This matcher is finally called if there are no other matches in getServiceAction.
    * In other words, no event should be generated for this request (e.g., for invoke action, list all namespaces, etc.).
    *
+   * @param transid transaction id
    * @param method http method of the request
    * @param uri uri of the request
    * @return None
    */
-  def matchOther(transactionId: TransactionId,
-                 method: String,
-                 uri: String,
-                 logger: Logging): Option[ApiMatcherResult] = {
-    logger.debug(this, "audit log - no event created for method=" + method + ", uri=" + uri)(id = transactionId)
+  def matchOther(transid: TransactionId, method: String, uri: String, logger: Logging): Option[ApiMatcherResult] = {
+    logger.debug(this, "audit log - no event created for method=" + method + ", uri=" + uri)(id = transid)
     None
   }
 
