@@ -48,6 +48,8 @@ class ReplicatorTests
     with StreamLogging
     with DatabaseScriptTestUtils {
 
+  val retriesOnTestFailures = 5
+  val waitBeforeRetry = 1.second
   val testDbPrefix = s"replicatortest_$dbPrefix"
 
   val replicatorClient =
@@ -190,309 +192,393 @@ class ReplicatorTests
   behavior of "Database replication script"
 
   it should "replicate a database (snapshot)" in {
-    // Create a database to backup
-    val dbName = testDbPrefix + "database_for_single_replication"
-    val client = createDatabase(dbName, Some(designDocPath))
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          // Create a database to backup
+          val dbName = testDbPrefix + "database_for_single_replication"
+          val client = createDatabase(dbName, Some(designDocPath))
 
-    println(s"Creating testdocument")
-    val testDocument = JsObject("testKey" -> "testValue".toJson)
-    client.putDoc("testId", testDocument).futureValue
+          println(s"Creating testdocument")
+          val testDocument = JsObject("testKey" -> "testValue".toJson)
+          client.putDoc("testId", testDocument).futureValue
 
-    // Trigger replication and verify the created databases have the correct format
-    val (createdBackupDbs, _, _) = runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes)
-    createdBackupDbs should have size 1
-    val backupDbName = createdBackupDbs.head
-    backupDbName should fullyMatch regex s"backup_\\d+_$dbName"
+          // Trigger replication and verify the created databases have the correct format
+          val (createdBackupDbs, _, _) = runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes)
+          createdBackupDbs should have size 1
+          val backupDbName = createdBackupDbs.head
+          backupDbName should fullyMatch regex s"backup_\\d+_$dbName"
 
-    // Wait for the replication to finish
-    waitForReplication(backupDbName)
+          // Wait for the replication to finish
+          waitForReplication(backupDbName)
 
-    // Verify the replicated database is equal to the original database
-    compareDatabases(dbName, backupDbName, filterUsed = true)
+          // Verify the replicated database is equal to the original database
+          compareDatabases(dbName, backupDbName, filterUsed = true)
 
-    // Remove all created databases
-    createdBackupDbs.foreach(removeDatabase(_))
-    createdBackupDbs.foreach(removeReplicationDoc)
-    removeDatabase(dbName)
+          // Remove all created databases
+          createdBackupDbs.foreach(removeDatabase(_))
+          createdBackupDbs.foreach(removeReplicationDoc)
+          removeDatabase(dbName)
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Database replication script should replicate a database (snapshot) not successful, retrying.."))
   }
 
   it should "do not replicate a database that is excluded" in {
-    // Create a database to backup
-    val dbNameToBackup = testDbPrefix + "database_for_single_replication_with_exclude"
-    val nExClient = createDatabase(dbNameToBackup, Some(designDocPath))
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          // Create a database to backup
+          val dbNameToBackup = testDbPrefix + "database_for_single_replication_with_exclude"
+          val nExClient = createDatabase(dbNameToBackup, Some(designDocPath))
 
-    val excludedName = "some_excluded_name"
-    val exClient = createDatabase(testDbPrefix + excludedName, Some(designDocPath))
+          val excludedName = "some_excluded_name"
+          val exClient = createDatabase(testDbPrefix + excludedName, Some(designDocPath))
 
-    // Trigger replication and verify the created databases have the correct format
-    val (createdBackupDbs, _, _) = runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes, exclude = List(excludedName))
-    createdBackupDbs should have size 1
-    val backupDbName = createdBackupDbs.head
-    backupDbName should fullyMatch regex s"backup_\\d+_$dbNameToBackup"
+          // Trigger replication and verify the created databases have the correct format
+          val (createdBackupDbs, _, _) =
+            runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes, exclude = List(excludedName))
+          createdBackupDbs should have size 1
+          val backupDbName = createdBackupDbs.head
+          backupDbName should fullyMatch regex s"backup_\\d+_$dbNameToBackup"
 
-    // Wait for the replication to finish
-    waitForReplication(backupDbName)
+          // Wait for the replication to finish
+          waitForReplication(backupDbName)
 
-    // Remove all created databases
-    createdBackupDbs.foreach(removeDatabase(_))
-    createdBackupDbs.foreach(removeReplicationDoc)
-    removeDatabase(dbNameToBackup)
-    removeDatabase(testDbPrefix + excludedName)
+          // Remove all created databases
+          createdBackupDbs.foreach(removeDatabase(_))
+          createdBackupDbs.foreach(removeReplicationDoc)
+          removeDatabase(dbNameToBackup)
+          removeDatabase(testDbPrefix + excludedName)
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Database replication script should do not replicate a database that is excluded not successful, retrying.."))
   }
 
   it should "not replicate a database that basename is excluded" in {
-    // Create a database to backup
-    val dbNameToBackup = testDbPrefix + "database_for_single_replication_with_exclude_basename"
-    createDatabase(dbNameToBackup, Some(designDocPath))
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          // Create a database to backup
+          val dbNameToBackup = testDbPrefix + "database_for_single_replication_with_exclude_basename"
+          createDatabase(dbNameToBackup, Some(designDocPath))
 
-    val excludedName = "some_excluded_name"
-    createDatabase(testDbPrefix + excludedName + "-postfix123", Some(designDocPath))
+          val excludedName = "some_excluded_name"
+          createDatabase(testDbPrefix + excludedName + "-postfix123", Some(designDocPath))
 
-    // Trigger replication and verify the created databases have the correct format
-    val (createdBackupDbs, _, _) =
-      runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes, excludeBaseName = List(excludedName))
-    createdBackupDbs should have size 1
-    val backupDbName = createdBackupDbs.head
-    backupDbName should fullyMatch regex s"backup_\\d+_$dbNameToBackup"
+          // Trigger replication and verify the created databases have the correct format
+          val (createdBackupDbs, _, _) =
+            runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes, excludeBaseName = List(excludedName))
+          createdBackupDbs should have size 1
+          val backupDbName = createdBackupDbs.head
+          backupDbName should fullyMatch regex s"backup_\\d+_$dbNameToBackup"
 
-    // Wait for the replication to finish
-    waitForReplication(backupDbName)
+          // Wait for the replication to finish
+          waitForReplication(backupDbName)
 
-    // Remove all created databases
-    createdBackupDbs.foreach(removeDatabase(_))
-    createdBackupDbs.foreach(removeReplicationDoc)
-    removeDatabase(dbNameToBackup)
-    removeDatabase(testDbPrefix + excludedName + "-postfix123")
+          // Remove all created databases
+          createdBackupDbs.foreach(removeDatabase(_))
+          createdBackupDbs.foreach(removeReplicationDoc)
+          removeDatabase(dbNameToBackup)
+          removeDatabase(testDbPrefix + excludedName + "-postfix123")
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Database replication script should not replicate a database that basename is excluded not successful, retrying.."))
   }
 
   it should "replicate a database (snapshot) even if the filter is not available" in {
-    // Create a db to backup
-    val dbName = testDbPrefix + "database_for_snapshout_without_filter"
-    val client = createDatabase(dbName, None)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          // Create a db to backup
+          val dbName = testDbPrefix + "database_for_snapshout_without_filter"
+          val client = createDatabase(dbName, None)
 
-    println("Creating testdocuments")
-    val testDocuments = Seq(
-      JsObject("testKey" -> "testValue".toJson, "_id" -> "doc1".toJson),
-      JsObject("testKey" -> "testValue".toJson, "_id" -> "_design/doc1".toJson))
-    val documents = testDocuments.map { doc =>
-      val res = client.putDoc(doc.fields("_id").convertTo[String], doc).futureValue
-      res shouldBe 'right
-      res.right.get
-    }
+          println("Creating testdocuments")
+          val testDocuments = Seq(
+            JsObject("testKey" -> "testValue".toJson, "_id" -> "doc1".toJson),
+            JsObject("testKey" -> "testValue".toJson, "_id" -> "_design/doc1".toJson))
+          val documents = testDocuments.map { doc =>
+            val res = client.putDoc(doc.fields("_id").convertTo[String], doc).futureValue
+            res shouldBe 'right
+            res.right.get
+          }
 
-    // Trigger replication and verify the created databases have the correct format
-    val (createdBackupDbs, _, _) = runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes)
-    createdBackupDbs should have size 1
-    val backupDbName = createdBackupDbs.head
-    backupDbName should fullyMatch regex s"backup_\\d+_$dbName"
+          // Trigger replication and verify the created databases have the correct format
+          val (createdBackupDbs, _, _) = runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes)
+          createdBackupDbs should have size 1
+          val backupDbName = createdBackupDbs.head
+          backupDbName should fullyMatch regex s"backup_\\d+_$dbName"
 
-    // Wait for the replication to finish
-    waitForReplication(backupDbName)
+          // Wait for the replication to finish
+          waitForReplication(backupDbName)
 
-    // Verify the replicated database is equal to the original database
-    compareDatabases(dbName, backupDbName, filterUsed = false)
+          // Verify the replicated database is equal to the original database
+          compareDatabases(dbName, backupDbName, filterUsed = false)
 
-    // Remove all created databases
-    createdBackupDbs.foreach(removeDatabase(_))
-    createdBackupDbs.foreach(removeReplicationDoc)
-    removeDatabase(dbName)
+          // Remove all created databases
+          createdBackupDbs.foreach(removeDatabase(_))
+          createdBackupDbs.foreach(removeReplicationDoc)
+          removeDatabase(dbName)
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Database replication script should replicate a database (snapshot) even if the filter is not available not successful, retrying.."))
   }
 
   it should "replicate a database (snapshot) and deleted documents and design documents should not be in the snapshot" in {
-    // Create a database to backup
-    val dbName = testDbPrefix + "database_for_single_replication_design_and_deleted_docs"
-    val client = createDatabase(dbName, Some(designDocPath))
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          // Create a database to backup
+          val dbName = testDbPrefix + "database_for_single_replication_design_and_deleted_docs"
+          val client = createDatabase(dbName, Some(designDocPath))
 
-    println(s"Creating testdocument")
-    val testDocuments = Seq(
-      JsObject("testKey" -> "testValue".toJson, "_id" -> "doc1".toJson),
-      JsObject("testKey" -> "testValue".toJson, "_id" -> "doc2".toJson),
-      JsObject("testKey" -> "testValue".toJson, "_id" -> "_design/doc1".toJson))
-    val documents = testDocuments.map { doc =>
-      val res = client.putDoc(doc.fields("_id").convertTo[String], doc).futureValue
-      res shouldBe 'right
-      res.right.get
-    }
+          println(s"Creating testdocument")
+          val testDocuments = Seq(
+            JsObject("testKey" -> "testValue".toJson, "_id" -> "doc1".toJson),
+            JsObject("testKey" -> "testValue".toJson, "_id" -> "doc2".toJson),
+            JsObject("testKey" -> "testValue".toJson, "_id" -> "_design/doc1".toJson))
+          val documents = testDocuments.map { doc =>
+            val res = client.putDoc(doc.fields("_id").convertTo[String], doc).futureValue
+            res shouldBe 'right
+            res.right.get
+          }
 
-    // Delete second document again
-    val indexOfDocumentToDelete = 1
-    val idOfDeletedDocument = documents(indexOfDocumentToDelete).fields("id").convertTo[String]
-    client.deleteDoc(idOfDeletedDocument, documents(indexOfDocumentToDelete).fields("rev").convertTo[String])
+          // Delete second document again
+          val indexOfDocumentToDelete = 1
+          val idOfDeletedDocument = documents(indexOfDocumentToDelete).fields("id").convertTo[String]
+          client.deleteDoc(idOfDeletedDocument, documents(indexOfDocumentToDelete).fields("rev").convertTo[String])
 
-    // Trigger replication and verify the created databases have the correct format
-    val (createdBackupDbs, _, _) = runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes)
-    createdBackupDbs should have size 1
-    val backupDbName = createdBackupDbs.head
-    backupDbName should fullyMatch regex s"backup_\\d+_$dbName"
+          // Trigger replication and verify the created databases have the correct format
+          val (createdBackupDbs, _, _) = runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes)
+          createdBackupDbs should have size 1
+          val backupDbName = createdBackupDbs.head
+          backupDbName should fullyMatch regex s"backup_\\d+_$dbName"
 
-    // Wait for the replication to finish
-    waitForReplication(backupDbName)
+          // Wait for the replication to finish
+          waitForReplication(backupDbName)
 
-    // Verify the replicated database is equal to the original database
-    compareDatabases(dbName, backupDbName, filterUsed = true)
+          // Verify the replicated database is equal to the original database
+          compareDatabases(dbName, backupDbName, filterUsed = true)
 
-    // Check that deleted doc has not been copied to snapshot
-    val snapshotClient =
-      new ExtendedCouchDbRestClient(dbProtocol, dbHost, dbPort.toInt, dbUsername, dbPassword, backupDbName)
-    val snapshotResponse = snapshotClient.getAllDocs(keys = Some(List(idOfDeletedDocument))).futureValue
-    snapshotResponse shouldBe 'right
-    val results = snapshotResponse.right.get.fields("rows").convertTo[List[JsObject]]
-    results should have size 1
-    // If deleted doc would be in db, the document id and rev would have been returned
-    results.head shouldBe JsObject("key" -> idOfDeletedDocument.toJson, "error" -> "not_found".toJson)
+          // Check that deleted doc has not been copied to snapshot
+          val snapshotClient =
+            new ExtendedCouchDbRestClient(dbProtocol, dbHost, dbPort.toInt, dbUsername, dbPassword, backupDbName)
+          val snapshotResponse = snapshotClient.getAllDocs(keys = Some(List(idOfDeletedDocument))).futureValue
+          snapshotResponse shouldBe 'right
+          val results = snapshotResponse.right.get.fields("rows").convertTo[List[JsObject]]
+          results should have size 1
+          // If deleted doc would be in db, the document id and rev would have been returned
+          results.head shouldBe JsObject("key" -> idOfDeletedDocument.toJson, "error" -> "not_found".toJson)
 
-    // Remove all created databases
-    createdBackupDbs.foreach(removeDatabase(_))
-    createdBackupDbs.foreach(removeReplicationDoc)
-    removeDatabase(dbName)
+          // Remove all created databases
+          createdBackupDbs.foreach(removeDatabase(_))
+          createdBackupDbs.foreach(removeReplicationDoc)
+          removeDatabase(dbName)
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Database replication script should replicate a database (snapshot) and deleted documents and design documents should not be in the snapshot not successful, retrying.."))
   }
 
   it should "continuously update a database" in {
-    // Create a database to backup
-    val dbName = testDbPrefix + "database_for_continous_replication"
-    val backupDbName = s"continuous_$dbName"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          // Create a database to backup
+          val dbName = testDbPrefix + "database_for_continous_replication"
+          val backupDbName = s"continuous_$dbName"
 
-    // Pre-test cleanup of previously created entities
-    removeDatabase(backupDbName, true)
-    removeReplicationDoc(backupDbName)
+          // Pre-test cleanup of previously created entities
+          removeDatabase(backupDbName, true)
+          removeReplicationDoc(backupDbName)
 
-    val client = createDatabase(dbName, Some(designDocPath))
+          val client = createDatabase(dbName, Some(designDocPath))
 
-    // Trigger replication and verify the created databases have the correct format
-    val (createdBackupDbs, _, _) = runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes, continuous = true)
-    createdBackupDbs should have size 1
-    createdBackupDbs.head shouldBe backupDbName
+          // Trigger replication and verify the created databases have the correct format
+          val (createdBackupDbs, _, _) = runReplicator(dbUrl, dbUrl, testDbPrefix, 10.minutes, continuous = true)
+          createdBackupDbs should have size 1
+          createdBackupDbs.head shouldBe backupDbName
 
-    // Wait for the replicated database to appear
-    val backupClient = waitForDatabase(backupDbName)
+          // Wait for the replicated database to appear
+          val backupClient = waitForDatabase(backupDbName)
 
-    // Create a document in the old database
-    println(s"Creating testdocument")
-    val docId = "testId"
-    val testDocument = JsObject("testKey" -> "testValue".toJson)
-    client.putDoc(docId, testDocument).futureValue
+          // Create a document in the old database
+          println(s"Creating testdocument")
+          val docId = "testId"
+          val testDocument = JsObject("testKey" -> "testValue".toJson)
+          client.putDoc(docId, testDocument).futureValue
 
-    // Wait for the document to appear
-    waitForDocument(backupClient, docId)
+          // Wait for the document to appear
+          waitForDocument(backupClient, docId)
 
-    // Verify the replicated database is equal to the original database
-    compareDatabases(backupDbName, dbName, filterUsed = false)
+          // Verify the replicated database is equal to the original database
+          compareDatabases(backupDbName, dbName, filterUsed = false)
 
-    // Stop the replication
-    val replication = replicatorClient.getDoc(backupDbName).futureValue
-    replication shouldBe 'right
-    val replicationDoc = replication.right.get
-    replicatorClient.deleteDoc(
-      replicationDoc.fields("_id").convertTo[String],
-      replicationDoc.fields("_rev").convertTo[String])
+          // Stop the replication
+          val replication = replicatorClient.getDoc(backupDbName).futureValue
+          replication shouldBe 'right
+          val replicationDoc = replication.right.get
+          replicatorClient
+            .deleteDoc(replicationDoc.fields("_id").convertTo[String], replicationDoc.fields("_rev").convertTo[String])
 
-    // Remove all created databases
-    createdBackupDbs.foreach(removeDatabase(_))
-    createdBackupDbs.foreach(removeReplicationDoc)
-    removeDatabase(dbName)
+          // Remove all created databases
+          createdBackupDbs.foreach(removeDatabase(_))
+          createdBackupDbs.foreach(removeReplicationDoc)
+          removeDatabase(dbName)
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Database replication script should continuously update a database not successful, retrying.."))
   }
 
   it should "remove outdated databases and replicationDocs" in {
-    val now = Instant.now()
-    val expires = 10.minutes
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val now = Instant.now()
+          val expires = 10.minutes
 
-    println(s"Now is: ${toEpochSeconds(now)}")
+          println(s"Now is: ${toEpochSeconds(now)}")
 
-    // Create a database that is already expired
-    val expired = now.minus(expires + 5.minutes)
-    val expiredName = s"backup_${toEpochSeconds(expired)}_${testDbPrefix}expired_backup"
-    val expiredClient = createDatabase(expiredName, Some(designDocPath))
-    replicatorClient.putDoc(expiredName, JsObject("source" -> "".toJson, "target" -> "".toJson)).futureValue
+          val expired = now.minus(expires + 5.minutes)
+          val expiredName = s"backup_${toEpochSeconds(expired)}_${testDbPrefix}expired_backup"
+          val notExpired = now.plus(expires - 5.minutes)
+          val notExpiredName = s"backup_${toEpochSeconds(notExpired)}_${testDbPrefix}notexpired_backup"
+          var createdDatabasesVar: List[String] = List()
 
-    // Create a database that is not yet expired
-    val notExpired = now.plus(expires - 5.minutes)
-    val notExpiredName = s"backup_${toEpochSeconds(notExpired)}_${testDbPrefix}notexpired_backup"
-    val notExpiredClient = createDatabase(notExpiredName, Some(designDocPath))
-    replicatorClient.putDoc(notExpiredName, JsObject("source" -> "".toJson, "target" -> "".toJson)).futureValue
+          try {
+            // Create a database that is already expired
+            val expiredClient = createDatabase(expiredName, Some(designDocPath))
+            replicatorClient.putDoc(expiredName, JsObject("source" -> "".toJson, "target" -> "".toJson)).futureValue
 
-    // Trigger replication and verify the expired database is deleted while the unexpired one is kept
-    val (createdDatabases, deletedReplicationDocs, deletedDatabases) =
-      runReplicator(dbUrl, dbUrl, testDbPrefix, expires)
-    deletedReplicationDocs should (contain(expiredName) and not contain notExpiredName)
-    deletedDatabases should (contain(expiredName) and not contain notExpiredName)
+            // Create a database that is not yet expired
+            val notExpiredClient = createDatabase(notExpiredName, Some(designDocPath))
+            replicatorClient.putDoc(notExpiredName, JsObject("source" -> "".toJson, "target" -> "".toJson)).futureValue
 
-    expiredClient.getAllDocs().futureValue shouldBe Left(StatusCodes.NotFound)
-    notExpiredClient.getAllDocs().futureValue shouldBe 'right
+            // Trigger replication and verify the expired database is deleted while the unexpired one is kept
+            val (createdDatabases, deletedReplicationDocs, deletedDatabases) =
+              runReplicator(dbUrl, dbUrl, testDbPrefix, expires)
+            createdDatabasesVar = createdDatabases
+            deletedReplicationDocs should (contain(expiredName) and not contain notExpiredName)
+            deletedDatabases should (contain(expiredName) and not contain notExpiredName)
 
-    // Cleanup backup database
-    createdDatabases.foreach(removeDatabase(_))
-    createdDatabases.foreach(removeReplicationDoc)
-    removeReplicationDoc(notExpiredName)
-    removeDatabase(notExpiredName)
+            expiredClient.getAllDocs().futureValue shouldBe Left(StatusCodes.NotFound)
+            notExpiredClient.getAllDocs().futureValue shouldBe 'right
+
+          } finally {
+            // make sure dbs are deleted in case of errors
+            // cleanup backup database
+            createdDatabasesVar.foreach(removeDatabase(_))
+            createdDatabasesVar.foreach(removeReplicationDoc)
+            removeDatabase(expiredName)
+            removeDatabase(notExpiredName)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Database replication script should remove outdated databases and replicationDocs not successful, retrying.."))
   }
 
   it should "not remove outdated databases with other prefix" in {
-    val now = Instant.now()
-    val expires = 10.minutes
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val now = Instant.now()
+          val expires = 10.minutes
 
-    println(s"Now is: ${toEpochSeconds(now)}")
+          println(s"Now is: ${toEpochSeconds(now)}")
 
-    val expired = now.minus(expires + 5.minutes)
+          val expired = now.minus(expires + 5.minutes)
 
-    // Create a database that is expired with correct prefix
-    val correctPrefixName = s"backup_${toEpochSeconds(expired)}_${testDbPrefix}expired_backup_correct_prefix"
-    val correctPrefixClient = createDatabase(correctPrefixName, Some(designDocPath))
-    replicatorClient.putDoc(correctPrefixName, JsObject("source" -> "".toJson, "target" -> "".toJson)).futureValue
+          val correctPrefixName = s"backup_${toEpochSeconds(expired)}_${testDbPrefix}expired_backup_correct_prefix"
+          val wrongPrefix = s"replicatortest_wrongprefix_$dbPrefix"
+          val wrongPrefixName = s"backup_${toEpochSeconds(expired)}_${wrongPrefix}expired_backup_wrong_prefix"
+          var createdDatabasesVar: List[String] = List()
 
-    // Create a database that is expired with wrong prefix
-    val wrongPrefix = s"replicatortest_wrongprefix_$dbPrefix"
-    val wrongPrefixName = s"backup_${toEpochSeconds(expired)}_${wrongPrefix}expired_backup_wrong_prefix"
-    val wrongPrefixClient = createDatabase(wrongPrefixName, Some(designDocPath))
-    replicatorClient.putDoc(wrongPrefixName, JsObject("source" -> "".toJson, "target" -> "".toJson)).futureValue
+          try {
+            // Create a database that is expired with correct prefix
+            val correctPrefixClient = createDatabase(correctPrefixName, Some(designDocPath))
+            replicatorClient
+              .putDoc(correctPrefixName, JsObject("source" -> "".toJson, "target" -> "".toJson))
+              .futureValue
 
-    // Trigger replication and verify the expired database with correct prefix is deleted while the db with the wrong prefix is kept
-    val (createdDatabases, deletedReplicationDocs, deletedDatabases) =
-      runReplicator(dbUrl, dbUrl, testDbPrefix, expires)
-    deletedReplicationDocs should (contain(correctPrefixName) and not contain wrongPrefixName)
-    deletedDatabases should (contain(correctPrefixName) and not contain wrongPrefixName)
+            // Create a database that is expired with wrong prefix
+            val wrongPrefixClient = createDatabase(wrongPrefixName, Some(designDocPath))
+            replicatorClient.putDoc(wrongPrefixName, JsObject("source" -> "".toJson, "target" -> "".toJson)).futureValue
 
-    correctPrefixClient.getAllDocs().futureValue shouldBe Left(StatusCodes.NotFound)
-    wrongPrefixClient.getAllDocs().futureValue shouldBe 'right
+            // Trigger replication and verify the expired database with correct prefix is deleted while the db with the wrong prefix is kept
+            val (createdDatabases, deletedReplicationDocs, deletedDatabases) =
+              runReplicator(dbUrl, dbUrl, testDbPrefix, expires)
+            createdDatabasesVar = createdDatabases
+            deletedReplicationDocs should (contain(correctPrefixName) and not contain wrongPrefixName)
+            deletedDatabases should (contain(correctPrefixName) and not contain wrongPrefixName)
 
-    // Cleanup backup database
-    createdDatabases.foreach(removeDatabase(_))
-    createdDatabases.foreach(removeReplicationDoc)
-    removeReplicationDoc(wrongPrefixName)
-    removeDatabase(wrongPrefixName)
+            correctPrefixClient.getAllDocs().futureValue shouldBe Left(StatusCodes.NotFound)
+            wrongPrefixClient.getAllDocs().futureValue shouldBe 'right
+
+          } finally {
+            // make sure dbs are deleted in case of errors
+            // cleanup backup database
+            createdDatabasesVar.foreach(removeDatabase(_))
+            createdDatabasesVar.foreach(removeReplicationDoc)
+            removeReplicationDoc(wrongPrefixName)
+            removeDatabase(correctPrefixName)
+            removeDatabase(wrongPrefixName)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Database replication script should not remove outdated databases with other prefix not successful, retrying.."))
   }
 
   it should "replay a database" in {
     org.apache.openwhisk.utils
       .retry(
         {
-          //val now = Instant.now()
+          val now = Instant.now()
           val dbName = testDbPrefix + "database_to_be_restored"
-          // use hardcoded prefix to allow deletion/cleanup also in case of errors
-          //val backupPrefix = s"backup_${toEpochSeconds(now)}_"
-          val backupPrefix = s"backup_(1593591021)_"
+          val backupPrefix = s"backup_${toEpochSeconds(now)}_"
           val backupDbName = backupPrefix + dbName // eg backup_1593591021_replicatortest_fn-dev-build_database_to_be_restored
 
-          // Create a database that looks like a backup
-          val backupClient = createDatabase(backupDbName, Some(designDocPath))
-          println(s"Creating testdocument")
-          backupClient.putDoc("testId", JsObject("testKey" -> "testValue".toJson)).futureValue
+          try {
+            // Create a database that looks like a backup
+            val backupClient = createDatabase(backupDbName, Some(designDocPath))
+            println(s"Creating testdocument")
+            backupClient.putDoc("testId", JsObject("testKey" -> "testValue".toJson)).futureValue
 
-          // Run the replay script
-          val (_, _, replicationId) = runReplay(dbUrl, dbUrl, backupPrefix).head
+            // Run the replay script
+            val (_, _, replicationId) = runReplay(dbUrl, dbUrl, backupPrefix).head
 
-          // Wait for the replication to finish
-          waitForReplication(replicationId)
+            // Wait for the replication to finish
+            waitForReplication(replicationId)
 
-          // Verify the replicated database is equal to the original database
-          compareDatabases(backupDbName, dbName, filterUsed = false)
+            // Verify the replicated database is equal to the original database
+            compareDatabases(backupDbName, dbName, filterUsed = false)
 
-          // Cleanup databases
-          removeReplicationDoc(replicationId)
-          removeDatabase(backupDbName)
-          removeDatabase(dbName)
+            // cleanup replication doc
+            removeReplicationDoc(replicationId)
+          } finally {
+            // make sure backup db is deleted in case of errors
+            // cleanup databases
+            removeDatabase(backupDbName)
+            removeDatabase(dbName)
+          }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
           s"${this.getClass.getName} > Database replication script should replay a database not successful, retrying.."))
   }
