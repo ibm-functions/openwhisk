@@ -25,30 +25,43 @@ import common._
 import spray.json._
 import spray.json.DefaultJsonProtocol._
 
+import scala.concurrent.duration.DurationInt
+
 @RunWith(classOf[JUnitRunner])
 class WskActivationTests extends TestHelpers with WskTestHelpers with WskActorSystem {
 
   implicit val wskprops = WskProps()
   val wsk: WskOperations = new WskRestOperations
 
+  private val retriesOnTestFailures = 5
+  private val waitBeforeRetry = 1.second
+
   behavior of "Whisk activations"
 
   it should "fetch result using activation result API" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val name = "hello"
-    val expectedResult = JsObject(
-      "result" -> JsObject("payload" -> "hello, undefined!".toJson),
-      "success" -> true.toJson,
-      "status" -> "success".toJson)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val name = "hello-" + System.currentTimeMillis()
+          val expectedResult = JsObject(
+            "result" -> JsObject("payload" -> "hello, undefined!".toJson),
+            "success" -> true.toJson,
+            "status" -> "success".toJson)
 
-    assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-      action.create(name, Some(TestUtils.getTestActionFilename("hello.js")))
-    }
+          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+            action.create(name, Some(TestUtils.getTestActionFilename("hello.js")))
+          }
 
-    withActivation(wsk.activation, wsk.action.invoke(name)) { activation =>
-      val result = wsk.activation.result(Some(activation.activationId)).stdout.parseJson.asJsObject
-      //Remove size from comparison as its exact value may vary
-      val resultWithoutSize = JsObject(result.fields - "size")
-      resultWithoutSize shouldBe expectedResult
-    }
+          withActivation(wsk.activation, wsk.action.invoke(name)) { activation =>
+            val result = wsk.activation.result(Some(activation.activationId)).stdout.parseJson.asJsObject
+            //Remove size from comparison as its exact value may vary
+            val resultWithoutSize = JsObject(result.fields - "size")
+            resultWithoutSize shouldBe expectedResult
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Whisk activations should fetch result using activation result API not successful, retrying.."))
   }
 }
