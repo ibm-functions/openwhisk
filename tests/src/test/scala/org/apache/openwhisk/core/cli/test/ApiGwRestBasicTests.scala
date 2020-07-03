@@ -29,6 +29,7 @@ import common.TestUtils
 
 import scala.util.matching.Regex
 import common.WskProps
+import scala.concurrent.duration.DurationInt
 
 /**
  * Tests for testing the CLI "api" subcommand.  Most of these tests require a deployed backend.
@@ -38,6 +39,9 @@ abstract class ApiGwRestBasicTests extends BaseApiGwTests {
 
   lazy val clinamespace = wsk.namespace.whois()
   val createCode: Int
+
+  private val retriesOnTestFailures = 5
+  private val waitBeforeRetry = 1.second
 
   def verifyBadCommands(rr: RunResult, badpath: String): Unit = {
     rr.stderr should include(s"'${badpath}' must begin with '/'")
@@ -904,35 +908,43 @@ abstract class ApiGwRestBasicTests extends BaseApiGwTests {
   }
 
   it should "verify get API name that uses custom package" in {
-    val testName = "CLI_APIGWTEST25"
-    val testbasepath = "/" + testName + "_bp"
-    val testrelpath = "/path"
-    val testnewrelpath = "/path_new"
-    val testurlop = "get"
-    val testapiname = testName + " API Name"
-    val packageName = withTimestamp("pkg")
-    val actionName = packageName + "/" + testName + "_action"
-    try {
-      wsk.pkg.create(packageName).stdout should include regex (s""""name":\\s*"$packageName"""")
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val testName = "CLI_APIGWTEST25"
+          val testbasepath = "/" + testName + "_bp"
+          val testrelpath = "/path"
+          val testnewrelpath = "/path_new"
+          val testurlop = "get"
+          val testapiname = testName + " API Name"
+          val packageName = withTimestamp("pkg")
+          val actionName = packageName + "/" + testName + "_action"
+          try {
+            wsk.pkg.create(packageName).stdout should include regex (s""""name":\\s*"$packageName"""")
 
-      // Create the action for the API.  It must be a "web-action" action.
-      val file = TestUtils.getTestActionFilename(s"echo.js")
-      wsk.action.create(name = actionName, artifact = Some(file), expectedExitCode = 200, web = Some("true"))
+            // Create the action for the API.  It must be a "web-action" action.
+            val file = TestUtils.getTestActionFilename(s"echo.js")
+            wsk.action.create(name = actionName, artifact = Some(file), expectedExitCode = 200, web = Some("true"))
 
-      var rr = apiCreate(
-        basepath = Some(testbasepath),
-        relpath = Some(testrelpath),
-        operation = Some(testurlop),
-        action = Some(actionName),
-        apiname = Some(testapiname))
-      verifyApiCreated(rr)
+            var rr = apiCreate(
+              basepath = Some(testbasepath),
+              relpath = Some(testrelpath),
+              operation = Some(testurlop),
+              action = Some(actionName),
+              apiname = Some(testapiname))
+            verifyApiCreated(rr)
 
-      rr = apiGet(basepathOrApiName = Some(testapiname))
-      verifyApiList(rr, clinamespace, testName + "_action", testurlop, testbasepath, testrelpath, testapiname)
-    } finally {
-      wsk.action.delete(name = actionName, expectedExitCode = DONTCARE_EXIT)
-      apiDelete(basepathOrApiName = testbasepath, expectedExitCode = DONTCARE_EXIT)
-      wsk.pkg.delete(packageName).stdout should include regex (s""""name":\\s*"$packageName"""")
-    }
+            rr = apiGet(basepathOrApiName = Some(testapiname))
+            verifyApiList(rr, clinamespace, testName + "_action", testurlop, testbasepath, testrelpath, testapiname)
+          } finally {
+            wsk.action.delete(name = actionName, expectedExitCode = DONTCARE_EXIT)
+            apiDelete(basepathOrApiName = testbasepath, expectedExitCode = DONTCARE_EXIT)
+            wsk.pkg.delete(packageName).stdout should include regex (s""""name":\\s*"$packageName"""")
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Wsk api should verify get API name that uses custom package not successful, retrying.."))
   }
 }
