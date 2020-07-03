@@ -261,7 +261,7 @@ trait ArtifactStoreAttachmentBehaviors extends ArtifactStoreBehaviorBase with Ex
             .failed
             .futureValue shouldBe a[NoDocumentException]
         },
-        retriesOnTestFailures,
+        if (getAttachmentStore(entityStore).isDefined) retriesOnTestFailures else 1,
         Some(waitBeforeRetry),
         Some(
           s"${this.getClass.getName} > ${storeType}ArtifactStore attachments should delete attachment on document delete not successful, retrying.."))
