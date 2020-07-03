@@ -941,7 +941,7 @@ abstract class ApiGwRestBasicTests extends BaseApiGwTests {
             wsk.action.delete(name = actionName)
             apiDelete(basepathOrApiName = testbasepath, expectedExitCode = DONTCARE_EXIT)
             org.apache.openwhisk.utils.retry({
-              wsk.pkg.list().getBodyListString.length shouldBe (0)
+              wsk.pkg.list().stdout should not include (s"/${wsk.namespace}/$packageName/$actionName")
             }, retriesOnTestFailures, Some(waitBeforeRetry), Some(s"${this.getClass.getName} package ${wsk.pkg} not empty, retrying.."))
             wsk.pkg.delete(packageName).stdout should include regex (s""""name":\\s*"$packageName"""")
           }

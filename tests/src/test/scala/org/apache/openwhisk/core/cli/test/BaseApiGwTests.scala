@@ -23,31 +23,28 @@ import java.time.Instant
 import scala.collection.mutable.ArrayBuffer
 import scala.concurrent.duration._
 import scala.math.max
+
 import org.junit.runner.RunWith
+
 import org.scalatest.BeforeAndAfterAll
 import org.scalatest.BeforeAndAfterEach
 import org.scalatest.junit.JUnitRunner
-import common._
+
 import common.TestHelpers
 import common.TestUtils._
 import common.WhiskProperties
+import common.WskOperations
 import common.WskProps
 import common.WskTestHelpers
-import common.rest.WskRestOperations
 
 /**
  * Tests for testing the CLI "api" subcommand.  Most of these tests require a deployed backend.
  */
 @RunWith(classOf[JUnitRunner])
-abstract class BaseApiGwTests
-    extends TestHelpers
-    with WskTestHelpers
-    with WskActorSystem
-    with BeforeAndAfterEach
-    with BeforeAndAfterAll {
+abstract class BaseApiGwTests extends TestHelpers with WskTestHelpers with BeforeAndAfterEach with BeforeAndAfterAll {
 
   implicit val wskprops = WskProps()
-  val wsk = new WskRestOperations
+  val wsk: WskOperations
 
   // This test suite makes enough CLI invocations in 60 seconds to trigger the OpenWhisk
   // throttling restriction.  To avoid CLI failures due to being throttled, track the
