@@ -31,7 +31,6 @@ import common._
 import common.TestHelpers
 import common.TestUtils._
 import common.WhiskProperties
-import common.WskOperations
 import common.WskProps
 import common.WskTestHelpers
 import common.rest.WskRestOperations

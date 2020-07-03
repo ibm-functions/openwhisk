@@ -29,8 +29,6 @@ import common.TestUtils
 
 import scala.util.matching.Regex
 import common.WskProps
-import common.rest.RestResult
-import common.rest.WskRestOperations
 
 import scala.concurrent.duration.DurationInt
 
