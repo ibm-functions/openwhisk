@@ -301,7 +301,6 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
               method = transid.getTag(TransactionId.tagHttpMethod),
               url = uri,
               userAgent = transid.getTag(TransactionId.tagUserAgent),
-              failure = if (success) "" else reasonType,
               resourceGroupCrn = resourceGroupCrn)
 
           var nameSpaceId = transid.getTag(TransactionId.tagNamespaceId)
@@ -316,7 +315,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
             target = Target(targetId, serviceAction.targetName, serviceAction.targetType),
             action = serviceAction.actionType,
             outcome = if (success) "success" else "failure",
-            reason = Reason(reasonCode, reasonType),
+            reason = Reason(reasonCode, reasonType, success, reasonForFailure = reasonType),
             severity = serviceAction.severity,
             message = logMessage,
             logSourceCRN = convertToLogSourceCRN(targetId),

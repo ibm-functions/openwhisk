@@ -207,7 +207,7 @@ class ActivityTrackerTests()
  "message":"Functions: read rule testrule for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"$targetId",
-     "name":"testrule","typeURI":"functions/rule"
+     "name":"testrule","typeURI":"functions/namespace/rule"
  },
  "severity":"normal",
  "logSourceCRN":"$logSourceCRN",
@@ -264,7 +264,7 @@ class ActivityTrackerTests()
     Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.Conflict)), waitTime)
 
     // in case of errors following additional settings hold:
-    // - requestData.reasonForFailure must be filled
+    // - reason.reasonForFailure must be filled
     // - message must contain "-failure"
     // - outcome is "failure"
     val expectedString =
@@ -273,7 +273,6 @@ class ActivityTrackerTests()
     "requestId":"test_create_action_err",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123?overwrite=false",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
-    "reasonForFailure":"Conflict",
     "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
     "method":"PUT"
  },
@@ -282,14 +281,15 @@ class ActivityTrackerTests()
  "saveServiceCopy":true,
  "reason":{
      "reasonCode":409,
-     "reasonType":"Conflict"
+     "reasonType":"Conflict",
+     "reasonForFailure":"Conflict"
  },
  "eventTime":"2020-06-02T18:42:55.149+0000",
  "message":"Functions: create action hello123 for namespace a88c0a24-853b-4477-82f8-6876e72bebf2 -failure",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:a88c0a24-853b-4477-82f8-6876e72bebf2::",
      "name":"hello123",
-     "typeURI":"functions/action"
+     "typeURI":"functions/namespace/action"
  },
  "severity":"normal",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
@@ -373,7 +373,7 @@ class ActivityTrackerTests()
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:s-3c9f2ed8-6436-4288-93ad-1815b7ea10a6::",
      "name":"helloClassic1",
-     "typeURI":"functions/action"
+     "typeURI":"functions/namespace/action"
  },
  "severity":"normal",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
@@ -592,7 +592,7 @@ class ActivityTrackerTests()
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
      "name":"$entityName",
-     "typeURI":"functions/$entityType"
+     "typeURI":"functions/namespace/$entityType"
  },
  "severity":"${severity(methodIndex)}",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
@@ -938,7 +938,7 @@ class ActivityTrackerTests()
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
      "name":"$entityName",
-     "typeURI":"functions/$entityType"
+     "typeURI":"functions/namespace/$entityType"
  },
  "severity":"normal",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
@@ -1043,7 +1043,7 @@ class ActivityTrackerTests()
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
      "name":"$entityName",
-     "typeURI":"functions/rule"
+     "typeURI":"functions/namespace/rule"
  },
  "severity":"warning",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",

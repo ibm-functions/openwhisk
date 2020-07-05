@@ -71,30 +71,16 @@ case class ActivityEvent(initiator: Initiator,
         "responseData" -> JsObject()))
 }
 
-case class RequestData(requestId: String,
-                       method: String,
-                       url: String,
-                       userAgent: String,
-                       failure: String,
-                       resourceGroupCrn: String)
+case class RequestData(requestId: String, method: String, url: String, userAgent: String, resourceGroupCrn: String)
     extends ActivityUtils {
   def toJson =
     JsObject(
-      if (failure.isEmpty)
-        Map(
-          "requestId" -> getJsString(requestId),
-          "method" -> getJsString(method),
-          "url" -> getJsString(url),
-          "userAgent" -> getJsString(userAgent),
-          "resourceGroupId" -> getJsString(resourceGroupCrn)) // misleading field name, resourceGroupId is a CRN
-      else
-        Map(
-          "requestId" -> getJsString(requestId),
-          "method" -> getJsString(method),
-          "url" -> getJsString(url),
-          "userAgent" -> getJsString(userAgent),
-          "reasonForFailure" -> getJsString(failure),
-          "resourceGroupId" -> getJsString(resourceGroupCrn))) // misleading field name, resourceGroupId is a CRN
+      Map(
+        "requestId" -> getJsString(requestId),
+        "method" -> getJsString(method),
+        "url" -> getJsString(url),
+        "userAgent" -> getJsString(userAgent),
+        "resourceGroupId" -> getJsString(resourceGroupCrn))) // misleading field name, resourceGroupId is a CRN
 }
 
 case class Observer() extends ActivityUtils {
@@ -102,8 +88,7 @@ case class Observer() extends ActivityUtils {
 }
 
 case class Target(id: String, name: String, typeURI: String) extends ActivityUtils {
-  def toJson =
-    JsObject(Map("id" -> getJsString(id), "name" -> getJsString(name), "typeURI" -> getJsString(typeURI)))
+  def toJson = JsObject(Map("id" -> getJsString(id), "name" -> getJsString(name), "typeURI" -> getJsString(typeURI)))
 }
 
 case class TargetHost(address: String) extends ActivityUtils {
@@ -131,9 +116,17 @@ case class InitiatorCredential(typeURI: String) extends ActivityUtils {
   def toJson = JsObject(Map("type" -> getJsString(typeURI)))
 }
 
-case class Reason(reasonCode: String, reasonType: String) extends ActivityUtils {
+case class Reason(reasonCode: String, reasonType: String, success: Boolean, reasonForFailure: String)
+    extends ActivityUtils {
   def toJson =
-    JsObject(Map("reasonCode" -> getJsNumber(reasonCode), "reasonType" -> getJsString(reasonType)))
+    JsObject(
+      if (success)
+        Map("reasonCode" -> getJsNumber(reasonCode), "reasonType" -> getJsString(reasonType))
+      else
+        Map(
+          "reasonCode" -> getJsNumber(reasonCode),
+          "reasonType" -> getJsString(reasonType),
+          "reasonForFailure" -> getJsString(reasonForFailure)))
 }
 
 case class ApiMatcherResult(actionType: String,
@@ -317,6 +310,7 @@ trait ActivityUtils {
 
   private val thisService = "functions"
   private val messagePrefix = "Functions: "
+  private val prefixTypeURI = thisService + "/namespace/"
 
   /**
    * Converts a target crn to a logSourceCRN (removes all sections after account scope section)
@@ -408,7 +402,7 @@ trait ActivityUtils {
                uri: String): Option[ApiMatcherResult] = {
     // ignored: invoke action, list all actions
     val entityTypePathSelector = entityType + "s" // plural of entityType
-    val targetType = thisService + "/" + entityType
+    val targetType = prefixTypeURI + entityType
     val actionTypePrefix = thisService + "." + entityType
     uri match {
       case matcher() =>
@@ -457,7 +451,7 @@ trait ActivityUtils {
    */
   def matchRulesAPI(transid: TransactionId, method: String, uri: String, logger: Logging): Option[ApiMatcherResult] = {
     // ignored: list all rules
-    val targetType = thisService + "/" + "rule"
+    val targetType = prefixTypeURI + "rule"
     uri match {
       case rulesAPIMatcher() =>
         val pos = uri.indexOf("/rules/") + "/rules/".length
