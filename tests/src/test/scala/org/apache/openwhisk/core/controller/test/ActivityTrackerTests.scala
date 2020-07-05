@@ -190,7 +190,7 @@ class ActivityTrackerTests()
     accountInResourceGroupId: String = "a/eb2e36585c91a27a709c44e2652a381a") =
     s"""
 {"requestData":{
-    "tid":"test_get_activation",
+    "requestId":"test_get_activation",
     "method":"GET",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/rules/testrule",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
@@ -270,7 +270,7 @@ class ActivityTrackerTests()
     val expectedString =
       """
 {"requestData":{
-    "tid":"test_create_action_err",
+    "requestId":"test_create_action_err",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123?overwrite=false",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
     "reasonForFailure":"Conflict",
@@ -353,7 +353,7 @@ class ActivityTrackerTests()
     val expectedString =
       """
 {"requestData":{
-    "tid":"test_create_action_classic",
+    "requestId":"test_create_action_classic",
     "method":"PUT",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/helloClassic1?overwrite=false",
     "resourceGroupId":"",
@@ -572,7 +572,7 @@ class ActivityTrackerTests()
         val expectedString =
           s"""
 {"requestData":{
-    "tid":"test_api",
+    "requestId":"test_api",
     "method":"${method(methodIndex)}",
     "url":"$url",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
@@ -918,7 +918,7 @@ class ActivityTrackerTests()
           val expectedString =
             s"""
 {"requestData":{
-    "tid":"test_api",
+    "requestId":"test_api",
     "method":"${method(methodIndex)}",
     "url":"$url",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
@@ -1023,7 +1023,7 @@ class ActivityTrackerTests()
         val expectedString =
           s"""
 {"requestData":{
-    "tid":"test_api",
+    "requestId":"test_api",
     "method":"$method",
     "url":"$url",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",

@@ -297,7 +297,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
 
           val requestData =
             RequestData(
-              tid = transid.toString.substring("#tid_".length),
+              requestId = transid.toString.substring("#tid_".length),
               method = transid.getTag(TransactionId.tagHttpMethod),
               url = uri,
               userAgent = transid.getTag(TransactionId.tagUserAgent),

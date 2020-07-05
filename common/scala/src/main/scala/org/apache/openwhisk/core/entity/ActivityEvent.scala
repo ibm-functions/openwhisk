@@ -71,7 +71,7 @@ case class ActivityEvent(initiator: Initiator,
         "responseData" -> JsObject()))
 }
 
-case class RequestData(tid: String,
+case class RequestData(requestId: String,
                        method: String,
                        url: String,
                        userAgent: String,
@@ -82,14 +82,14 @@ case class RequestData(tid: String,
     JsObject(
       if (failure.isEmpty)
         Map(
-          "tid" -> getJsString(tid),
+          "requestId" -> getJsString(requestId),
           "method" -> getJsString(method),
           "url" -> getJsString(url),
           "userAgent" -> getJsString(userAgent),
           "resourceGroupId" -> getJsString(resourceGroupCrn)) // misleading field name, resourceGroupId is a CRN
       else
         Map(
-          "tid" -> getJsString(tid),
+          "requestId" -> getJsString(requestId),
           "method" -> getJsString(method),
           "url" -> getJsString(url),
           "userAgent" -> getJsString(userAgent),
