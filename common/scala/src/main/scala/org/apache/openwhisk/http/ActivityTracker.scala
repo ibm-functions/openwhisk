@@ -19,10 +19,11 @@ package org.apache.openwhisk.http
 
 import java.nio.file.Paths
 
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import akka.actor.ActorSystem
-import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
 import akka.stream.ActorMaterializer
+import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
+import akka.http.scaladsl.unmarshalling.Unmarshaller
 import kamon.Kamon
 import pureconfig._
 import pureconfig.generic.auto._
@@ -221,6 +222,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
    */
   def requestHandler(transid: TransactionId, req: HttpRequest): Unit = {
     try {
+      println("RMRMRMX requestHandler entered")
       transid.setTag(TransactionId.tagHttpMethod, getString(req.method.value, 7))
       transid.setTag(TransactionId.tagUri, getString(req.uri.toString, 2048))
 
@@ -260,6 +262,8 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
       val initiatorName = transid.getTag(TransactionId.tagInitiatorName)
       val httpMethod = transid.getTag(TransactionId.tagHttpMethod)
       val uri = transid.getTag(TransactionId.tagUri)
+
+      println("RMRMRMX responseHandler entered")
 
       if (!isIgnoredUser(initiatorName)) {
 
@@ -309,6 +313,21 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
           val logMessage = serviceAction.logMessage +
             (if (nameSpaceId == "") "" else " for namespace " + nameSpaceId) +
             (if (success) "" else " -failure")
+
+          println("RMRMRMX before getRequestBody definition")
+
+          val getRequestBody = Unmarshaller.stringUnmarshaller(resp.entity)(actorSystem.dispatcher, materializer)
+
+          implicit val executor = actorSystem.dispatcher
+
+          println("RMRMRMX before getRequestBody call")
+
+          getRequestBody onComplete {
+            case Success(s) => println("RMRMRMX" + s)
+            case Failure(t) => println("RMRMRMX" + t.getMessage)
+          }
+
+          println("RMRMRMX after getRequestBody call")
 
           val event = ActivityEvent(
             initiator = initiator,
