@@ -66,6 +66,9 @@ class CouchDbRestClientTests
   val client =
     new ExtendedCouchDbRestClient(config.protocol, config.host, config.port, config.username, config.password, dbName)
 
+  private val retriesOnTestFailures = 5
+  private val waitBeforeRetry = 1.second
+
   override def beforeAll() = {
     super.beforeAll()
     whenReady(client.createDb()) { r =>
@@ -92,69 +95,102 @@ class CouchDbRestClientTests
 
   it should "successfully access the DB instance info" in {
     assume(config.provider == "Cloudant" || config.provider == "CouchDB")
-    val f = client.instanceInfo()
-    whenReady(f) { e =>
-      checkInstanceInfoResponse(e)
-    }
+
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val f = client.instanceInfo()
+          whenReady(f) { e =>
+            checkInstanceInfoResponse(e)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > CouchDbRestClient should successfully access the DB instance info not successful, retrying.."))
   }
 
   it should "successfully read and write documents containing unicode" in {
-    val docId = someId("unicode_doc_")
-    val doc = JsObject("winter" -> JsString("❄ ☃ ❄"))
-    val f1 = client.putDoc(docId, doc)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val docId = someId("unicode_doc_")
+          val doc = JsObject("winter" -> JsString("❄ ☃ ❄"))
+          val f1 = client.putDoc(docId, doc)
 
-    whenReady(f1) { e1 =>
-      assert(e1.isRight)
+          whenReady(f1) { e1 =>
+            assert(e1.isRight)
 
-      val f2 = client.getDoc(docId)
-      whenReady(f2) { e2 =>
-        assert(e2.isRight)
-        assert(JsObject(e2.right.get.fields.filter(_._1 == "winter")) === doc)
-      }
-    }
+            val f2 = client.getDoc(docId)
+            whenReady(f2) { e2 =>
+              assert(e2.isRight)
+              assert(JsObject(e2.right.get.fields.filter(_._1 == "winter")) === doc)
+            }
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > CouchDbRestClient should successfully read and write documents containing unicode not successful, retrying.."))
   }
 
   it should "successfully write documents in bulk" in {
-    val docs = (1 to 2).map(i => JsObject("_id" -> someId("bulk").toJson, "int" -> i.toJson))
-    client.putDocs(docs).futureValue shouldBe 'right
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val docs = (1 to 2).map(i => JsObject("_id" -> someId("bulk").toJson, "int" -> i.toJson))
+          client.putDocs(docs).futureValue shouldBe 'right
 
-    docs.foreach { doc =>
-      val dbDoc = retry[JsObject](
-        () =>
-          client
-            .getDoc(doc.fields("_id").convertTo[String])
-            .collect({
-              case Right(doc) => doc
-            }),
-        dbOpTimeout).get
+          docs.foreach { doc =>
+            val dbDoc = retry[JsObject](
+              () =>
+                client
+                  .getDoc(doc.fields("_id").convertTo[String])
+                  .collect({
+                    case Right(doc) => doc
+                  }),
+              dbOpTimeout).get
 
-      JsObject(dbDoc.fields - "_rev") shouldBe doc
-    }
+            JsObject(dbDoc.fields - "_rev") shouldBe doc
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > CouchDbRestClient should successfully write documents in bulk not successful, retrying.."))
   }
 
   it should "bulk-write documents even if some of them fail" in {
-    val ids = (1 to 2).map(_ => someId("failedBulk"))
-    val docs = ids.map(id => JsObject("_id" -> id.toJson))
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val ids = (1 to 2).map(_ => someId("failedBulk"))
+          val docs = ids.map(id => JsObject("_id" -> id.toJson))
 
-    val (firstId, firstDoc) = ids.zip(docs).head
-    client.putDoc(firstId, firstDoc).futureValue shouldBe 'right
+          val (firstId, firstDoc) = ids.zip(docs).head
+          client.putDoc(firstId, firstDoc).futureValue shouldBe 'right
 
-    val bulkResult = client.putDocs(docs).futureValue
-    bulkResult shouldBe 'right
-    bulkResult.right.get.compactPrint should include("conflict")
+          val bulkResult = client.putDocs(docs).futureValue
+          bulkResult shouldBe 'right
+          bulkResult.right.get.compactPrint should include("conflict")
 
-    // even though the bulk request contained a conflict, the other document was successfully written
-    val (secondId, secondDoc) = ids.zip(docs).last
-    val dbDoc = retry[JsObject](
-      () =>
-        client
-          .getDoc(secondId)
-          .collect({
-            case Right(doc) => doc
-          }),
-      dbOpTimeout).get
+          // even though the bulk request contained a conflict, the other document was successfully written
+          val (secondId, secondDoc) = ids.zip(docs).last
+          val dbDoc = retry[JsObject](
+            () =>
+              client
+                .getDoc(secondId)
+                .collect({
+                  case Right(doc) => doc
+                }),
+            dbOpTimeout).get
 
-    JsObject(dbDoc.fields - "_rev") shouldBe secondDoc
+          JsObject(dbDoc.fields - "_rev") shouldBe secondDoc
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > CouchDbRestClient should bulk-write documents even if some of them fail not successful, retrying.."))
   }
 
   ignore /* it */ should "successfully access the DB despite transient connection failures" in {
@@ -208,102 +244,129 @@ class CouchDbRestClientTests
   }
 
   it should "upload then download an attachment" in {
-    assume(config.provider == "Cloudant" || config.provider == "CouchDB")
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          assume(config.provider == "Cloudant" || config.provider == "CouchDB")
 
-    val docId = "some_doc"
-    val doc = JsObject("greeting" -> JsString("hello"))
-    val attachmentName = "misc"
-    val attachmentType = ContentTypes.`text/plain(UTF-8)`
-    val attachment = ("""
+          val docId = "some_doc"
+          val doc = JsObject("greeting" -> JsString("hello"))
+          val attachmentName = "misc"
+          val attachmentType = ContentTypes.`text/plain(UTF-8)`
+          val attachment = ("""
             | This could have been poetry.
             | But it isn't.
         """).stripMargin
 
-    val attachmentSource = Source.single(ByteString.fromString(attachment))
+          val attachmentSource = Source.single(ByteString.fromString(attachment))
 
-    val retrievalSink = Sink.fold[String, ByteString]("")((s, bs) => s + bs.decodeString("UTF-8"))
+          val retrievalSink = Sink.fold[String, ByteString]("")((s, bs) => s + bs.decodeString("UTF-8"))
 
-    val insertAndRetrieveResult: Future[(ContentType, String)] = for (docResponse <- client.putDoc(docId, doc);
-                                                                      Right(d) = docResponse;
-                                                                      rev1 = d.fields("rev").convertTo[String];
-                                                                      attResponse <- client.putAttachment(
-                                                                        docId,
-                                                                        rev1,
-                                                                        attachmentName,
-                                                                        attachmentType,
-                                                                        attachmentSource);
-                                                                      Right(a) = attResponse;
-                                                                      rev2 = a.fields("rev").convertTo[String];
-                                                                      retResponse <- client.getAttachment[String](
-                                                                        docId,
-                                                                        rev2,
-                                                                        attachmentName,
-                                                                        retrievalSink);
-                                                                      Right(pair) = retResponse) yield pair
+          val insertAndRetrieveResult: Future[(ContentType, String)] = for (docResponse <- client.putDoc(docId, doc);
+                                                                            Right(d) = docResponse;
+                                                                            rev1 = d.fields("rev").convertTo[String];
+                                                                            attResponse <- client.putAttachment(
+                                                                              docId,
+                                                                              rev1,
+                                                                              attachmentName,
+                                                                              attachmentType,
+                                                                              attachmentSource);
+                                                                            Right(a) = attResponse;
+                                                                            rev2 = a.fields("rev").convertTo[String];
+                                                                            retResponse <- client.getAttachment[String](
+                                                                              docId,
+                                                                              rev2,
+                                                                              attachmentName,
+                                                                              retrievalSink);
+                                                                            Right(pair) = retResponse) yield pair
 
-    whenReady(insertAndRetrieveResult) {
-      case (t, r) =>
-        assert(t === ContentTypes.`text/plain(UTF-8)`)
-        assert(r === attachment)
-    }
+          whenReady(insertAndRetrieveResult) {
+            case (t, r) =>
+              assert(t === ContentTypes.`text/plain(UTF-8)`)
+              assert(r === attachment)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > CouchDbRestClient should upload then download an attachment not successful, retrying.."))
   }
 
   it should "fail if group=true is used together with reduce=false" in {
-    intercept[IllegalArgumentException] {
-      Await.result(client.executeView("", "")(reduce = false, group = true), 15.seconds)
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          intercept[IllegalArgumentException] {
+            Await.result(client.executeView("", "")(reduce = false, group = true), 15.seconds)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > CouchDbRestClient should fail if group=true is used together with reduce=false not successful, retrying.."))
   }
 
   it should "check group Parameter on view-execution" in {
     assume(config.provider == "Cloudant" || config.provider == "CouchDB")
 
-    val ids = List("some_doc_1", "some_doc_2", "some_doc_3", "some_doc_4", "some_doc_5")
-    val docs = Map(
-      ids(0) -> JsObject("key" -> JsString("a"), "value" -> JsNumber(1)),
-      ids(1) -> JsObject("key" -> JsString("a"), "value" -> JsNumber(2)),
-      ids(2) -> JsObject("key" -> JsString("b"), "value" -> JsNumber(3)),
-      ids(3) -> JsObject("key" -> JsString("b"), "value" -> JsNumber(4)),
-      ids(4) -> JsObject("key" -> JsString("c"), "value" -> JsNumber(5)))
-    val designDocName = "testDocument"
-    val viewName = "sumOfValues"
-    val designDoc = JsObject(
-      "views" -> JsObject(viewName -> JsObject(
-        "reduce" -> JsString("_sum"),
-        "map" -> JsString("function (doc) {\n  if(doc.key && doc.value) {\n    emit([doc.key], doc.value);\n  }\n}"))),
-      "language" -> JsString("javascript"))
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val ids = List("some_doc_1", "some_doc_2", "some_doc_3", "some_doc_4", "some_doc_5")
+          val docs = Map(
+            ids(0) -> JsObject("key" -> JsString("a"), "value" -> JsNumber(1)),
+            ids(1) -> JsObject("key" -> JsString("a"), "value" -> JsNumber(2)),
+            ids(2) -> JsObject("key" -> JsString("b"), "value" -> JsNumber(3)),
+            ids(3) -> JsObject("key" -> JsString("b"), "value" -> JsNumber(4)),
+            ids(4) -> JsObject("key" -> JsString("c"), "value" -> JsNumber(5)))
+          val designDocName = "testDocument"
+          val viewName = "sumOfValues"
+          val designDoc = JsObject(
+            "views" -> JsObject(
+              viewName -> JsObject(
+                "reduce" -> JsString("_sum"),
+                "map" -> JsString(
+                  "function (doc) {\n  if(doc.key && doc.value) {\n    emit([doc.key], doc.value);\n  }\n}"))),
+            "language" -> JsString("javascript"))
 
-    Await.result(client.putDoc(s"_design/$designDocName", designDoc), 15.seconds)
-    docs.map {
-      case (id, doc) =>
-        Await.result(client.putDoc(id, doc), 15.seconds)
-    }
+          Await.result(client.putDoc(s"_design/$designDocName", designDoc), 15.seconds)
+          docs.map {
+            case (id, doc) =>
+              Await.result(client.putDoc(id, doc), 15.seconds)
+          }
 
-    waitOnView(client, designDocName, viewName, docs.size)
+          waitOnView(client, designDocName, viewName, docs.size)
 
-    val resultGroupedTrue =
-      Await.result(client.executeView(designDocName, viewName)(reduce = true, group = true), 15.seconds)
-    resultGroupedTrue should be('right)
-    val jsObjectTrue = resultGroupedTrue.right.get
-    var rows = jsObjectTrue.fields("rows").convertTo[List[JsObject]]
-    rows.length should equal(3)
-    rows(0) shouldBe JsObject("key" -> JsArray(JsString("a")), "value" -> JsNumber(3))
-    rows(1) shouldBe JsObject("key" -> JsArray(JsString("b")), "value" -> JsNumber(7))
-    rows(2) shouldBe JsObject("key" -> JsArray(JsString("c")), "value" -> JsNumber(5))
+          val resultGroupedTrue =
+            Await.result(client.executeView(designDocName, viewName)(reduce = true, group = true), 15.seconds)
+          resultGroupedTrue should be('right)
+          val jsObjectTrue = resultGroupedTrue.right.get
+          var rows = jsObjectTrue.fields("rows").convertTo[List[JsObject]]
+          rows.length should equal(3)
+          rows(0) shouldBe JsObject("key" -> JsArray(JsString("a")), "value" -> JsNumber(3))
+          rows(1) shouldBe JsObject("key" -> JsArray(JsString("b")), "value" -> JsNumber(7))
+          rows(2) shouldBe JsObject("key" -> JsArray(JsString("c")), "value" -> JsNumber(5))
 
-    val resultGroupedFalse =
-      Await.result(client.executeView(designDocName, viewName)(reduce = true, group = false), 15.seconds)
-    resultGroupedFalse should be('right)
-    val jsObjectFalse = resultGroupedFalse.right.get
-    rows = jsObjectFalse.fields("rows").convertTo[List[JsObject]]
-    rows.length should equal(1)
-    rows(0).fields("value") should equal(JsNumber(15))
+          val resultGroupedFalse =
+            Await.result(client.executeView(designDocName, viewName)(reduce = true, group = false), 15.seconds)
+          resultGroupedFalse should be('right)
+          val jsObjectFalse = resultGroupedFalse.right.get
+          rows = jsObjectFalse.fields("rows").convertTo[List[JsObject]]
+          rows.length should equal(1)
+          rows(0).fields("value") should equal(JsNumber(15))
 
-    val resultGroupedWithout = Await.result(client.executeView(designDocName, viewName)(reduce = true), 15.seconds)
-    resultGroupedWithout should be('right)
-    val jsObjectWithout = resultGroupedWithout.right.get
-    rows = jsObjectWithout.fields("rows").convertTo[List[JsObject]]
-    rows.length should equal(1)
-    rows(0).fields("value") should equal(JsNumber(15))
+          val resultGroupedWithout =
+            Await.result(client.executeView(designDocName, viewName)(reduce = true), 15.seconds)
+          resultGroupedWithout should be('right)
+          val jsObjectWithout = resultGroupedWithout.right.get
+          rows = jsObjectWithout.fields("rows").convertTo[List[JsObject]]
+          rows.length should equal(1)
+          rows(0).fields("value") should equal(JsNumber(15))
 
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > CouchDbRestClient should check group Parameter on view-execution not successful, retrying.."))
   }
 }
