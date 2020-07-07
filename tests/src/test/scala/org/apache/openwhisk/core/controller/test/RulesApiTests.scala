@@ -19,6 +19,8 @@ package org.apache.openwhisk.core.controller.test
 
 import java.time.Instant
 
+import scala.concurrent.duration.DurationInt
+
 import scala.language.postfixOps
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -65,39 +67,50 @@ class RulesApiTests extends ControllerTestCommon with WhiskRulesApi {
   val parametersLimit = Parameters.sizeLimit
   val dummyInstant = Instant.now()
 
+  private val retriesOnTestFailures = 5
+  private val waitBeforeRetry = 1.second
+
   def checkResponse(response: WhiskRuleResponse, expected: WhiskRuleResponse) =
     // ignore `updated` field because another test covers it
     response should be(expected copy (updated = response.updated))
 
   //// GET /rules
   it should "list rules by default/explicit namespace" in {
-    implicit val tid = transid()
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          implicit val tid = transid()
 
-    val rules = (1 to 2).map { i =>
-      WhiskRule(namespace, aname(), afullname(namespace, "bogus trigger"), afullname(namespace, "bogus action"))
-    }.toList
-    rules foreach { put(entityStore, _) }
-    waitOnView(entityStore, WhiskRule, namespace, 2, includeDocs = true)
-    Get(s"$collectionPath") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[List[JsObject]]
-      rules.length should be(response.length)
-      response should contain theSameElementsAs rules.map(_.toJson)
-    }
+          val rules = (1 to 2).map { i =>
+            WhiskRule(namespace, aname(), afullname(namespace, "bogus trigger"), afullname(namespace, "bogus action"))
+          }.toList
+          rules foreach { put(entityStore, _) }
+          waitOnView(entityStore, WhiskRule, namespace, 2, includeDocs = true)
+          Get(s"$collectionPath") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[List[JsObject]]
+            rules.length should be(response.length)
+            response should contain theSameElementsAs rules.map(_.toJson)
+          }
 
-    // it should "list rules with explicit namespace owned by subject" in {
-    Get(s"/$namespace/${collection.path}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[List[JsObject]]
-      rules.length should be(response.length)
-      response should contain theSameElementsAs rules.map(_.toJson)
-    }
+          // it should "list rules with explicit namespace owned by subject" in {
+          Get(s"/$namespace/${collection.path}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[List[JsObject]]
+            rules.length should be(response.length)
+            response should contain theSameElementsAs rules.map(_.toJson)
+          }
 
-    // it should "reject list rules with explicit namespace not owned by subject" in {
-    val auser = WhiskAuthHelpers.newIdentity()
-    Get(s"/$namespace/${collection.path}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+          // it should "reject list rules with explicit namespace not owned by subject" in {
+          val auser = WhiskAuthHelpers.newIdentity()
+          Get(s"/$namespace/${collection.path}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Rules API should list rules by default/explicit namespace not successful, retrying.."))
   }
 
   it should "reject list when limit is greater than maximum allowed value" in {
