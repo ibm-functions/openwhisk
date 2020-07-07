@@ -191,6 +191,7 @@ class ActivityTrackerTests()
     s"""
 {"requestData":{
     "requestId":"test_get_activation",
+    "ruleName" :"testrule",
     "method":"GET",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/rules/testrule",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
@@ -207,7 +208,7 @@ class ActivityTrackerTests()
  "message":"Functions: read rule testrule for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"$targetId",
-     "name":"testrule",
+     "name":"",
      "typeURI":"functions/namespace/rule"
  },
  "severity":"normal",
@@ -279,6 +280,7 @@ class ActivityTrackerTests()
     val expectedString =
       """
 {"requestData":{
+    "actionName":"hello123",
     "requestId":"test_create_action_err",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123?overwrite=false",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
@@ -297,7 +299,7 @@ class ActivityTrackerTests()
  "message":"Functions: create action hello123 for namespace a88c0a24-853b-4477-82f8-6876e72bebf2 -failure",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:a88c0a24-853b-4477-82f8-6876e72bebf2::",
-     "name":"hello123",
+     "name":"",
      "typeURI":"functions/namespace/action"
  },
  "severity":"warning",
@@ -363,6 +365,7 @@ class ActivityTrackerTests()
     val expectedString =
       """
 {"requestData":{
+    "actionName":"helloClassic1",
     "requestId":"test_create_action_classic",
     "method":"PUT",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/helloClassic1?overwrite=false",
@@ -382,7 +385,7 @@ class ActivityTrackerTests()
  "message":"Functions: create action helloClassic1 for namespace s-3c9f2ed8-6436-4288-93ad-1815b7ea10a6",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:s-3c9f2ed8-6436-4288-93ad-1815b7ea10a6::",
-     "name":"helloClassic1",
+     "name":"",
      "typeURI":"functions/namespace/action"
  },
  "severity":"normal",
@@ -584,6 +587,7 @@ class ActivityTrackerTests()
           s"""
 {"requestData":{
     "requestId":"test_api",
+    "${entityType}Name": "$entityName",
     "method":"${method(methodIndex)}",
     "url":"$url",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
@@ -602,7 +606,7 @@ class ActivityTrackerTests()
  "message":"Functions: ${operation(methodIndex)} $entityType $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
-     "name":"$entityName",
+     "name":"",
      "typeURI":"functions/namespace/$entityType"
  },
  "severity":"${severity(methodIndex)}",
@@ -930,6 +934,7 @@ class ActivityTrackerTests()
           val expectedString =
             s"""
 {"requestData":{
+    "${entityType}Name":"$entityName",
     "requestId":"test_api",
     "method":"${method(methodIndex)}",
     "url":"$url",
@@ -949,7 +954,7 @@ class ActivityTrackerTests()
  "message":"Functions: ${operation(methodIndex)} $entityType $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
-     "name":"$entityName",
+     "name":"",
      "typeURI":"functions/namespace/$entityType"
  },
  "severity":"normal",
@@ -1006,36 +1011,35 @@ class ActivityTrackerTests()
       val entityName = "hello123"
       val method = "POST"
 
-      for (entityType <- 0 to 1) {
+      val url =
+        s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/rules/$entityName"
 
-        val url =
-          s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/rules/$entityName"
+      val settings = Seq(
+        (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
+        (TransactionId.tagHttpMethod, method),
+        (TransactionId.tagInitiatorId, "IBMid-310000GN7M"),
+        (TransactionId.tagInitiatorIp, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
+        (TransactionId.tagInitiatorName, "john.doe@acme.com"),
+        (TransactionId.tagNamespaceId, "a88c0a24-853b-4477-82f8-6876e72bebf2"),
+        (TransactionId.tagRequestedStatus, requestedStatus(operationIndex)), // only filled for rules
+        (TransactionId.tagResourceGroupId, "ca23a1a3f0a84e2ab6b70c22ec6b1324"),
+        (
+          TransactionId.tagTargetId,
+          "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::"),
+        (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
+        (TransactionId.tagUri, url),
+        (TransactionId.tagUserAgent, "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"))
 
-        val settings = Seq(
-          (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
-          (TransactionId.tagHttpMethod, method),
-          (TransactionId.tagInitiatorId, "IBMid-310000GN7M"),
-          (TransactionId.tagInitiatorIp, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
-          (TransactionId.tagInitiatorName, "john.doe@acme.com"),
-          (TransactionId.tagNamespaceId, "a88c0a24-853b-4477-82f8-6876e72bebf2"),
-          (TransactionId.tagRequestedStatus, requestedStatus(operationIndex)), // only filled for rules
-          (TransactionId.tagResourceGroupId, "ca23a1a3f0a84e2ab6b70c22ec6b1324"),
-          (
-            TransactionId.tagTargetId,
-            "crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::"),
-          (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
-          (TransactionId.tagUri, url),
-          (TransactionId.tagUserAgent, "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"))
+      val transid = TransactionId("test_api")
+      for (setting <- settings) transid.setTag(setting._1, setting._2)
 
-        val transid = TransactionId("test_api")
-        for (setting <- settings) transid.setTag(setting._1, setting._2)
+      eventString = null
+      Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.OK)), waitTime)
 
-        eventString = null
-        Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.OK)), waitTime)
-
-        val expectedString =
-          s"""
+      val expectedString =
+        s"""
 {"requestData":{
+    "ruleName":"$entityName",
     "requestId":"test_api",
     "method":"$method",
     "url":"$url",
@@ -1055,7 +1059,7 @@ class ActivityTrackerTests()
  "message":"Functions: ${actionType(operationIndex)} rule $entityName for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a::a88c0a24-853b-4477-82f8-6876e72bebf2::",
-     "name":"$entityName",
+     "name":"",
      "typeURI":"functions/namespace/rule"
  },
  "severity":"warning",
@@ -1077,8 +1081,7 @@ class ActivityTrackerTests()
  "responseData":{}
 }
 """
-        verifyEvent(eventString, expectedString)
-      }
+      verifyEvent(eventString, expectedString)
     }
   }
 

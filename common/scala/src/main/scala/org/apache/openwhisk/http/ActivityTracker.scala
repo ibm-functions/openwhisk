@@ -312,7 +312,9 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
               requestId = transid.toString.substring("#tid_".length),
               method = transid.getTag(TransactionId.tagHttpMethod),
               url = uri,
-              userAgent = transid.getTag(TransactionId.tagUserAgent))
+              userAgent = transid.getTag(TransactionId.tagUserAgent),
+              targetIdentifier = serviceAction.targetIdentifier,
+              targetName = serviceAction.targetName)
 
           var nameSpaceId = transid.getTag(TransactionId.tagNamespaceId)
           if (nameSpaceId.isEmpty) nameSpaceId = extractInstance(targetId)
@@ -353,7 +355,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
             resourceGroupCrn = resourceGroupCrn,
             saveServiceCopy = true,
             severity = serviceAction.severity,
-            target = Target(targetId, serviceAction.targetName, serviceAction.targetType))
+            target = Target(targetId, "", serviceAction.targetType))
 
           val line = event.toJson.compactPrint
           logging.info(this, "activity tracker event: " + line.replaceAll("\\{", "(").replaceAll("\\}", ")"))(

@@ -263,6 +263,7 @@ object TransactionId {
   val tagInitiatorIp = "initiatorIp"
   val tagInitiatorName = "initiatorName"
   val tagNamespaceId = "namespaceId"
+  val tagNamespaceName = "namespaceName"
   val tagRequestedStatus = "requestedStatus"
   val tagResourceGroupId = "resourceGroupId"
   val tagTargetId = "targetId"

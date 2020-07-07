@@ -73,14 +73,21 @@ case class ActivityEvent(action: String,
         "target" -> target.toJson))
 }
 
-case class RequestData(requestId: String, method: String, url: String, userAgent: String) extends ActivityUtils {
+case class RequestData(requestId: String,
+                       method: String,
+                       url: String,
+                       userAgent: String,
+                       targetIdentifier: String,
+                       targetName: String)
+    extends ActivityUtils {
   def toJson =
     JsObject(
       Map(
         "requestId" -> getJsString(requestId),
         "method" -> getJsString(method),
         "url" -> getJsString(url),
-        "userAgent" -> getJsString(userAgent)))
+        "userAgent" -> getJsString(userAgent),
+        targetIdentifier -> JsString(targetName)))
 }
 
 case class Observer() extends ActivityUtils {
@@ -127,6 +134,7 @@ case class Reason(reasonCode: String, reasonType: String, success: Boolean, reas
 
 case class ApiMatcherResult(actionType: String,
                             logMessage: String,
+                            targetIdentifier: String,
                             targetName: String,
                             targetType: String,
                             severity: String)
@@ -420,6 +428,8 @@ trait ActivityUtils {
     val entityTypePathSelector = entityType + "s" // plural of entityType
     val targetType = prefixTypeURI + entityType
     val actionTypePrefix = thisService + "." + entityType
+    val targetIdentifier = entityType + "Name"
+
     uri match {
       case matcher() =>
         val pos = uri.indexOf("/" + entityTypePathSelector + "/") + ("/" + entityTypePathSelector + "/").length
@@ -430,6 +440,7 @@ trait ActivityUtils {
               ApiMatcherResult(
                 actionType = actionTypePrefix + ".read",
                 logMessage = messagePrefix + "read " + entityType + " " + targetName,
+                targetIdentifier = targetIdentifier,
                 targetName = targetName,
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, severity_normal)))
@@ -440,6 +451,7 @@ trait ActivityUtils {
               ApiMatcherResult(
                 actionType = actionTypePrefix + "." + operation,
                 logMessage = messagePrefix + operation + " " + entityType + " " + targetName,
+                targetIdentifier = targetIdentifier,
                 targetName = targetName,
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, if (isUpdate) severity_warning else severity_normal)))
@@ -448,6 +460,7 @@ trait ActivityUtils {
               ApiMatcherResult(
                 actionType = actionTypePrefix + ".delete",
                 logMessage = messagePrefix + "delete " + entityType + " " + targetName,
+                targetIdentifier = targetIdentifier,
                 targetName = targetName,
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, severity_critical)))
@@ -472,6 +485,7 @@ trait ActivityUtils {
                     reasonCode: String): Option[ApiMatcherResult] = {
     // ignored: list all rules
     val targetType = prefixTypeURI + "rule"
+    val ruleIdentifier = "ruleName"
     uri match {
       case rulesAPIMatcher() =>
         val pos = uri.indexOf("/rules/") + "/rules/".length
@@ -482,6 +496,7 @@ trait ActivityUtils {
               ApiMatcherResult(
                 actionType = thisService + ".rule.read",
                 logMessage = messagePrefix + "read rule " + ruleName,
+                targetIdentifier = ruleIdentifier,
                 targetName = ruleName,
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, severity_normal)))
@@ -492,6 +507,7 @@ trait ActivityUtils {
               ApiMatcherResult(
                 actionType = thisService + ".rule." + operation,
                 logMessage = messagePrefix + operation + " rule " + ruleName,
+                targetIdentifier = ruleIdentifier,
                 targetName = ruleName,
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, if (isUpdate) severity_warning else severity_normal)))
@@ -500,6 +516,7 @@ trait ActivityUtils {
               ApiMatcherResult(
                 actionType = thisService + ".rule.delete",
                 logMessage = messagePrefix + "delete rule " + ruleName,
+                targetIdentifier = ruleIdentifier,
                 targetName = ruleName,
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, severity_critical)))
@@ -511,6 +528,7 @@ trait ActivityUtils {
                   ApiMatcherResult(
                     actionType = thisService + ".rule.enable",
                     logMessage = messagePrefix + "enable rule " + ruleName,
+                    targetIdentifier = ruleIdentifier,
                     targetName = ruleName,
                     targetType = targetType,
                     severity = adjustSeverityByReasonCode(reasonCode, severity_warning)))
@@ -519,6 +537,7 @@ trait ActivityUtils {
                   ApiMatcherResult(
                     actionType = thisService + ".rule.disable",
                     logMessage = messagePrefix + "disable rule " + ruleName,
+                    targetIdentifier = ruleIdentifier,
                     targetName = ruleName,
                     targetType = targetType,
                     severity = adjustSeverityByReasonCode(reasonCode, severity_warning)))
