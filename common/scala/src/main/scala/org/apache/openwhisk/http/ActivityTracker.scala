@@ -20,7 +20,7 @@ package org.apache.openwhisk.http
 import java.nio.file.Paths
 
 import scala.util.Try
-import scala.concurrent.duration.Duration
+import scala.concurrent.duration._
 import spray.json._
 import DefaultJsonProtocol._
 import akka.actor.ActorSystem
@@ -331,7 +331,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
               val getRequestBody = Unmarshaller.stringUnmarshaller(resp.entity)(actorSystem.dispatcher, materializer)
 
               // convert responseBody to String
-              val responseBody = Try { Await.result(getRequestBody, Duration.Inf) }.getOrElse("")
+              val responseBody = Try { Await.result(getRequestBody, 5.seconds) }.getOrElse("")
 
               if (responseBody.isEmpty) {
                 logging.warn(this, "could not read response body for ActivityTracker")
