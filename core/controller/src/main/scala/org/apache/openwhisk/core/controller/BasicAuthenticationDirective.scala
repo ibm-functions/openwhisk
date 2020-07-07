@@ -44,6 +44,7 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
         val future = Identity.get(authStore, authkey) map { result =>
           // store info for activity tracker
           val name = result.subject.asString
+          transid.setTag(TransactionId.tagNamespaceId, result.namespace.name.asString)
           transid.setTag(TransactionId.tagInitiatorId, name)
           transid.setTag(TransactionId.tagInitiatorName, name)
           transid.setTag(TransactionId.tagGrantType, "password")
