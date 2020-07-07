@@ -25,7 +25,7 @@ import scala.util.Try
 import org.junit.runner.RunWith
 import org.scalatest.{BeforeAndAfterEach, FlatSpecLike, Matchers}
 import org.scalatestplus.junit.JUnitRunner
-import akka.http.scaladsl.model.{HttpResponse, StatusCodes}
+import akka.http.scaladsl.model.{ContentTypes, HttpEntity, HttpResponse, StatusCodes}
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import spray.json._
@@ -193,9 +193,9 @@ class ActivityTrackerTests()
     "requestId":"test_get_activation",
     "method":"GET",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/rules/testrule",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
-    "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:$accountInResourceGroupId::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324"
+    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
  },
+ "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:$accountInResourceGroupId::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
  "observer":{"name":"ActivityTracker"},
  "outcome":"success",
  "saveServiceCopy":true,
@@ -207,14 +207,15 @@ class ActivityTrackerTests()
  "message":"Functions: read rule testrule for namespace a88c0a24-853b-4477-82f8-6876e72bebf2",
  "target":{
      "id":"$targetId",
-     "name":"testrule","typeURI":"functions/namespace/rule"
+     "name":"testrule",
+     "typeURI":"functions/namespace/rule"
  },
  "severity":"normal",
  "logSourceCRN":"$logSourceCRN",
  "action":"functions.rule.read",
  "initiator":{
     "name":"john.doe@acme.com",
-    "host":{"address":"192.168.0.1"},
+    "host":{"address":"192.168.0.1","addressType":"IPv4"},
     "id":"IBMid-310000GN7M",
     "typeURI":"service/security/account/user",
     "credential":{"type":"$credType"}
@@ -226,7 +227,10 @@ class ActivityTrackerTests()
 
   // crudcontroller tests (getIsCrudController = true)
 
-  it should "handle unsuccessful create action correctly (crudcontroller)" in {
+  it should "handle unsuccessful create action correctly, check reasonCode adjustment, reasonForFailure (crudcontroller)" in {
+
+    // adjustment: severity should be adjusted from normal to warning
+    // test reasonForFailure with a response containing an error entitiy
 
     var eventString: String = null
 
@@ -261,7 +265,12 @@ class ActivityTrackerTests()
     for (setting <- settings) transid.setTag(setting._1, setting._2)
 
     eventString = null
-    Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.Conflict)), waitTime)
+
+    val resp = HttpResponse(
+      status = StatusCodes.Conflict,
+      entity = HttpEntity(ContentTypes.`application/json`, """{"id": "id", "error": "error message"}"""))
+
+    Await.result(activityTracker.responseHandlerAsync(transid, resp), waitTime)
 
     // in case of errors following additional settings hold:
     // - reason.reasonForFailure must be filled
@@ -273,16 +282,16 @@ class ActivityTrackerTests()
     "requestId":"test_create_action_err",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123?overwrite=false",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
-    "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
     "method":"PUT"
  },
+ "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
  "observer":{"name":"ActivityTracker"},
  "outcome":"failure",
  "saveServiceCopy":true,
  "reason":{
      "reasonCode":409,
      "reasonType":"Conflict",
-     "reasonForFailure":"Conflict"
+     "reasonForFailure":"error message"
  },
  "eventTime":"2020-06-02T18:42:55.149+0000",
  "message":"Functions: create action hello123 for namespace a88c0a24-853b-4477-82f8-6876e72bebf2 -failure",
@@ -291,13 +300,14 @@ class ActivityTrackerTests()
      "name":"hello123",
      "typeURI":"functions/namespace/action"
  },
- "severity":"normal",
+ "severity":"warning",
  "logSourceCRN":"crn:v1:bluemix:public:functions:us-south:a/eb2e36585c91a27a709c44e2652a381a:::",
  "action":"functions.action.create",
  "initiator":{
      "name":"john.doe@acme.com",
      "host":{
-         "address":"192.168.0.1"
+         "address":"192.168.0.1",
+         "addressType":"IPv4"
       },
       "id":"IBMid-310000GN7M",
       "typeURI":"service/security/account/user",
@@ -356,9 +366,9 @@ class ActivityTrackerTests()
     "requestId":"test_create_action_classic",
     "method":"PUT",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/helloClassic1?overwrite=false",
-    "resourceGroupId":"",
     "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
  },
+ "resourceGroupId":"",
  "observer":{
      "name":"ActivityTracker"
  },
@@ -381,7 +391,8 @@ class ActivityTrackerTests()
  "initiator":{
      "name":"john.doe@acme.com",
      "host":{
-         "address":"192.168.0.1"
+         "address":"192.168.0.1",
+         "addressType":"IPv4"
      },
      "id":"john.doe@acme.com",
      "typeURI":"service/security/account/user",
@@ -575,9 +586,9 @@ class ActivityTrackerTests()
     "requestId":"test_api",
     "method":"${method(methodIndex)}",
     "url":"$url",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
-    "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324"
+    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
  },
+ "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
  "observer":{
     "name":"ActivityTracker"
  },
@@ -600,7 +611,8 @@ class ActivityTrackerTests()
  "initiator":{
      "name":"john.doe@acme.com",
      "host":{
-         "address":"192.168.0.1"
+         "address":"192.168.0.1",
+         "addressType":"IPv4"
      },
      "id":"IBMid-310000GN7M",
      "typeURI":"service/security/account/user",
@@ -921,9 +933,9 @@ class ActivityTrackerTests()
     "requestId":"test_api",
     "method":"${method(methodIndex)}",
     "url":"$url",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
-    "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324"
+    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
  },
+ "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
  "observer":{
     "name":"ActivityTracker"
  },
@@ -946,7 +958,8 @@ class ActivityTrackerTests()
  "initiator":{
      "name":"john.doe@acme.com",
      "host":{
-         "address":"192.168.0.1"
+         "address":"192.168.0.1",
+         "addressType":"IPv4"
      },
      "id":"IBMid-310000GN7M",
      "typeURI":"service/security/account/user",
@@ -970,7 +983,7 @@ class ActivityTrackerTests()
   // controller tests (getIsCrudController = false)
   // only http POST is tested since all requests with PUT, GET, DELETE are directed to crudcontroller
 
-  it should "handle successful (enable, disable) rule correctly (controller)" in {
+  it should "handle successful (enable, disable) rule correctly, also check IPv6 address (controller)" in {
 
     var eventString: String = null
 
@@ -1002,7 +1015,7 @@ class ActivityTrackerTests()
           (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
           (TransactionId.tagHttpMethod, method),
           (TransactionId.tagInitiatorId, "IBMid-310000GN7M"),
-          (TransactionId.tagInitiatorIp, "192.168.0.1"),
+          (TransactionId.tagInitiatorIp, "2001:0db8:85a3:0000:0000:8a2e:0370:7334"),
           (TransactionId.tagInitiatorName, "john.doe@acme.com"),
           (TransactionId.tagNamespaceId, "a88c0a24-853b-4477-82f8-6876e72bebf2"),
           (TransactionId.tagRequestedStatus, requestedStatus(operationIndex)), // only filled for rules
@@ -1026,9 +1039,9 @@ class ActivityTrackerTests()
     "requestId":"test_api",
     "method":"$method",
     "url":"$url",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
-    "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324"
+    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
  },
+ "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
  "observer":{
     "name":"ActivityTracker"
  },
@@ -1051,7 +1064,8 @@ class ActivityTrackerTests()
  "initiator":{
      "name":"john.doe@acme.com",
      "host":{
-         "address":"192.168.0.1"
+         "address":"2001:0db8:85a3:0000:0000:8a2e:0370:7334",
+         "addressType":"IPv6"
      },
      "id":"IBMid-310000GN7M",
      "typeURI":"service/security/account/user",

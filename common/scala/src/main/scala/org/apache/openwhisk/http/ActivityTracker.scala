@@ -19,7 +19,10 @@ package org.apache.openwhisk.http
 
 import java.nio.file.Paths
 
-import scala.util.{Failure, Success, Try}
+import scala.util.Try
+import scala.concurrent.duration.Duration
+import spray.json._
+import DefaultJsonProtocol._
 import akka.actor.ActorSystem
 import akka.stream.ActorMaterializer
 import akka.http.scaladsl.model.{HttpRequest, HttpResponse}
@@ -27,7 +30,6 @@ import akka.http.scaladsl.unmarshalling.Unmarshaller
 import kamon.Kamon
 import pureconfig._
 import pureconfig.generic.auto._
-
 import org.apache.openwhisk.common.{Logging, TransactionId}
 import org.apache.openwhisk.core.database.FileStorage
 import org.apache.openwhisk.core.ConfigKeys
@@ -43,7 +45,7 @@ import org.apache.openwhisk.core.entity.{
   Target
 }
 
-import scala.concurrent.Future
+import scala.concurrent.{Await, Future}
 
 /**
  * Base class for activity trackers that are called in BasicHttpService on the request path (requestHandler),
@@ -222,7 +224,6 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
    */
   def requestHandler(transid: TransactionId, req: HttpRequest): Unit = {
     try {
-      println("RMRMRMX requestHandler entered")
       transid.setTag(TransactionId.tagHttpMethod, getString(req.method.value, 7))
       transid.setTag(TransactionId.tagUri, getString(req.uri.toString, 2048))
 
@@ -247,6 +248,12 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
     }
   }
 
+  /**
+   * Future for responseHandler
+   * @param transid transaction id
+   * @param resp outgoing http response
+   * @return
+   */
   def responseHandlerAsync(transid: TransactionId, resp: HttpResponse): Future[Unit] =
     if (isActive) Future { responseHandler(transid, resp) }(actorSystem.dispatcher) else Future.successful((): Unit)
 
@@ -260,15 +267,15 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
   private def responseHandler(transid: TransactionId, resp: HttpResponse): Unit = {
     try {
       val initiatorName = transid.getTag(TransactionId.tagInitiatorName)
-      val httpMethod = transid.getTag(TransactionId.tagHttpMethod)
-      val uri = transid.getTag(TransactionId.tagUri)
-
-      println("RMRMRMX responseHandler entered")
 
       if (!isIgnoredUser(initiatorName)) {
 
+        val httpMethod = transid.getTag(TransactionId.tagHttpMethod)
+        val uri = transid.getTag(TransactionId.tagUri)
+        val reasonCode = resp.status.value.split(" ")(0)
+
         val serviceAction: ApiMatcherResult =
-          getServiceAction(transid, getIsCrudController, httpMethod, uri, logging)
+          getServiceAction(transid, getIsCrudController, httpMethod, reasonCode, uri, logging)
 
         if (serviceAction != null) {
 
@@ -283,8 +290,9 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
               InitiatorCredential(getGrantType(transid.getTag(TransactionId.tagGrantType))),
               InitiatorHost(hostIp))
 
-          val reasonCode = resp.status.value.split(" ")(0)
-          val reasonCodeInt = Try { reasonCode.toInt }.getOrElse(0)
+          val reasonCodeInt = Try {
+            reasonCode.toInt
+          }.getOrElse(0)
           val reasonType = getReasonType(reasonCode)
           val success = reasonCodeInt >= 200 && reasonCodeInt < 300
           val targetId = getTargetId(transid)
@@ -304,8 +312,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
               requestId = transid.toString.substring("#tid_".length),
               method = transid.getTag(TransactionId.tagHttpMethod),
               url = uri,
-              userAgent = transid.getTag(TransactionId.tagUserAgent),
-              resourceGroupCrn = resourceGroupCrn)
+              userAgent = transid.getTag(TransactionId.tagUserAgent))
 
           var nameSpaceId = transid.getTag(TransactionId.tagNamespaceId)
           if (nameSpaceId.isEmpty) nameSpaceId = extractInstance(targetId)
@@ -314,33 +321,39 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
             (if (nameSpaceId == "") "" else " for namespace " + nameSpaceId) +
             (if (success) "" else " -failure")
 
-          println("RMRMRMX before getRequestBody definition")
+          val reasonForFailure =
+            if (success)
+              ""
+            else { // try to get error message from responseBody, use reasonType as fallback solution
 
-          val getRequestBody = Unmarshaller.stringUnmarshaller(resp.entity)(actorSystem.dispatcher, materializer)
+              val getRequestBody = Unmarshaller.stringUnmarshaller(resp.entity)(actorSystem.dispatcher, materializer)
 
-          implicit val executor = actorSystem.dispatcher
+              // convert responseBody to String
+              val responseBody = Try { Await.result(getRequestBody, Duration.Inf) }.getOrElse("")
 
-          println("RMRMRMX before getRequestBody call")
-
-          getRequestBody onComplete {
-            case Success(s) => println("RMRMRMX" + s)
-            case Failure(t) => println("RMRMRMX" + t.getMessage)
-          }
-
-          println("RMRMRMX after getRequestBody call")
+              if (responseBody.isEmpty) {
+                logging.warn(this, "could not read response body for ActivityTracker")
+                reasonType // use a copy of reasonType as reasonForFailure
+              } else {
+                Try {
+                  responseBody.parseJson.asJsObject.fields("error").convertTo[String]
+                }.getOrElse(reasonType)
+              }
+            }
 
           val event = ActivityEvent(
-            initiator = initiator,
-            target = Target(targetId, serviceAction.targetName, serviceAction.targetType),
             action = serviceAction.actionType,
-            outcome = if (success) "success" else "failure",
-            reason = Reason(reasonCode, reasonType, success, reasonForFailure = reasonType),
-            severity = serviceAction.severity,
-            message = logMessage,
-            logSourceCRN = convertToLogSourceCRN(targetId),
-            saveServiceCopy = true,
             dataEvent = true, // events that manage customer data are data events
-            requestData)
+            initiator = initiator,
+            logSourceCRN = convertToLogSourceCRN(targetId),
+            message = logMessage,
+            outcome = if (success) "success" else "failure",
+            reason = Reason(reasonCode, reasonType, success, reasonForFailure.replaceAll("[\\n,\\t]", " ")),
+            requestData = requestData,
+            resourceGroupCrn = resourceGroupCrn,
+            saveServiceCopy = true,
+            severity = serviceAction.severity,
+            target = Target(targetId, serviceAction.targetName, serviceAction.targetType))
 
           val line = event.toJson.compactPrint
           logging.info(this, "activity tracker event: " + line.replaceAll("\\{", "(").replaceAll("\\}", ")"))(
