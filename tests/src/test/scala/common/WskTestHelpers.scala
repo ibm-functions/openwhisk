@@ -213,8 +213,45 @@ trait WskTestHelpers extends Matchers {
                 val rr = cli.sanitize(n)(wskprops)
                 rr.exitCode match {
                   case CONFLICT | StatusCodes.Conflict.intValue =>
+                    org.apache.openwhisk.utils.retry(
+                      {
+                        println(
+                          s"package deletion conflict for $n (details: ${rr.toString}), view computation delay likely, retrying...")
+                        cli.delete(n)(wskprops)
+                      },
+                      5,
+                      Some(1.second))
+                  case _ => rr
+                }
+              case _: ActionOperations if delete =>
+                // sanitize ignores the exit code, so we can inspect the actual result and retry accordingly
+                val rr = cli.sanitize(n)(wskprops)
+                rr.exitCode match {
+                  case CONFLICT | StatusCodes.Conflict.intValue =>
                     org.apache.openwhisk.utils.retry({
-                      println("package deletion conflict, view computation delay likely, retrying...")
+                      println(s"action deletion conflict for $n (details: ${rr.toString}), retrying...")
+                      cli.delete(n)(wskprops)
+                    }, 5, Some(1.second))
+                  case _ => rr
+                }
+              case _: TriggerOperations if delete =>
+                // sanitize ignores the exit code, so we can inspect the actual result and retry accordingly
+                val rr = cli.sanitize(n)(wskprops)
+                rr.exitCode match {
+                  case CONFLICT | StatusCodes.Conflict.intValue =>
+                    org.apache.openwhisk.utils.retry({
+                      println(s"trigger deletion conflict for $n (details: ${rr.toString}), retrying...")
+                      cli.delete(n)(wskprops)
+                    }, 5, Some(1.second))
+                  case _ => rr
+                }
+              case _: RuleOperations if delete =>
+                // sanitize ignores the exit code, so we can inspect the actual result and retry accordingly
+                val rr = cli.sanitize(n)(wskprops)
+                rr.exitCode match {
+                  case CONFLICT | StatusCodes.Conflict.intValue =>
+                    org.apache.openwhisk.utils.retry({
+                      println(s"rule deletion conflict for $n (details: ${rr.toString}), retrying...")
                       cli.delete(n)(wskprops)
                     }, 5, Some(1.second))
                   case _ => rr
