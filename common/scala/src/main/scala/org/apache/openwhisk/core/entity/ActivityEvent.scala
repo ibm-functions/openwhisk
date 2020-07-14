@@ -73,12 +73,7 @@ case class ActivityEvent(action: String,
         "target" -> target.toJson))
 }
 
-case class RequestData(requestId: String,
-                       method: String,
-                       url: String,
-                       userAgent: String,
-                       targetIdentifier: String,
-                       targetName: String)
+case class RequestData(requestId: String, method: String, url: String, targetIdentifier: String, targetName: String)
     extends ActivityUtils {
   def toJson =
     JsObject(
@@ -86,7 +81,6 @@ case class RequestData(requestId: String,
         "requestId" -> getJsString(requestId),
         "method" -> getJsString(method),
         "url" -> getJsString(url),
-        "userAgent" -> getJsString(userAgent),
         targetIdentifier -> JsString(targetName)))
 }
 
@@ -98,9 +92,11 @@ case class Target(id: String, name: String, typeURI: String) extends ActivityUti
   def toJson = JsObject(Map("id" -> getJsString(id), "name" -> getJsString(name), "typeURI" -> getJsString(typeURI)))
 }
 
-case class InitiatorHost(address: String) extends ActivityUtils {
+case class InitiatorHost(address: String, userAgent: String) extends ActivityUtils {
   val addressType = if (address.contains(":")) "IPv6" else "IPv4"
-  def toJson = JsObject(Map("address" -> getJsString(address), "addressType" -> JsString(addressType)))
+  def toJson =
+    JsObject(
+      Map("address" -> getJsString(address), "addressType" -> JsString(addressType), "agent" -> getJsString(userAgent)))
 }
 
 case class Initiator(id: String, name: String, typeURI: String, credential: InitiatorCredential, host: InitiatorHost)

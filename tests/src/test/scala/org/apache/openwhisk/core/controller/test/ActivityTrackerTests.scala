@@ -193,8 +193,7 @@ class ActivityTrackerTests()
     "requestId":"test_get_activation",
     "ruleName" :"testrule",
     "method":"GET",
-    "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/rules/testrule",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
+    "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/rules/testrule"
  },
  "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:$accountInResourceGroupId::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
  "observer":{"name":"ActivityTracker"},
@@ -216,7 +215,11 @@ class ActivityTrackerTests()
  "action":"functions.rule.read",
  "initiator":{
     "name":"john.doe@acme.com",
-    "host":{"address":"192.168.0.1","addressType":"IPv4"},
+    "host":{
+       "address":"192.168.0.1",
+       "addressType":"IPv4",
+       "agent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
+    },
     "id":"IBMid-310000GN7M",
     "typeURI":"service/security/account/user",
     "credential":{"type":"$credType"}
@@ -283,7 +286,6 @@ class ActivityTrackerTests()
     "actionName":"hello123",
     "requestId":"test_create_action_err",
     "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123?overwrite=false",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
     "method":"PUT"
  },
  "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
@@ -309,7 +311,8 @@ class ActivityTrackerTests()
      "name":"john.doe@acme.com",
      "host":{
          "address":"192.168.0.1",
-         "addressType":"IPv4"
+         "addressType":"IPv4",
+         "agent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
       },
       "id":"IBMid-310000GN7M",
       "typeURI":"service/security/account/user",
@@ -368,8 +371,7 @@ class ActivityTrackerTests()
     "actionName":"helloClassic1",
     "requestId":"test_create_action_classic",
     "method":"PUT",
-    "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/helloClassic1?overwrite=false",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
+    "url":"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/helloClassic1?overwrite=false"
  },
  "resourceGroupId":"",
  "observer":{
@@ -395,7 +397,8 @@ class ActivityTrackerTests()
      "name":"john.doe@acme.com",
      "host":{
          "address":"192.168.0.1",
-         "addressType":"IPv4"
+         "addressType":"IPv4",
+         "agent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
      },
      "id":"john.doe@acme.com",
      "typeURI":"service/security/account/user",
@@ -589,8 +592,7 @@ class ActivityTrackerTests()
     "requestId":"test_api",
     "${entityType}Name": "$entityName",
     "method":"${method(methodIndex)}",
-    "url":"$url",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
+    "url":"$url"
  },
  "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
  "observer":{
@@ -616,7 +618,8 @@ class ActivityTrackerTests()
      "name":"john.doe@acme.com",
      "host":{
          "address":"192.168.0.1",
-         "addressType":"IPv4"
+         "addressType":"IPv4",
+         "agent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
      },
      "id":"IBMid-310000GN7M",
      "typeURI":"service/security/account/user",
@@ -937,8 +940,7 @@ class ActivityTrackerTests()
     "${entityType}Name":"$entityName",
     "requestId":"test_api",
     "method":"${method(methodIndex)}",
-    "url":"$url",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
+    "url":"$url"
  },
  "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
  "observer":{
@@ -964,7 +966,8 @@ class ActivityTrackerTests()
      "name":"john.doe@acme.com",
      "host":{
          "address":"192.168.0.1",
-         "addressType":"IPv4"
+         "addressType":"IPv4",
+         "agent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
      },
      "id":"IBMid-310000GN7M",
      "typeURI":"service/security/account/user",
@@ -1042,8 +1045,7 @@ class ActivityTrackerTests()
     "ruleName":"$entityName",
     "requestId":"test_api",
     "method":"$method",
-    "url":"$url",
-    "userAgent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
+    "url":"$url"
  },
  "resourceGroupId":"crn:v1:bluemix:public:resource-controller:global:a/eb2e36585c91a27a709c44e2652a381a::resource-group:ca23a1a3f0a84e2ab6b70c22ec6b1324",
  "observer":{
@@ -1069,7 +1071,8 @@ class ActivityTrackerTests()
      "name":"john.doe@acme.com",
      "host":{
          "address":"2001:0db8:85a3:0000:0000:8a2e:0370:7334",
-         "addressType":"IPv6"
+         "addressType":"IPv6",
+         "agent":"CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
      },
      "id":"IBMid-310000GN7M",
      "typeURI":"service/security/account/user",

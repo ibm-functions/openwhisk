@@ -288,7 +288,7 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
               transid.getTag(TransactionId.tagInitiatorName),
               "service/security/account/user",
               InitiatorCredential(getGrantType(transid.getTag(TransactionId.tagGrantType))),
-              InitiatorHost(hostIp))
+              InitiatorHost(hostIp, transid.getTag(TransactionId.tagUserAgent)))
 
           val reasonCodeInt = Try {
             reasonCode.toInt
@@ -312,7 +312,6 @@ class ActivityTracker(actorSystem: ActorSystem, materializer: ActorMaterializer,
               requestId = transid.toString.substring("#tid_".length),
               method = transid.getTag(TransactionId.tagHttpMethod),
               url = uri,
-              userAgent = transid.getTag(TransactionId.tagUserAgent),
               targetIdentifier = serviceAction.targetIdentifier,
               targetName = serviceAction.targetName)
 
