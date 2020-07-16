@@ -18,6 +18,8 @@
 package system.basic
 
 import java.io.File
+import java.util.UUID
+
 import io.restassured.RestAssured
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -36,6 +38,9 @@ class WskUnicodeTests extends TestHelpers with WskTestHelpers with JsHelpers wit
 
   val activationMaxDuration = 2.minutes
   val activationPollDuration = 3.minutes
+
+  private val retriesOnTestFailures = 5
+  private val waitBeforeRetry = 1.second
 
   import WskUnicodeTests._
 
@@ -76,23 +81,36 @@ class WskUnicodeTests extends TestHelpers with WskTestHelpers with JsHelpers wit
     case (actionKind, file @ Some(_)) =>
       s"$actionKind action" should "Ensure that UTF-8 in supported in source files, input params, logs, and output results" in withAssetCleaner(
         wskprops) { (wp, assetHelper) =>
-        val name = s"unicodeGalore.${actionKind.replace(":", "")}"
+        org.apache.openwhisk.utils
+          .retry(
+            {
+              val name = s"unicodeGalore.${actionKind.replace(":", "")}" + UUID.randomUUID().toString()
 
-        assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-          action
-            .create(name, file, main = main(actionKind), kind = Some(actionKind), timeout = Some(activationMaxDuration))
-        }
+              assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+                action
+                  .create(
+                    name,
+                    file,
+                    main = main(actionKind),
+                    kind = Some(actionKind),
+                    timeout = Some(activationMaxDuration))
+              }
 
-        withActivation(
-          wsk.activation,
-          wsk.action.invoke(name, parameters = Map("delimiter" -> JsString("❄"))),
-          totalWait = activationPollDuration) { activation =>
-          val response = activation.response
-          response.result.get.fields.get("error") shouldBe empty
-          response.result.get.fields.get("winter") should be(Some(JsString("❄ ☃ ❄")))
+              withActivation(
+                wsk.activation,
+                wsk.action.invoke(name, parameters = Map("delimiter" -> JsString("❄"))),
+                totalWait = activationPollDuration) { activation =>
+                val response = activation.response
+                response.result.get.fields.get("error") shouldBe empty
+                response.result.get.fields.get("winter") should be(Some(JsString("❄ ☃ ❄")))
 
-          activation.logs.toList.flatten.mkString(" ") should include("❄ ☃ ❄")
-        }
+                activation.logs.toList.flatten.mkString(" ") should include("❄ ☃ ❄")
+              }
+            },
+            retriesOnTestFailures,
+            Some(waitBeforeRetry),
+            Some(
+              s"${this.getClass.getName} > $actionKind action should Ensure that UTF-8 in supported in source files, input params, logs, and output results not successful, retrying.."))
       }
   }
 }
