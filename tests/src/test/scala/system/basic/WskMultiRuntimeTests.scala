@@ -16,6 +16,8 @@
  */
 
 package system.basic
+import java.util.UUID
+
 import common.JsHelpers
 import common.TestHelpers
 import common.TestUtils
@@ -26,6 +28,8 @@ import common.WskTestHelpers
 import common.rest.WskRestOperations
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
+
+import scala.concurrent.duration.DurationInt
 import spray.json._
 import spray.json.DefaultJsonProtocol._
 
@@ -38,23 +42,34 @@ class WskMultiRuntimeTests extends TestHelpers with WskTestHelpers with JsHelper
   val wsk: WskOperations = new WskRestOperations
   val testString = "this is a test"
 
+  private val retriesOnTestFailures = 5
+  private val waitBeforeRetry = 1.second
+
   it should "update an action with different language and check preserving params" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val name = "updatedAction"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            val name = "updatedAction-" + UUID.randomUUID().toString()
 
-      assetHelper.withCleaner(wsk.action, name, false) { (action, _) =>
-        wsk.action.create(
-          name,
-          Some(TestUtils.getTestActionFilename("hello.js")),
-          parameters = Map("name" -> testString.toJson)) //unused in the first function
-      }
+            assetHelper.withCleaner(wsk.action, name, false) { (action, _) =>
+              wsk.action.create(
+                name,
+                Some(TestUtils.getTestActionFilename("hello.js")),
+                parameters = Map("name" -> testString.toJson)) //unused in the first function
+            }
 
-      wsk.action.create(name, Some(TestUtils.getTestActionFilename("hello.py")), update = true)
+            wsk.action.create(name, Some(TestUtils.getTestActionFilename("hello.py")), update = true)
 
-      val run = wsk.action.invoke(name)
-      withActivation(wsk.activation, run) { activation =>
-        activation.response.status shouldBe "success"
-        activation.logs.get.mkString(" ") should include(s"Hello $testString")
-      }
+            val run = wsk.action.invoke(name)
+            withActivation(wsk.activation, run) { activation =>
+              activation.response.status shouldBe "success"
+              activation.logs.get.mkString(" ") should include(s"Hello $testString")
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(
+            s"${this.getClass.getName} > update an action with different language and check preserving params not successful, retrying.."))
   }
 }
