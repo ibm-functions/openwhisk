@@ -113,17 +113,24 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
     cacheLookup(
       CacheKey(authkey), {
-        list(datastore, List(authkey.uuid.asString, authkey.key.asString)) map { list =>
-          list.length match {
-            case 1 =>
-              Some(rowToIdentity(list.head, authkey.uuid.asString))
-            case 0 =>
-              logger.info(this, s"$viewName[${authkey.uuid}] does not exist")
-              None
-            case _ =>
-              logger.error(this, s"$viewName[${authkey.uuid}] is not unique")
-              throw new IllegalStateException("uuid is not unique")
-          }
+        list(datastore, List(authkey.uuid.asString, authkey.key.asString)) map {
+          list =>
+            list.length match {
+              case 1 =>
+                Some(rowToIdentity(list.head, authkey.uuid.asString))
+              case 0 =>
+                val len = authkey.key.key.length
+                logger.info(
+                  this,
+                  s"$viewName[${authkey.uuid},${authkey.key.key.substring(0, if (len > 1) 2 else len)}..] does not exist, user might have been deleted")
+                None
+              case _ =>
+                val len = authkey.key.key.length
+                logger.error(
+                  this,
+                  s"$viewName[${authkey.uuid},${authkey.key.key.substring(0, if (len > 1) 2 else len)}..] is not unique")
+                throw new IllegalStateException("uuid is not unique")
+            }
         }
       }).map(_.getOrElse(throw new NoDocumentException("namespace does not exist")))
   }
