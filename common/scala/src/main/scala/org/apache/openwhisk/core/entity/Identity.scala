@@ -122,13 +122,13 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
                 val len = authkey.key.key.length
                 logger.info(
                   this,
-                  s"$viewName[${authkey.uuid},${authkey.key.key.substring(0, if (len > 1) 2 else len)}..] does not exist, user might have been deleted")
+                  s"$viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key.substring(0, if (len > 1) 2 else len)}..] does not exist, user might have been deleted")
                 None
               case _ =>
                 val len = authkey.key.key.length
                 logger.error(
                   this,
-                  s"$viewName[${authkey.uuid},${authkey.key.key.substring(0, if (len > 1) 2 else len)}..] is not unique")
+                  s"$viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key.substring(0, if (len > 1) 2 else len)}..] is not unique")
                 throw new IllegalStateException("uuid is not unique")
             }
         }
