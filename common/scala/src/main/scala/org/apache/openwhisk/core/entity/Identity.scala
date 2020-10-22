@@ -195,10 +195,11 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
     implicit val ec = datastore.executionContext
 
     lookupAuthKeyInCacheOrDatastore(datastore, authkey, authkeyEncrypted)
-      .flatMap(_ match {
+      .flatMap {
         case None if (authkeyEncryptedFallback.isDefined) =>
           lookupAuthKeyInCacheOrDatastore(datastore, authkey, authkeyEncryptedFallback.get)
-      })
+        case other => Future.successful(other)
+      }
       .map(_.getOrElse(throw new NoDocumentException("namespace does not exist")))
   }
 
