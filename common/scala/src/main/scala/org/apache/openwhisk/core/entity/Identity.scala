@@ -112,17 +112,43 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
     cacheLookup(
       key, {
-        list(datastore, List(ns), limit = 1) map { list =>
-          list.length match {
-            case 1 =>
-              Some(rowToIdentity(list.head, ns))
-            case 0 =>
-              logger.info(this, s"$viewName[$namespace] does not exist")
-              None
-            case _ =>
-              logger.error(this, s"$viewName[$namespace] is not unique")
-              throw new IllegalStateException("namespace is not unique")
-          }
+        list(datastore, List(ns), limit = 1) map {
+          list =>
+            list.length match {
+              case 1 =>
+                val keyFromDb = list.head.fields("key").convertTo[String]
+                (keyFromDb.split(ccdelim).toList match {
+                  case _ :: version :: keki :: crypttext :: _ =>
+                    keki match {
+                      case _ if keki == cckeki =>
+                        Try(CryptHelpers.decryptString(crypttext, cckek)).toEither
+                      case _ if keki == cckekif =>
+                        Try(CryptHelpers.decryptString(crypttext, cckekf)).toEither
+                      case _ =>
+                        logging.error(this, s"invalid keki $keki, have: ($cckeki,$cckekif)")
+                        Left(new IllegalStateException("namespace key not valid"))
+                    }
+                  case _ =>
+                    Right(keyFromDb)
+                }) match {
+                  case Right(key) =>
+                    Some(rowToIdentity(list.head, key, ns))
+                  case Left(e) =>
+                    logging
+                      .error(
+                        this,
+                        s"failed to read key of namespace $namespace" +
+                          s" using either keki $cckeki or kekif $cckekif " +
+                          s"because of ${e.getClass.getSimpleName}: ${e.getMessage}")
+                    throw e
+                }
+              case 0 =>
+                logger.info(this, s"$viewName[$namespace] does not exist")
+                None
+              case _ =>
+                logger.error(this, s"$viewName[$namespace] is not unique")
+                throw new IllegalStateException("namespace is not unique")
+            }
         }
       }).map(_.getOrElse(throw new NoDocumentException("namespace does not exist")))
   }
@@ -190,7 +216,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
           s"failed to read $viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key
             .substring(0, if (len > 1) 2 else len)}..] using keki $cckeki " +
             s"because of ${e.getClass.getSimpleName}: ${e.getMessage}")
-        throw new IllegalStateException("uuid is not unique")
+        throw e
       case (_, Left(e)) =>
         val len = authkey.key.key.length
         logger.error(
@@ -198,7 +224,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
           s"failed to read $viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key
             .substring(0, if (len > 1) 2 else len)}..] using keki $cckekif " +
             s"because of ${e.getClass.getSimpleName}: ${e.getMessage}")
-        throw new IllegalStateException("uuid is not unique")
+        throw e
       case (Right(key1), Right(key2)) =>
         lookupAuthKey(
           datastore,
@@ -226,8 +252,8 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
       stale = StaleParameter.No)
   }
 
-  protected[entity] def rowToIdentity(row: JsObject, key: String, uuid: String)(implicit transid: TransactionId,
-                                                                                logger: Logging) = {
+  protected[entity] def rowToIdentity(row: JsObject, key: String, viewKey: String)(implicit transid: TransactionId,
+                                                                                   logger: Logging) = {
     row.getFields("id", "value", "doc") match {
       case Seq(JsString(id), JsObject(value), doc) =>
         val limits =
@@ -250,7 +276,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
           Privilege.ALL,
           limits)
       case _ =>
-        logger.error(this, s"$viewName[$uuid] has malformed view '${row.compactPrint}'")
+        logger.error(this, s"$viewName[$viewKey] has malformed view '${row.compactPrint}'")
         throw new IllegalStateException("identities view malformed")
     }
   }
