@@ -30,6 +30,7 @@ import org.apache.openwhisk.core.entitlement.Privilege
 import org.apache.openwhisk.core.entity.types.AuthStore
 import org.apache.openwhisk.utils.CryptHelpers
 import pureconfig._
+import pureconfig.generic.auto._
 import spray.json._
 
 import scala.concurrent.Future
@@ -65,7 +66,7 @@ protected[core] case class Identity(subject: Subject,
 
 object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocInfo] with DefaultJsonProtocol {
 
-  implicit val logging: Logging = new PrintStreamLogging()
+  implicit val logger: Logging = new PrintStreamLogging()
 
   private val blueAuthConfigNamespace = "whisk.blueauth"
   private val crnConfig = loadConfig[CRNConfig](blueAuthConfigNamespace).toOption
@@ -80,7 +81,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
   private val cckek = if (cryptConfig.kek.equals("None")) "" else cryptConfig.kek
   private val cckekif = if (cryptConfig.kekif.equals("None")) "" else cryptConfig.kekif
   private val cckekf = if (cryptConfig.kekf.equals("None")) "" else cryptConfig.kekf
-  logging.info(
+  logger.info(
     this,
     s"ccdelim: ${ccdelim}, " +
       s"ccversion: ${ccversion}, " +
@@ -125,7 +126,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
                       case _ if keki == cckekif =>
                         Try(CryptHelpers.decryptString(crypttext, cckekf)).toEither
                       case _ =>
-                        logging.error(this, s"invalid keki $keki, have: ($cckeki,$cckekif)")
+                        logger.error(this, s"invalid keki $keki, have: ($cckeki,$cckekif)")
                         Left(new IllegalStateException("namespace key not valid"))
                     }
                   case _ =>
@@ -134,7 +135,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
                   case Right(key) =>
                     Some(rowToIdentity(list.head, key, ns))
                   case Left(e) =>
-                    logging
+                    logger
                       .error(
                         this,
                         s"failed to read key of namespace $namespace" +

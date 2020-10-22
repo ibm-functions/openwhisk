@@ -18,14 +18,10 @@
 package org.apache.openwhisk.utils
 
 import java.nio.charset.StandardCharsets
-import java.security.InvalidAlgorithmParameterException
-import java.security.InvalidKeyException
-import java.security.NoSuchAlgorithmException
 import java.security.SecureRandom
 import java.util.Base64
 
 import javax.crypto.Cipher
-import javax.crypto.NoSuchPaddingException
 import javax.crypto.spec.GCMParameterSpec
 import javax.crypto.spec.SecretKeySpec
 
