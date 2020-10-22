@@ -19,7 +19,7 @@ package org.apache.openwhisk.core.entity
 
 import java.util.Base64
 
-import org.apache.openwhisk.common.{Logging, TransactionId}
+import org.apache.openwhisk.common.{Logging, PrintStreamLogging, TransactionId}
 import org.apache.openwhisk.core.database.{
   MultipleReadersSingleWriterCache,
   NoDocumentException,
@@ -28,14 +28,16 @@ import org.apache.openwhisk.core.database.{
 }
 import org.apache.openwhisk.core.entitlement.Privilege
 import org.apache.openwhisk.core.entity.types.AuthStore
+import org.apache.openwhisk.utils.CryptHelpers
 import pureconfig._
-import pureconfig.generic.auto._
 import spray.json._
 
 import scala.concurrent.Future
 import scala.util.Try
 
 final case class CRNConfig(environment: String, region: String)
+
+final case class CryptConfig(delimiter: String, version: String, keki: String, kek: String, kekif: String, kekf: String)
 
 case class UserLimits(invocationsPerMinute: Option[Int] = None,
                       concurrentInvocations: Option[Int] = None,
@@ -63,10 +65,29 @@ protected[core] case class Identity(subject: Subject,
 
 object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocInfo] with DefaultJsonProtocol {
 
+  implicit val logging: Logging = new PrintStreamLogging()
+
   private val blueAuthConfigNamespace = "whisk.blueauth"
   private val crnConfig = loadConfig[CRNConfig](blueAuthConfigNamespace).toOption
   private val environment = crnConfig.map(_.environment).getOrElse("<environment>")
   private val region = crnConfig.map(_.region).getOrElse("<region>")
+
+  private val cryptConfigNamespace = "whisk.crypt"
+  private val cryptConfig = loadConfigOrThrow[CryptConfig](cryptConfigNamespace)
+  private val ccdelim = cryptConfig.delimiter
+  private val ccversion = cryptConfig.version
+  private val cckeki = if (cryptConfig.keki.equals("None")) "" else cryptConfig.keki
+  private val cckek = if (cryptConfig.kek.equals("None")) "" else cryptConfig.kek
+  private val cckekif = if (cryptConfig.kekif.equals("None")) "" else cryptConfig.kekif
+  private val cckekf = if (cryptConfig.kekf.equals("None")) "" else cryptConfig.kekf
+  logging.info(
+    this,
+    s"ccdelim: ${ccdelim}, " +
+      s"ccversion: ${ccversion}, " +
+      s"cckeki: ${if (cckeki.length > 0) cckeki else "<not set>"}, " +
+      s"cckek: ${Try(cckek.substring(0, 1) + ".. (" + cckek.length + ")").getOrElse("<not set>")}, " +
+      s"cckekif: ${if (cckekif.length > 0) cckekif else "<not set>"}, " +
+      s"cckekf: ${Try(cckekf.substring(0, 1) + "..(" + cckekf.length + ")").getOrElse("<not set>")}")
 
   private val viewName = WhiskQueries.view(WhiskQueries.dbConfig.subjectsDdoc, "identities").name
 
@@ -106,33 +127,89 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
       }).map(_.getOrElse(throw new NoDocumentException("namespace does not exist")))
   }
 
+  private def lookupAuthKeyInCacheOrDatastore(
+    datastore: AuthStore,
+    authkey: BasicAuthenticationAuthKey,
+    authkeyEncrypted: BasicAuthenticationAuthKey)(implicit transid: TransactionId) = {
+    implicit val logger: Logging = datastore.logging
+    implicit val ec = datastore.executionContext
+
+    cacheLookup(
+      CacheKey(authkeyEncrypted), {
+        list(datastore, List(authkeyEncrypted.uuid, authkeyEncrypted.key.asString)) map {
+          list =>
+            list.length match {
+              case 1 =>
+                Some(rowToIdentity(list.head, authkey.key.key, authkey.uuid.asString))
+              case 0 =>
+                val len = authkey.key.key.length
+                logger.info(
+                  this,
+                  s"$viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key
+                    .substring(0, if (len > 1) 2 else len)}..] does not exist, user might have been deleted")
+                None
+              case _ =>
+                val len = authkey.key.key.length
+                logger.error(this, s"$viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key
+                  .substring(0, if (len > 1) 2 else len)}..] is not unique")
+                throw new IllegalStateException("uuid is not unique")
+            }
+        }
+      })
+
+  }
+
+  private def lookupAuthKey(
+    datastore: AuthStore,
+    authkey: BasicAuthenticationAuthKey,
+    authkeyEncrypted: BasicAuthenticationAuthKey,
+    authkeyEncryptedFallback: Option[BasicAuthenticationAuthKey])(implicit transid: TransactionId) = {
+    implicit val logger: Logging = datastore.logging
+    implicit val ec = datastore.executionContext
+
+    lookupAuthKeyInCacheOrDatastore(datastore, authkey, authkeyEncrypted)
+      .flatMap(_ match {
+        case None if (authkeyEncryptedFallback.isDefined) =>
+          lookupAuthKeyInCacheOrDatastore(datastore, authkey, authkeyEncryptedFallback.get)
+      })
+      .map(_.getOrElse(throw new NoDocumentException("namespace does not exist")))
+  }
+
   def get(datastore: AuthStore, authkey: BasicAuthenticationAuthKey)(
     implicit transid: TransactionId): Future[Identity] = {
     implicit val logger: Logging = datastore.logging
     implicit val ec = datastore.executionContext
 
-    cacheLookup(
-      CacheKey(authkey), {
-        list(datastore, List(authkey.uuid.asString, authkey.key.asString)) map {
-          list =>
-            list.length match {
-              case 1 =>
-                Some(rowToIdentity(list.head, authkey.uuid.asString))
-              case 0 =>
-                val len = authkey.key.key.length
-                logger.info(
-                  this,
-                  s"$viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key.substring(0, if (len > 1) 2 else len)}..] does not exist, user might have been deleted")
-                None
-              case _ =>
-                val len = authkey.key.key.length
-                logger.error(
-                  this,
-                  s"$viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key.substring(0, if (len > 1) 2 else len)}..] is not unique")
-                throw new IllegalStateException("uuid is not unique")
-            }
-        }
-      }).map(_.getOrElse(throw new NoDocumentException("namespace does not exist")))
+    (
+      Try(if (cckeki.length == 0) None else Some(CryptHelpers.encryptString(authkey.key.key, cckek))).toEither,
+      Try(if (cckekif.length == 0) None else Some(CryptHelpers.encryptString(authkey.key.key, cckekf))).toEither) match {
+      case (Left(e), _) =>
+        val len = authkey.key.key.length
+        logger.error(
+          this,
+          s"failed to read $viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key
+            .substring(0, if (len > 1) 2 else len)}..] using keki $cckeki " +
+            s"because of ${e.getClass.getSimpleName}: ${e.getMessage}")
+        throw new IllegalStateException("uuid is not unique")
+      case (_, Left(e)) =>
+        val len = authkey.key.key.length
+        logger.error(
+          this,
+          s"failed to read $viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key
+            .substring(0, if (len > 1) 2 else len)}..] using keki $cckekif " +
+            s"because of ${e.getClass.getSimpleName}: ${e.getMessage}")
+        throw new IllegalStateException("uuid is not unique")
+      case (Right(key1), Right(key2)) =>
+        lookupAuthKey(
+          datastore,
+          authkey,
+          BasicAuthenticationAuthKey(
+            authkey.uuid,
+            Secret(if (key1.isEmpty) authkey.key.key else s"$ccdelim$ccversion$ccdelim$cckeki$ccdelim$key1")),
+          if (key2.isEmpty) None
+          else
+            Some(BasicAuthenticationAuthKey(authkey.uuid, Secret(s"$ccdelim$ccversion$ccdelim$cckeki$ccdelim$key2"))))
+    }
   }
 
   def list(datastore: AuthStore, key: List[Any], limit: Int = 2)(
@@ -149,7 +226,8 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
       stale = StaleParameter.No)
   }
 
-  protected[entity] def rowToIdentity(row: JsObject, key: String)(implicit transid: TransactionId, logger: Logging) = {
+  protected[entity] def rowToIdentity(row: JsObject, key: String, uuid: String)(implicit transid: TransactionId,
+                                                                                logger: Logging) = {
     row.getFields("id", "value", "doc") match {
       case Seq(JsString(id), JsObject(value), doc) =>
         val limits =
@@ -157,7 +235,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
           else UserLimits.standardUserLimits
         val subject = Subject(id)
         val JsString(uuid) = value("uuid")
-        val JsString(secret) = value("key")
+        val JsString(secretEncrypted) = value("key")
         val JsString(namespace) = value("namespace")
         val JsString(account) = JsObject(value).fields.get("account").getOrElse(JsString.empty)
         val crn =
@@ -168,11 +246,11 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
         Identity(
           subject,
           Namespace(EntityName(namespace), UUID(uuid)),
-          BasicAuthenticationAuthKey(UUID(uuid), Secret(secret), crnEncoded),
+          BasicAuthenticationAuthKey(UUID(uuid), Secret(key), Some(Secret(secretEncrypted)), crnEncoded),
           Privilege.ALL,
           limits)
       case _ =>
-        logger.error(this, s"$viewName[$key] has malformed view '${row.compactPrint}'")
+        logger.error(this, s"$viewName[$uuid] has malformed view '${row.compactPrint}'")
         throw new IllegalStateException("identities view malformed")
     }
   }

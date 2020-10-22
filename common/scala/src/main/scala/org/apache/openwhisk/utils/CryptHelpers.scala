@@ -17,26 +17,32 @@
 
 package org.apache.openwhisk.utils
 
-import java.nio.charset.StandardCharsets;
-import java.security.InvalidAlgorithmParameterException;
-import java.security.InvalidKeyException;
-import java.security.NoSuchAlgorithmException;
-import java.util.Base64;
+import java.nio.charset.StandardCharsets
+import java.security.InvalidAlgorithmParameterException
+import java.security.InvalidKeyException
+import java.security.NoSuchAlgorithmException
+import java.security.SecureRandom
+import java.util.Base64
 
-import javax.crypto.Cipher;
-import javax.crypto.NoSuchPaddingException;
-import javax.crypto.spec.GCMParameterSpec;
-import javax.crypto.spec.SecretKeySpec;
+import javax.crypto.Cipher
+import javax.crypto.NoSuchPaddingException
+import javax.crypto.spec.GCMParameterSpec
+import javax.crypto.spec.SecretKeySpec
 
 object CryptHelpers {
 
+  private val ALGORITHM_AES = "AES"
+  private val ALGORITHM_AES_GCM_NOPADDING = "AES/GCM/NoPadding"
+  private val ALGORITHM_NONCE_SIZE_12 = 12;
+  private val ALGORITHM_TAG_SIZE_128 = 128;
+
   /**
-   * Decrypts base64 encoded AES encrypted string.
+   * AES encrypts string and returns it base64 encoded
    *
-   * @param base64NonceAndCiphertext Base64 encoded AES encrypted string containing nonce and ciphertext
-   * @param key key encrytion key value
+   * @param plaintext plain string
+   * @param key key encryption key
    *
-   * @return decrypted string
+   * @return Base64 encoded AES encrypted string
    *
    * @throws IllegalArgumentException
    * @throws InvalidAlgorithmParameterException
@@ -45,23 +51,56 @@ object CryptHelpers {
    * @throws NoSuchPaddingException
    *
    */
-  @throws(classOf[IllegalArgumentException])
-  @throws(classOf[InvalidAlgorithmParameterException])
-  @throws(classOf[InvalidKeyException])
-  @throws(classOf[NoSuchAlgorithmException])
-  @throws(classOf[NoSuchPaddingException])
+  def encryptString(plaintext: String, key: String): String = {
+    // generate a 96-bit cipher
+    val rand = new SecureRandom()
+    val nonce = new Array[Byte](ALGORITHM_NONCE_SIZE_12)
+    rand.nextBytes(nonce)
+    // create the cipher instance and initialize
+    val cipher = Cipher.getInstance(ALGORITHM_AES_GCM_NOPADDING)
+    cipher.init(
+      Cipher.ENCRYPT_MODE,
+      new SecretKeySpec(key.getBytes(), ALGORITHM_AES),
+      new GCMParameterSpec(ALGORITHM_TAG_SIZE_128, nonce))
+    // encrypt and prepend nonce
+    val ciphertext = cipher.doFinal(plaintext.getBytes())
+    val nonceAndCiphertext = new Array[Byte](nonce.length + ciphertext.length)
+    Array.copy(nonce, 0, nonceAndCiphertext, 0, nonce.size)
+    Array.copy(ciphertext, 0, nonceAndCiphertext, nonce.size, ciphertext.size)
+    // return base64 encoded AES encrypted string
+    return Base64.getEncoder().encodeToString(nonceAndCiphertext)
+  }
+
+  /**
+   * Decrypts base64 encoded AES encrypted string
+   *
+   * @param base64NonceAndCiphertext Base64 encoded AES encrypted string containing nonce and ciphertext
+   * @param key key encryption key
+   *
+   * @return decrypted/plain string
+   *
+   * @throws IllegalArgumentException
+   * @throws InvalidAlgorithmParameterException
+   * @throws InvalidKeyException
+   * @throws NoSuchAlgorithmException
+   * @throws NoSuchPaddingException
+   *
+   */
   def decryptString(base64NonceAndCiphertext: String, key: String): String = {
     // decode
-    val nonceAndCiphertext = Base64.getDecoder().decode(base64NonceAndCiphertext);
+    val nonceAndCiphertext = Base64.getDecoder().decode(base64NonceAndCiphertext)
     // retrieve nonce and ciphertext
-    val nonce = new Array[Byte](12)
-    val ciphertext = new Array[Byte](nonceAndCiphertext.length - 12);
+    val nonce = new Array[Byte](ALGORITHM_NONCE_SIZE_12)
+    val ciphertext = new Array[Byte](nonceAndCiphertext.length - ALGORITHM_NONCE_SIZE_12)
     Array.copy(nonceAndCiphertext, 0, nonce, 0, nonce.size)
     Array.copy(nonceAndCiphertext, nonce.size, ciphertext, 0, ciphertext.size)
     // create cipher instance and initialize
-    val cipher = Cipher.getInstance("AES/GCM/NoPadding");
-    cipher.init(Cipher.DECRYPT_MODE, new SecretKeySpec(key.getBytes(), "AES"), new GCMParameterSpec(128, nonce));
+    val cipher = Cipher.getInstance(ALGORITHM_AES_GCM_NOPADDING)
+    cipher.init(
+      Cipher.DECRYPT_MODE,
+      new SecretKeySpec(key.getBytes(), ALGORITHM_AES),
+      new GCMParameterSpec(ALGORITHM_TAG_SIZE_128, nonce))
     // decrypt and return
-    return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8);
+    return new String(cipher.doFinal(ciphertext), StandardCharsets.UTF_8)
   }
 }

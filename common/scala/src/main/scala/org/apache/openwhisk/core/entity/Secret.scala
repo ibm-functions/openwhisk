@@ -53,7 +53,7 @@ protected[core] object Secret {
   @throws[IllegalArgumentException]
   protected[core] def apply(str: String): Secret = {
     require(str.length >= MIN_LENGTH, s"secret must be at least $MIN_LENGTH characters")
-    require(str.length <= MAX_LENGTH, s"secret must be at most $MAX_LENGTH characters")
+    //require(str.length <= MAX_LENGTH, s"secret must be at most $MAX_LENGTH characters")
     new Secret(str)
   }
 

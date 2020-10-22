@@ -27,10 +27,19 @@ import spray.json.DefaultJsonProtocol._
  * @param uuid the uuid assured to be non-null because both types are values
  * @param key the key assured to be non-null because both types are values
  */
-protected[core] case class BasicAuthenticationAuthKey(uuid: UUID, key: Secret, namespaceCrnEncoded: String = "")
+protected[core] case class BasicAuthenticationAuthKey(uuid: UUID,
+                                                      key: Secret,
+                                                      keyEncrypted: Option[Secret] = None,
+                                                      namespaceCrnEncoded: String = "")
     extends GenericAuthKey(
-      JsObject("api_key" -> s"$uuid:$key".toJson, "namespace_crn_encoded" -> namespaceCrnEncoded.toJson)) {
-  def revoke = new BasicAuthenticationAuthKey(uuid, Secret(), namespaceCrnEncoded)
+      JsObject(
+        "api_key" -> s"$uuid:$key".toJson,
+        "api_key_encrypted" -> keyEncrypted.getOrElse(Secret(s"$uuid:$key")).toJson,
+        "namespace_crn_encoded" -> namespaceCrnEncoded.toJson)) {
+  def revoke = {
+    val secret = Secret()
+    new BasicAuthenticationAuthKey(uuid, secret, Some(secret), namespaceCrnEncoded)
+  }
   def compact: String = s"$uuid:$key"
   override def toString: String = uuid.toString
   override def getCredentials: Option[HttpCredentials] = Some(BasicHttpCredentials(uuid.asString, key.asString))
