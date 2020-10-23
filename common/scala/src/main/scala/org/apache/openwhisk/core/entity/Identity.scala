@@ -122,7 +122,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
               case 1 =>
                 logger.info(this, s"@StR found match..")
                 val keyFromDb = list.head.fields("value").convertTo[JsObject].fields("key").convertTo[String]
-                logger.info(this, s"@StR keyFromDb: ${keyFromDb}###")
+                logger.info(this, s"@StR keyFromDb: ${keyFromDb}")
                 (keyFromDb.split(ccdelim).toList match {
                   case _ :: version :: keki :: crypttext :: _ =>
                     keki match {
@@ -168,8 +168,8 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
     logger.info(
       this,
       s"@StR authkey.uuid: ${authkey.uuid.toString}, " +
-        s"authkey.key: ${authkey.key.toString}+###, " +
-        s"keyEncrypted.key: $keyEncrypted+###")
+        s"authkey.key: ${authkey.key.toString.substring(0, 2)}, " +
+        s"keyEncrypted.key: $keyEncrypted")
 
     val authkeyForLookup =
       if (keyEncrypted.length == 0) authkey
@@ -177,7 +177,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
     cacheLookup(
       CacheKey(authkeyForLookup), {
-        list(datastore, List(authkeyForLookup.uuid, authkeyForLookup.key.asString)) map {
+        list(datastore, List(authkeyForLookup.uuid.asString, authkeyForLookup.key.asString)) map {
           list =>
             list.length match {
               case 1 =>
@@ -270,7 +270,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
   protected[entity] def rowToIdentity(row: JsObject, key: String, uuidOrNamespace: String)(
     implicit transid: TransactionId,
     logger: Logging) = {
-    logger.info(this, s"@StR row: ${row.toString()}, key: ${key}###")
+    logger.info(this, s"@StR row: ${row.toString()}, key: ${key}")
     row.getFields("id", "value", "doc") match {
       case Seq(JsString(id), JsObject(value), doc) =>
         val limits =
