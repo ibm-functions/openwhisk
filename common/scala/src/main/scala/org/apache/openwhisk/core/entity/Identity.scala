@@ -75,8 +75,8 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
   private val cryptConfigNamespace = "whisk.crypt"
   private val cryptConfig = loadConfig[CryptConfig](cryptConfigNamespace).toOption
-  private val ccdelim = cryptConfig.map(_.delimiter).getOrElse("<not set>")
-  private val ccversion = cryptConfig.map(_.version).getOrElse("<not set>")
+  private val ccdelim = cryptConfig.map(_.delimiter).getOrElse("")
+  private val ccversion = cryptConfig.map(_.version).getOrElse("")
   private val cckeki = if (cryptConfig.isEmpty) "" else if (cryptConfig.get.keki == "None") "" else cryptConfig.get.keki
   private val cckek = if (cryptConfig.isEmpty) "" else if (cryptConfig.get.kek == "None") "" else cryptConfig.get.kek
   private val cckekif =
@@ -84,8 +84,8 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
   private val cckekf = if (cryptConfig.isEmpty) "" else if (cryptConfig.get.kekf == "None") "" else cryptConfig.get.kekf
   logger.info(
     this,
-    s"ccdelim: ${ccdelim}, " +
-      s"ccversion: ${ccversion}, " +
+    s"ccdelim: ${if (ccdelim.length > 0) ccdelim else "<not set>"}, " +
+      s"ccversion: ${if (ccversion.length > 0) ccdelim else "<not set>"}, " +
       s"cckeki: ${if (cckeki.length > 0) cckeki else "<not set>"}, " +
       s"cckek: ${Try(cckek.substring(0, 1) + ".. (" + cckek.length + ")").getOrElse("<not set>")}, " +
       s"cckekif: ${if (cckekif.length > 0) cckekif else "<not set>"}, " +
@@ -161,19 +161,19 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
   private def lookupAuthKeyInCacheOrDatastore(datastore: AuthStore,
                                               authkey: BasicAuthenticationAuthKey,
-                                              keyEncrypted: String = "")(implicit transid: TransactionId) = {
+                                              keye: String = "")(implicit transid: TransactionId) = {
     implicit val logger: Logging = datastore.logging
     implicit val ec = datastore.executionContext
 
     logger.info(
       this,
       s"@StR authkey.uuid: ${authkey.uuid.toString}, " +
-        s"authkey.key: ${authkey.key.toString.substring(0, 2)}, " +
-        s"keyEncrypted.key: $keyEncrypted")
+        s"authkey.key: ${authkey.key.toString}, " +
+        s"keye: $keye")
 
     val authkeyForLookup =
-      if (keyEncrypted.length == 0) authkey
-      else BasicAuthenticationAuthKey(UUID(authkey.uuid.toString), Secret(keyEncrypted))
+      if (keye.length == 0) authkey
+      else BasicAuthenticationAuthKey(UUID(authkey.uuid.toString), Secret(keye))
 
     cacheLookup(
       CacheKey(authkeyForLookup), {
@@ -181,8 +181,10 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
           list =>
             list.length match {
               case 1 =>
+                logger.info(this, s"@StR case 1 =>")
                 Some(rowToIdentity(list.head, authkey.key.key, authkey.uuid.asString))
               case 0 =>
+                logger.info(this, s"@StR case 0 =>")
                 val len = authkey.key.key.length
                 logger.info(
                   this,
@@ -190,6 +192,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
                     .substring(0, if (len > 1) 2 else len)}..] does not exist, user might have been deleted")
                 None
               case _ =>
+                logger.info(this, s"@StR case _ =>")
                 val len = authkey.key.key.length
                 logger.error(this, s"$viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key
                   .substring(0, if (len > 1) 2 else len)}..] is not unique")
@@ -200,22 +203,30 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
   }
 
-  private def lookupAuthKey(datastore: AuthStore,
-                            authkey: BasicAuthenticationAuthKey,
-                            keyEncrypted: String,
-                            keyEncryptedF: String)(implicit transid: TransactionId) = {
+  private def lookupAuthKey(datastore: AuthStore, authkey: BasicAuthenticationAuthKey, keye: String, keyef: String)(
+    implicit transid: TransactionId) = {
     implicit val logger: Logging = datastore.logging
     implicit val ec = datastore.executionContext
 
-    lookupAuthKeyInCacheOrDatastore(datastore, authkey, keyEncrypted)
+    logger.info(
+      this,
+      s"@StR authkey.uuid: ${authkey.uuid.toString}, " +
+        s"authkey.key: ${authkey.key.toString}, " +
+        s"keye: $keye, keyef: $keyef")
+
+    lookupAuthKeyInCacheOrDatastore(datastore, authkey, keye)
       .flatMap {
-        case None if (keyEncryptedF.length > 0) =>
+        case None if (keyef.length > 0) =>
+          logger.info(this, s"@StR case None if (keyEncryptedF.length > 0) =>")
           // use second key as fallback
-          lookupAuthKeyInCacheOrDatastore(datastore, authkey, keyEncryptedF)
-        case None if (keyEncrypted.length > 0) =>
+          lookupAuthKeyInCacheOrDatastore(datastore, authkey, keyef)
+        case None if (keye.length > 0) =>
+          logger.info(this, s"@StR case None if (keyEncrypted.length > 0) =>")
           // use unencrypted key as fallback
           lookupAuthKeyInCacheOrDatastore(datastore, authkey)
-        case other => Future.successful(other)
+        case other =>
+          logger.info(this, s"@StR case other => other: $other")
+          Future.successful(other)
       }
       .map(_.getOrElse(throw new NoDocumentException("namespace does not exist")))
   }
@@ -229,6 +240,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
       Try(if (cckeki.length == 0) None else Some(CryptHelpers.encryptString(authkey.key.key, cckek))).toEither,
       Try(if (cckekif.length == 0) None else Some(CryptHelpers.encryptString(authkey.key.key, cckekf))).toEither) match {
       case (Left(e), _) =>
+        logger.info(this, s"@StR case (Left(e), _) =>")
         val len = authkey.key.key.length
         logger.error(
           this,
@@ -237,6 +249,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
             s"because of ${e.getClass.getSimpleName}: ${e.getMessage}")
         throw e
       case (_, Left(e)) =>
+        logger.info(this, s"@StR case (_, Left(e)) =>")
         val len = authkey.key.key.length
         logger.error(
           this,
@@ -244,12 +257,14 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
             .substring(0, if (len > 1) 2 else len)}..] using keki $cckekif " +
             s"because of ${e.getClass.getSimpleName}: ${e.getMessage}")
         throw e
-      case (Right(key), Right(keyf)) =>
+      case (Right(keye), Right(keyef)) =>
+        logger.info(this, s"@StR case (Right(keye), Right(keyf)) =>")
+        logger.info(this, s"@StR keye: $keye, keyef: $keyef")
         lookupAuthKey(
           datastore,
           authkey,
-          if (key.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckeki$ccdelim$key",
-          if (keyf.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckekif$ccdelim$keyf")
+          if (keye.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckeki$ccdelim${keye.get}",
+          if (keyef.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckekif$ccdelim${keyef.get}")
     }
   }
 
