@@ -114,15 +114,19 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
     implicit val logger: Logging = datastore.logging
     implicit val ec = datastore.executionContext
     val ns = namespace.asString
-    val key = CacheKey(namespace)
+    val nsckey = CacheKey(namespace)
+
+    logger.info(this, s"@StR namespace: ${namespace.asString}")
 
     cacheLookup(
-      key, {
+      nsckey, {
         list(datastore, List(ns), limit = 1) map {
           list =>
             list.length match {
               case 1 =>
-                val keyFromDb = list.head.fields("key").convertTo[String]
+                logger.info(this, s"@StR found match..")
+                val keyFromDb = list.head.fields("value").convertTo[JsObject].fields("key").convertTo[String]
+                logger.info(this, s"@StR keyFromDb: $keyFromDb")
                 (keyFromDb.split(ccdelim).toList match {
                   case _ :: version :: keki :: crypttext :: _ =>
                     keki match {
@@ -269,6 +273,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
   protected[entity] def rowToIdentity(row: JsObject, key: String, viewKey: String)(implicit transid: TransactionId,
                                                                                    logger: Logging) = {
+    logger.info(this, s"@StR row: ${row.toString()}, key: $key")
     row.getFields("id", "value", "doc") match {
       case Seq(JsString(id), JsObject(value), doc) =>
         val limits =
