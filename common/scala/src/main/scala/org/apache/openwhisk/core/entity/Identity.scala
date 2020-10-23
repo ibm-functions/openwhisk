@@ -74,13 +74,18 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
   private val region = crnConfig.map(_.region).getOrElse("<region>")
 
   private val cryptConfigNamespace = "whisk.crypt"
-  private val cryptConfig = loadConfigOrThrow[CryptConfig](cryptConfigNamespace)
-  private val ccdelim = cryptConfig.delimiter
-  private val ccversion = cryptConfig.version
-  private val cckeki = if (cryptConfig.keki.equals("None")) "" else cryptConfig.keki
-  private val cckek = if (cryptConfig.kek.equals("None")) "" else cryptConfig.kek
-  private val cckekif = if (cryptConfig.kekif.equals("None")) "" else cryptConfig.kekif
-  private val cckekf = if (cryptConfig.kekf.equals("None")) "" else cryptConfig.kekf
+  private val cryptConfig = loadConfig[CryptConfig](cryptConfigNamespace).toOption
+  private val ccdelim = cryptConfig.map(_.delimiter).getOrElse("<not set>")
+  private val ccversion = cryptConfig.map(_.version).getOrElse("<not set>")
+  private val cckekiFromEnvironment = cryptConfig.map(_.keki).getOrElse("None")
+  private val cckeki = if (cckekiFromEnvironment.equals("None")) "" else cckekiFromEnvironment
+  private val cckekFromEnvironment = cryptConfig.map(_.kek).getOrElse("None")
+  private val cckek = if (cckekFromEnvironment.equals("None")) "" else cckekFromEnvironment
+  private val cckekifFromEnvironment = cryptConfig.map(_.kekif).getOrElse("None")
+  private val cckekif = if (cckekifFromEnvironment.equals("None")) "" else cckekifFromEnvironment
+  private val cckekfFromEnvironment = cryptConfig.map(_.kekf).getOrElse("None")
+  private val cckekf = if (cckekfFromEnvironment.equals("None")) "" else cckekfFromEnvironment
+  private val ccstart = true
   logger.info(
     this,
     s"ccdelim: ${ccdelim}, " +
@@ -161,6 +166,12 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
     implicit val logger: Logging = datastore.logging
     implicit val ec = datastore.executionContext
 
+    logger.info(
+      this,
+      s"@StR authkey.uuid: ${authkey.uuid.toString}, " +
+        s"authkey.key: ${authkey.key.toString}, authkeyEncrypted.uuid: ${authkeyEncrypted.uuid.toString}, " +
+        s"authkeyEncrypted.key: ${authkeyEncrypted.key.toString}")
+
     cacheLookup(
       CacheKey(authkeyEncrypted), {
         list(datastore, List(authkeyEncrypted.uuid, authkeyEncrypted.key.asString)) map {
@@ -198,6 +209,8 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
       .flatMap {
         case None if (authkeyEncryptedFallback.isDefined) =>
           lookupAuthKeyInCacheOrDatastore(datastore, authkey, authkeyEncryptedFallback.get)
+        case None if (ccstart) =>
+          lookupAuthKeyInCacheOrDatastore(datastore, authkey, authkey)
         case other => Future.successful(other)
       }
       .map(_.getOrElse(throw new NoDocumentException("namespace does not exist")))
