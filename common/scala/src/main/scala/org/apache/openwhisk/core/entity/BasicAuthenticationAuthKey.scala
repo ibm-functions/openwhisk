@@ -29,16 +29,16 @@ import spray.json.DefaultJsonProtocol._
  */
 protected[core] case class BasicAuthenticationAuthKey(uuid: UUID,
                                                       key: Secret,
-                                                      keyEncrypted: Option[Secret] = None,
+                                                      keyEncrypted: String = "",
                                                       namespaceCrnEncoded: String = "")
     extends GenericAuthKey(
       JsObject(
         "api_key" -> s"$uuid:$key".toJson,
-        "api_key_encrypted" -> keyEncrypted.getOrElse(Secret(s"$uuid:$key")).toJson,
+        "api_key_encrypted" -> keyEncrypted.toJson,
         "namespace_crn_encoded" -> namespaceCrnEncoded.toJson)) {
   def revoke = {
     val secret = Secret()
-    new BasicAuthenticationAuthKey(uuid, secret, Some(secret), namespaceCrnEncoded)
+    new BasicAuthenticationAuthKey(uuid, secret, keyEncrypted, namespaceCrnEncoded)
   }
   def compact: String = s"$uuid:$key"
   override def toString: String = uuid.toString
