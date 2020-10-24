@@ -235,9 +235,9 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
           logger.info(this, s"@StR case None if (keyEncrypted.length > 0) =>")
           // use unencrypted key as fallback
           lookupAuthKeyInCacheOrDatastore(datastore, authkey, "", keyenc)
-        case other =>
-          logger.info(this, s"@StR case other => other: $other")
-          Future.successful(other)
+        case identity =>
+          logger.info(this, s"@StR case identity => identity: $identity")
+          Future.successful(identity)
       }
       .map(_.getOrElse(throw new NoDocumentException("namespace does not exist")))
   }
