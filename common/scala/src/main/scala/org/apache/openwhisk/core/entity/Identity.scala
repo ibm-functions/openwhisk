@@ -19,6 +19,7 @@ package org.apache.openwhisk.core.entity
 
 import java.util.Base64
 
+import akka.http.scaladsl.model.ContentRange.Other
 import org.apache.openwhisk.common.{Logging, PrintStreamLogging, TransactionId}
 import org.apache.openwhisk.core.database.{
   MultipleReadersSingleWriterCache,
@@ -75,8 +76,8 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
   private val cryptConfigNamespace = "whisk.crypt"
   private val cryptConfig = loadConfig[CryptConfig](cryptConfigNamespace).toOption
-  private val ccdelim = cryptConfig.map(_.delimiter).getOrElse("")
-  private val ccversion = cryptConfig.map(_.version).getOrElse("")
+  private val ccdelim = cryptConfig.map(_.delimiter).getOrElse("::")
+  private val ccversion = cryptConfig.map(_.version).getOrElse("CFNv1")
   private val cckeki = if (cryptConfig.isEmpty) "" else if (cryptConfig.get.keki == "None") "" else cryptConfig.get.keki
   private val cckek = if (cryptConfig.isEmpty) "" else if (cryptConfig.get.kek == "None") "" else cryptConfig.get.kek
   private val cckekif =
@@ -124,7 +125,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
                 val keyFromDb = list.head.fields("value").convertTo[JsObject].fields("key").convertTo[String]
                 logger.info(this, s"@StR keyFromDb: ${keyFromDb}")
                 (keyFromDb.split(ccdelim).toList match {
-                  case _ :: version :: keki :: crypttext :: _ =>
+                  case _ :: version :: keki :: crypttext :: Nil =>
                     keki match {
                       case _ if keki == cckeki =>
                         Try(CryptHelpers.decryptString(crypttext, cckek)).toEither
@@ -138,7 +139,12 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
                     Right(keyFromDb)
                 }) match {
                   case Right(key) =>
-                    Some(rowToIdentity(list.head, key, ns))
+                    key.toString.split(':').toList match {
+                      case keyuuid :: keykey :: Nil =>
+                        Some(rowToIdentity(list.head, keykey, ns))
+                      case _ =>
+                        Some(rowToIdentity(list.head, key, ns))
+                    }
                   case Left(e) =>
                     logger
                       .error(
@@ -167,8 +173,8 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
     logger.info(
       this,
-      s"@StR authkey.uuid: ${authkey.uuid.toString}, " +
-        s"authkey.key: ${authkey.key.toString}, " +
+      s"@StR authkey.uuid: ${authkey.uuid}, " +
+        s"authkey.key: ${authkey.key.toString.substring(0, authkey.key.toString.length - 1)}.., " +
         s"keye: $keye")
 
     val authkeyForLookup =
@@ -211,7 +217,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
     logger.info(
       this,
       s"@StR authkey.uuid: ${authkey.uuid.toString}, " +
-        s"authkey.key: ${authkey.key.toString}, " +
+        s"authkey.key: ${authkey.key.toString.substring(0, authkey.key.toString.length - 1)}.., " +
         s"keye: $keye, keyef: $keyef")
 
     lookupAuthKeyInCacheOrDatastore(datastore, authkey, keye)
@@ -237,8 +243,14 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
     implicit val ec = datastore.executionContext
 
     (
-      Try(if (cckeki.length == 0) None else Some(CryptHelpers.encryptString(authkey.key.key, cckek))).toEither,
-      Try(if (cckekif.length == 0) None else Some(CryptHelpers.encryptString(authkey.key.key, cckekf))).toEither) match {
+      Try(
+        if (cckeki.length == 0) ""
+        else
+          CryptHelpers.encryptString(s"${authkey.uuid}:${authkey.key}", cckek)).toEither,
+      Try(
+        if (cckekif.length == 0) ""
+        else
+          CryptHelpers.encryptString(s"${authkey.uuid}:${authkey.key}", cckekf)).toEither) match {
       case (Left(e), _) =>
         logger.info(this, s"@StR case (Left(e), _) =>")
         val len = authkey.key.key.length
@@ -263,8 +275,8 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
         lookupAuthKey(
           datastore,
           authkey,
-          if (keye.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckeki$ccdelim${keye.get}",
-          if (keyef.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckekif$ccdelim${keyef.get}")
+          if (keye.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckeki$ccdelim$keye",
+          if (keyef.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckekif$ccdelim$keyef")
     }
   }
 
