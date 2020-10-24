@@ -133,7 +133,7 @@ class SchemaTests extends FlatSpec with BeforeAndAfter with ExecHelpers with Mat
         "namespace" -> "test_subject".toJson),
       "doc" -> JsNull)
 
-    Identity.rowToIdentity(json, id.authkey.asInstanceOf[BasicAuthenticationAuthKey].key.key, "test") shouldBe id
+    Identity.rowToIdentity(json, id.authkey.asInstanceOf[BasicAuthenticationAuthKey].key.key, "", "test") shouldBe id
   }
 
   behavior of "DocInfo"

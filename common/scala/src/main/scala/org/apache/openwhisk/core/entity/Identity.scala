@@ -140,9 +140,9 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
                   case Right(key) =>
                     key.toString.split(':').toList match {
                       case keyuuid :: keykey :: Nil =>
-                        Some(rowToIdentity(list.head, keykey, ns))
+                        Some(rowToIdentity(list.head, keykey, keyFromDb, ns))
                       case _ =>
-                        Some(rowToIdentity(list.head, key, ns))
+                        Some(rowToIdentity(list.head, keyFromDb, "", ns))
                     }
                   case Left(e) =>
                     logger
@@ -166,7 +166,8 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
   private def lookupAuthKeyInCacheOrDatastore(datastore: AuthStore,
                                               authkey: BasicAuthenticationAuthKey,
-                                              keye: String = "")(implicit transid: TransactionId) = {
+                                              keyenc: String = "",
+                                              keyenctarget: String = "")(implicit transid: TransactionId) = {
     implicit val logger: Logging = datastore.logging
     implicit val ec = datastore.executionContext
 
@@ -174,11 +175,11 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
       this,
       s"@StR authkey.uuid: ${authkey.uuid}, " +
         s"authkey.key: ${authkey.key.toString.substring(0, authkey.key.toString.length - 1)}.., " +
-        s"keye: $keye")
+        s"keyenc: $keyenc")
 
     val authkeyForLookup =
-      if (keye.length == 0) authkey
-      else BasicAuthenticationAuthKey(UUID(authkey.uuid.toString), Secret(keye))
+      if (keyenc.length == 0) authkey
+      else BasicAuthenticationAuthKey(UUID(authkey.uuid.toString), Secret(keyenc))
 
     cacheLookup(
       CacheKey(authkeyForLookup), {
@@ -187,7 +188,12 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
             list.length match {
               case 1 =>
                 logger.info(this, s"@StR case 1 =>")
-                Some(rowToIdentity(list.head, authkey.key.key, authkey.uuid.asString))
+                Some(
+                  rowToIdentity(
+                    list.head,
+                    authkey.key.key,
+                    if (keyenc.length > 0) keyenc else keyenctarget,
+                    authkey.uuid.asString))
               case 0 =>
                 logger.info(this, s"@StR case 0 =>")
                 val len = authkey.key.key.length
@@ -208,7 +214,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
 
   }
 
-  private def lookupAuthKey(datastore: AuthStore, authkey: BasicAuthenticationAuthKey, keye: String, keyef: String)(
+  private def lookupAuthKey(datastore: AuthStore, authkey: BasicAuthenticationAuthKey, keyenc: String, keyencf: String)(
     implicit transid: TransactionId) = {
     implicit val logger: Logging = datastore.logging
     implicit val ec = datastore.executionContext
@@ -217,18 +223,18 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
       this,
       s"@StR authkey.uuid: ${authkey.uuid.toString}, " +
         s"authkey.key: ${authkey.key.toString.substring(0, authkey.key.toString.length - 1)}.., " +
-        s"keye: $keye, keyef: $keyef")
+        s"keyenc: $keyenc, keyencf: $keyencf")
 
-    lookupAuthKeyInCacheOrDatastore(datastore, authkey, keye)
+    lookupAuthKeyInCacheOrDatastore(datastore, authkey, keyenc)
       .flatMap {
-        case None if (keyef.length > 0) =>
+        case None if (keyencf.length > 0) =>
           logger.info(this, s"@StR case None if (keyEncryptedF.length > 0) =>")
           // use second key as fallback
-          lookupAuthKeyInCacheOrDatastore(datastore, authkey, keyef)
-        case None if (keye.length > 0) =>
+          lookupAuthKeyInCacheOrDatastore(datastore, authkey, keyencf)
+        case None if (keyenc.length > 0) =>
           logger.info(this, s"@StR case None if (keyEncrypted.length > 0) =>")
           // use unencrypted key as fallback
-          lookupAuthKeyInCacheOrDatastore(datastore, authkey)
+          lookupAuthKeyInCacheOrDatastore(datastore, authkey, "", keyenc)
         case other =>
           logger.info(this, s"@StR case other => other: $other")
           Future.successful(other)
@@ -268,14 +274,14 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
             .substring(0, if (len > 1) 2 else len)}..] using keki $cckekif " +
             s"because of ${e.getClass.getSimpleName}: ${e.getMessage}")
         throw e
-      case (Right(keye), Right(keyef)) =>
+      case (Right(keyenc), Right(keyencf)) =>
         logger.info(this, s"@StR case (Right(keye), Right(keyf)) =>")
-        logger.info(this, s"@StR keye: $keye, keyef: $keyef")
+        logger.info(this, s"@StR keyenc: $keyenc, keyencf: $keyencf")
         lookupAuthKey(
           datastore,
           authkey,
-          if (keye.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckeki$ccdelim$keye",
-          if (keyef.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckekif$ccdelim$keyef")
+          if (keyenc.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckeki$ccdelim$keyenc",
+          if (keyencf.isEmpty) "" else s"$ccdelim$ccversion$ccdelim$cckekif$ccdelim$keyencf")
     }
   }
 
@@ -293,7 +299,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
       stale = StaleParameter.No)
   }
 
-  protected[entity] def rowToIdentity(row: JsObject, key: String, uuidOrNamespace: String)(
+  protected[entity] def rowToIdentity(row: JsObject, key: String, keyenc: String, uuidOrNamespace: String)(
     implicit transid: TransactionId,
     logger: Logging) = {
     logger.info(this, s"@StR row: ${row.toString()}, key: ${key}")
@@ -304,7 +310,6 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
           else UserLimits.standardUserLimits
         val subject = Subject(id)
         val JsString(uuid) = value("uuid")
-        val JsString(keyFromDb) = value("key")
         val JsString(namespace) = value("namespace")
         val JsString(account) = JsObject(value).fields.get("account").getOrElse(JsString.empty)
         val crn =
@@ -315,7 +320,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
         Identity(
           subject,
           Namespace(EntityName(namespace), UUID(uuid)),
-          BasicAuthenticationAuthKey(UUID(uuid), Secret(key), if (key == keyFromDb) "" else keyFromDb, crnEncoded),
+          BasicAuthenticationAuthKey(UUID(uuid), Secret(key), keyenc, crnEncoded),
           Privilege.ALL,
           limits)
       case _ =>
