@@ -19,7 +19,6 @@ package org.apache.openwhisk.core.entity
 
 import java.util.Base64
 
-import akka.http.scaladsl.model.ContentRange.Other
 import org.apache.openwhisk.common.{Logging, PrintStreamLogging, TransactionId}
 import org.apache.openwhisk.core.database.{
   MultipleReadersSingleWriterCache,
