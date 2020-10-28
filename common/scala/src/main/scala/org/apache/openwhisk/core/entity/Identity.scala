@@ -38,7 +38,12 @@ import scala.util.Try
 
 final case class CRNConfig(environment: String, region: String)
 
-final case class CryptConfig(delimiter: String, version: String, keki: String, kek: String, kekif: String, kekf: String)
+final case class CryptConfig(delimiter: Option[String] = None,
+                             version: Option[String] = None,
+                             keki: Option[String] = None,
+                             kek: Option[String] = None,
+                             kekif: Option[String] = None,
+                             kekf: Option[String] = None)
 
 case class UserLimits(invocationsPerMinute: Option[Int] = None,
                       concurrentInvocations: Option[Int] = None,
@@ -74,22 +79,21 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
   private val region = crnConfig.map(_.region).getOrElse("<region>")
 
   private val cryptConfigNamespace = "whisk.crypt"
-  private val cryptConfig = loadConfig[CryptConfig](cryptConfigNamespace).toOption
-  private val ccdelim = cryptConfig.map(_.delimiter).getOrElse("::")
-  private val ccversion = cryptConfig.map(_.version).getOrElse("CFNv1")
-  private val cckeki = if (cryptConfig.isEmpty) "" else if (cryptConfig.get.keki == "None") "" else cryptConfig.get.keki
-  private val cckek = if (cryptConfig.isEmpty) "" else if (cryptConfig.get.kek == "None") "" else cryptConfig.get.kek
-  private val cckekif =
-    if (cryptConfig.isEmpty) "" else if (cryptConfig.get.kekif == "None") "" else cryptConfig.get.kekif
-  private val cckekf = if (cryptConfig.isEmpty) "" else if (cryptConfig.get.kekf == "None") "" else cryptConfig.get.kekf
+  private val cryptConfig = loadConfigOrThrow[CryptConfig](cryptConfigNamespace)
+  private val ccdelim = cryptConfig.delimiter.getOrElse("::")
+  private val ccversion = cryptConfig.version.getOrElse("CFNv1")
+  private val cckeki = cryptConfig.keki.getOrElse("")
+  private val cckek = cryptConfig.kek.getOrElse("")
+  private val cckekif = cryptConfig.kekif.getOrElse("")
+  private val cckekf = cryptConfig.kekf.getOrElse("")
   logger.info(
     this,
-    s"ccdelim: ${if (ccdelim.length > 0) ccdelim else "<not set>"}, " +
-      s"ccversion: ${if (ccversion.length > 0) ccdelim else "<not set>"}, " +
-      s"cckeki: ${if (cckeki.length > 0) cckeki else "<not set>"}, " +
-      s"cckek: ${Try(cckek.substring(0, 1) + ".. (" + cckek.length + ")").getOrElse("<not set>")}, " +
-      s"cckekif: ${if (cckekif.length > 0) cckekif else "<not set>"}, " +
-      s"cckekf: ${Try(cckekf.substring(0, 1) + "..(" + cckekf.length + ")").getOrElse("<not set>")}")
+    s"ccdelim: $ccdelim (${ccdelim.length}), " +
+      s"ccversion: $ccversion (${ccversion.length}), " +
+      s"cckeki: $cckeki (${cckeki.length}), " +
+      s"cckek: ${if (cckek.length == 0) cckek else cckek.substring(0, 1)}.. (${cckek.length}), " +
+      s"cckekif: $cckekif (${cckekif.length}), " +
+      s"cckekf: ${if (cckekf.length == 0) cckekf else cckekf.substring(0, 1)}.. (${cckekf.length})")
 
   private val viewName = WhiskQueries.view(WhiskQueries.dbConfig.subjectsDdoc, "identities").name
 
@@ -251,11 +255,11 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
       Try(
         if (cckeki.length == 0) ""
         else
-          CryptHelpers.encryptString(s"${authkey.uuid}:${authkey.key}", cckek)).toEither,
+          CryptHelpers.encryptString(s"${authkey.uuid}:${authkey.key}", cckek, authkey.key.key)).toEither,
       Try(
         if (cckekif.length == 0) ""
         else
-          CryptHelpers.encryptString(s"${authkey.uuid}:${authkey.key}", cckekf)).toEither) match {
+          CryptHelpers.encryptString(s"${authkey.uuid}:${authkey.key}", cckekf, authkey.key.key)).toEither) match {
       case (Left(e), _) =>
         logger.info(this, s"@StR case (Left(e), _) =>")
         val len = authkey.key.key.length

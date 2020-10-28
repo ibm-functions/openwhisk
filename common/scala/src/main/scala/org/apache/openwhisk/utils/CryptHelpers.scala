@@ -37,6 +37,7 @@ object CryptHelpers {
    *
    * @param plaintext plain string
    * @param key key encryption key
+   * @param ivs intialization vector to be used instead of generating new random bytes
    *
    * @return Base64 encoded AES encrypted string
    *
@@ -47,11 +48,15 @@ object CryptHelpers {
    * @throws NoSuchPaddingException
    *
    */
-  def encryptString(plaintext: String, key: String): String = {
+  def encryptString(plaintext: String, key: String, ivs: String = ""): String = {
     // generate a 96-bit cipher
     val rand = new SecureRandom()
     val nonce = new Array[Byte](ALGORITHM_NONCE_SIZE_12)
-    rand.nextBytes(nonce)
+    if (ivs.size < nonce.size) {
+      rand.nextBytes(nonce)
+    } else {
+      Array.copy(ivs.getBytes(), 0, nonce, 0, nonce.size)
+    }
     // create the cipher instance and initialize
     val cipher = Cipher.getInstance(ALGORITHM_AES_GCM_NOPADDING)
     cipher.init(
@@ -60,7 +65,7 @@ object CryptHelpers {
       new GCMParameterSpec(ALGORITHM_TAG_SIZE_128, nonce))
     // encrypt and prepend nonce
     val ciphertext = cipher.doFinal(plaintext.getBytes())
-    val nonceAndCiphertext = new Array[Byte](nonce.length + ciphertext.length)
+    val nonceAndCiphertext = new Array[Byte](nonce.size + ciphertext.size)
     Array.copy(nonce, 0, nonceAndCiphertext, 0, nonce.size)
     Array.copy(ciphertext, 0, nonceAndCiphertext, nonce.size, ciphertext.size)
     // return base64 encoded AES encrypted string
@@ -87,7 +92,7 @@ object CryptHelpers {
     val nonceAndCiphertext = Base64.getDecoder().decode(base64NonceAndCiphertext)
     // retrieve nonce and ciphertext
     val nonce = new Array[Byte](ALGORITHM_NONCE_SIZE_12)
-    val ciphertext = new Array[Byte](nonceAndCiphertext.length - ALGORITHM_NONCE_SIZE_12)
+    val ciphertext = new Array[Byte](nonceAndCiphertext.size - ALGORITHM_NONCE_SIZE_12)
     Array.copy(nonceAndCiphertext, 0, nonce, 0, nonce.size)
     Array.copy(nonceAndCiphertext, nonce.size, ciphertext, 0, ciphertext.size)
     // create cipher instance and initialize
