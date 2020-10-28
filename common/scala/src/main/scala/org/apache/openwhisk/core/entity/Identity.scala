@@ -79,13 +79,13 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
   private val region = crnConfig.map(_.region).getOrElse("<region>")
 
   private val cryptConfigNamespace = "whisk.crypt"
-  private val cryptConfig = loadConfigOrThrow[CryptConfig](cryptConfigNamespace)
-  private val ccdelim = cryptConfig.delimiter.getOrElse("::")
-  private val ccversion = cryptConfig.version.getOrElse("CFNv1")
-  private val cckeki = cryptConfig.keki.getOrElse("")
-  private val cckek = cryptConfig.kek.getOrElse("")
-  private val cckekif = cryptConfig.kekif.getOrElse("")
-  private val cckekf = cryptConfig.kekf.getOrElse("")
+  private val cryptConfig = loadConfig[CryptConfig](cryptConfigNamespace).toOption
+  private val ccdelim = cryptConfig.map(_.delimiter.getOrElse("::")).getOrElse("::")
+  private val ccversion = cryptConfig.map(_.version.getOrElse("CFNv1")).getOrElse("CFNv1")
+  private val cckeki = cryptConfig.map(_.keki.getOrElse("")).getOrElse("")
+  private val cckek = cryptConfig.map(_.kek.getOrElse("")).getOrElse("")
+  private val cckekif = cryptConfig.map(_.kekif.getOrElse("")).getOrElse("")
+  private val cckekf = cryptConfig.map(_.kekf.getOrElse("")).getOrElse("")
   logger.info(
     this,
     s"ccdelim: $ccdelim (${ccdelim.length}), " +
@@ -255,11 +255,12 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
       Try(
         if (cckeki.length == 0) ""
         else
-          CryptHelpers.encryptString(s"${authkey.uuid}:${authkey.key}", cckek, authkey.key.key)).toEither,
+          CryptHelpers.encryptString(s"${authkey.uuid}:${authkey.key}", cckek, authkey.uuid.asString)).toEither,
       Try(
         if (cckekif.length == 0) ""
         else
-          CryptHelpers.encryptString(s"${authkey.uuid}:${authkey.key}", cckekf, authkey.key.key)).toEither) match {
+          CryptHelpers
+            .encryptString(s"${authkey.uuid}:${authkey.key}", cckekf, authkey.uuid.asString)).toEither) match {
       case (Left(e), _) =>
         logger.info(this, s"@StR case (Left(e), _) =>")
         val len = authkey.key.key.length

@@ -37,7 +37,7 @@ object CryptHelpers {
    *
    * @param plaintext plain string
    * @param key key encryption key
-   * @param ivs intialization vector to be used instead of generating new random bytes
+   * @param iv intialization vector to be used instead of generating new random bytes
    *
    * @return Base64 encoded AES encrypted string
    *
@@ -48,14 +48,14 @@ object CryptHelpers {
    * @throws NoSuchPaddingException
    *
    */
-  def encryptString(plaintext: String, key: String, ivs: String = ""): String = {
+  def encryptString(plaintext: String, key: String, iv: String = ""): String = {
     // generate a 96-bit cipher
-    val rand = new SecureRandom()
+    val ivb = iv.getBytes()
     val nonce = new Array[Byte](ALGORITHM_NONCE_SIZE_12)
-    if (ivs.size < nonce.size) {
-      rand.nextBytes(nonce)
+    if (ivb.size < nonce.size) {
+      new SecureRandom().nextBytes(nonce)
     } else {
-      Array.copy(ivs.getBytes(), 0, nonce, 0, nonce.size)
+      Array.copy(ivb, ivb.size - nonce.size, nonce, 0, nonce.size)
     }
     // create the cipher instance and initialize
     val cipher = Cipher.getInstance(ALGORITHM_AES_GCM_NOPADDING)
