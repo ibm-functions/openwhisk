@@ -19,8 +19,7 @@ package org.apache.openwhisk.core.entity
 
 import java.util.Base64
 
-import akka.actor.ActorSystem
-import org.apache.openwhisk.common._
+import org.apache.openwhisk.common.{Logging, PrintStreamLogging, TransactionId}
 import org.apache.openwhisk.core.database.{
   MultipleReadersSingleWriterCache,
   NoDocumentException,
@@ -72,8 +71,7 @@ protected[core] case class Identity(subject: Subject,
 
 object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocInfo] with DefaultJsonProtocol {
 
-  implicit val system: ActorSystem = ActorSystem()
-  implicit val logger: Logging = new AkkaLogging(system.log)
+  implicit val logger: Logging = new PrintStreamLogging()
 
   private val blueAuthConfigNamespace = "whisk.blueauth"
   private val crnConfig = loadConfig[CRNConfig](blueAuthConfigNamespace).toOption
