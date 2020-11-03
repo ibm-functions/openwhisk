@@ -19,7 +19,8 @@ package org.apache.openwhisk.core.entity
 
 import java.util.Base64
 
-import org.apache.openwhisk.common.{Logging, PrintStreamLogging, TransactionId}
+import akka.actor.ActorSystem
+import org.apache.openwhisk.common._
 import org.apache.openwhisk.core.database.{
   MultipleReadersSingleWriterCache,
   NoDocumentException,
@@ -71,7 +72,8 @@ protected[core] case class Identity(subject: Subject,
 
 object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocInfo] with DefaultJsonProtocol {
 
-  implicit val logger: Logging = new PrintStreamLogging()
+  implicit val system: ActorSystem = ActorSystem()
+  implicit val logger: Logging = new AkkaLogging(system.log)
 
   private val blueAuthConfigNamespace = "whisk.blueauth"
   private val crnConfig = loadConfig[CRNConfig](blueAuthConfigNamespace).toOption
@@ -267,7 +269,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
         logger.error(
           this,
           s"failed to read $viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key
-            .substring(0, if (len > 1) 2 else len)}..] using keki $cckeki " +
+            .substring(0, if (len > 0) 1 else len)}..] using keki $cckeki " +
             s"because of ${e.getClass.getSimpleName}: ${e.getMessage}")
         throw e
       case (_, Left(e)) =>
@@ -276,7 +278,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
         logger.error(
           this,
           s"failed to read $viewName[spaceguid:${authkey.uuid}, userkey:${authkey.key.key
-            .substring(0, if (len > 1) 2 else len)}..] using keki $cckekif " +
+            .substring(0, if (len > 0) 1 else len)}..] using keki $cckekif " +
             s"because of ${e.getClass.getSimpleName}: ${e.getMessage}")
         throw e
       case (Right(keyenc), Right(keyencf)) =>
