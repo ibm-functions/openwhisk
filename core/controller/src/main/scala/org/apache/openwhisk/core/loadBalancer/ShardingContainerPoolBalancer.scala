@@ -504,7 +504,7 @@ case class ShardingContainerPoolBalancerState(
    * @return calculated invoker slot
    */
   private def getInvokerSlot(memory: ByteSize): ByteSize = {
-    val invokerShardMemorySize = memory / _clusterSize
+    val invokerShardMemorySize = memory / (_clusterSize max 2) // if cluster size < 2 calculate half of the invoker capacity anyway
     val newTreshold = if (invokerShardMemorySize < MemoryLimit.MIN_MEMORY) {
       logging.error(
         this,
