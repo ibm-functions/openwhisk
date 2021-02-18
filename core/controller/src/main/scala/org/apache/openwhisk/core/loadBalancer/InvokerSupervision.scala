@@ -157,11 +157,12 @@ class InvokerPool(childFactory: (ActorRefFactory, InvokerInstanceId) => ActorRef
     val pretty = status.map(i => s"${i.id.toInt} -> ${i.status}")
     logging.info(this, s"invoker status changed to ${pretty.mkString(", ")}")
     val all = status.length
-    val healthy = status.map(_.status == InvokerState.Healthy).length
-    val unhealthy = status.map(_.status == InvokerState.Unhealthy).length
-    val unresponsive = if (healthy + unhealthy == all) 0 else status.map(_.status == InvokerState.Unresponsive).length
+    val healthy = status.filter(_.status == InvokerState.Healthy).length
+    val unhealthy = status.filter(_.status == InvokerState.Unhealthy).length
+    val unresponsive =
+      if (healthy + unhealthy == all) 0 else status.filter(_.status == InvokerState.Unresponsive).length
     val offline =
-      if (healthy + unhealthy + unresponsive == all) 0 else status.map(_.status == InvokerState.Offline).length
+      if (healthy + unhealthy + unresponsive == all) 0 else status.filter(_.status == InvokerState.Offline).length
     logging.info(
       this,
       s"invoker status summary all($all), healthy($healthy), unhealthy($unhealthy), unresponsive($unresponsive), offline($offline)")
