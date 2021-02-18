@@ -158,7 +158,7 @@ class InvokerPool(childFactory: (ActorRefFactory, InvokerInstanceId) => ActorRef
     logging.info(this, s"invoker status changed to ${pretty.mkString(", ")}")
     val all = status.length
     val healthy = status.filter(_.status == InvokerState.Healthy).length
-    val unhealthy = status.filter(_.status == InvokerState.Unhealthy).length
+    val unhealthy = if (healthy == all) 0 else status.filter(_.status == InvokerState.Unhealthy).length
     val unresponsive =
       if (healthy + unhealthy == all) 0 else status.filter(_.status == InvokerState.Unresponsive).length
     val offline =
