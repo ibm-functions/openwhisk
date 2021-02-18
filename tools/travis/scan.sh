@@ -26,7 +26,7 @@ HOMEDIR="$SCRIPTDIR/../../../"
 UTILDIR="$HOMEDIR/openwhisk-utilities/"
 
 cd $ROOTDIR
-./tools/travis/flake8.sh  # Check Python files for style and stop the build on syntax errors
+#./tools/travis/flake8.sh  # Check Python files for style and stop the build on syntax errors
 
 # clone the openwhisk utilities repo.
 cd $HOMEDIR
