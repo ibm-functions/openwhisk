@@ -495,7 +495,7 @@ class ShardingContainerPoolBalancerTests
       new ShardingContainerPoolBalancer(config, ControllerInstanceId("0"), feedProbe, invokerPoolProbe, mockMessaging)
 
     val invokers = IndexedSeq.tabulate(numInvokers) { i =>
-      new InvokerHealth(InvokerInstanceId(i, userMemory = invokerMem), Healthy)
+      new InvokerHealth(InvokerInstanceId(i, userMemory = invokerMem * 2), Healthy)
     }
     balancer.schedulingState.updateInvokers(invokers)
     val invocationNamespace = EntityName("invocationSpace")
