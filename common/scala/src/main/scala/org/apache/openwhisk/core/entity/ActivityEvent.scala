@@ -464,6 +464,17 @@ trait ActivityUtils {
                 targetName = targetName,
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, severity_critical)))
+          case "POST" =>
+            if (entityType == "action" && Try { reasonCode.toInt }.getOrElse(0) >= 400) {
+              Some(
+                ApiMatcherResult(
+                  actionType = actionTypePrefix + ".invoke",
+                  logMessage = messagePrefix + "invoke " + entityType + " " + targetName,
+                  targetIdentifier = targetIdentifier,
+                  targetName = targetName,
+                  targetType = targetType,
+                  severity = adjustSeverityByReasonCode(reasonCode, severity_critical)))
+            } else None
           case _ => None
         }
       case _ =>
