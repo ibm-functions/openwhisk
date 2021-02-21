@@ -445,7 +445,7 @@ trait ActivityUtils {
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, severity_normal)))
           case "PUT" =>
-            val isUpdate = !transid.getTag(TransactionId.tagUpdateInfo).isEmpty
+            val isUpdate = transid.getTag(TransactionId.tagUpdateInfo).nonEmpty
             val operation = if (isUpdate) "update" else "create"
             Some(
               ApiMatcherResult(
@@ -512,7 +512,7 @@ trait ActivityUtils {
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, severity_normal)))
           case "PUT" =>
-            val isUpdate = !transid.getTag(TransactionId.tagUpdateInfo).isEmpty
+            val isUpdate = transid.getTag(TransactionId.tagUpdateInfo).nonEmpty
             val operation = if (isUpdate) "update" else "create"
             Some(
               ApiMatcherResult(
