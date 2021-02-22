@@ -1098,7 +1098,7 @@ class ActivityTrackerTests()
     }
 
     val url =
-      s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123rmrm0"
+      s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123"
 
     val settings = Seq(
       (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
