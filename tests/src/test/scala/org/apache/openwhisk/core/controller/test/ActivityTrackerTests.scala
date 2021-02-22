@@ -1085,7 +1085,7 @@ class ActivityTrackerTests()
     }
   }
 
-  it should "create no event for an action invocation (controller)" in {
+  it should "create no event for a successful action invocation (controller)" in {
 
     var eventString: String = null
 
@@ -1098,7 +1098,7 @@ class ActivityTrackerTests()
     }
 
     val url =
-      s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123"
+      s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/hello123rmrm0"
 
     val settings = Seq(
       (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
@@ -1122,6 +1122,103 @@ class ActivityTrackerTests()
     Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.OK)), waitTime)
 
     eventString shouldBe null
+  }
+
+  it should "create an event for a failed action invocation (controller)" in {
+
+    var eventString: String = null
+
+    val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
+      override def isActive = true
+      override def getIsCrudController: Boolean = false
+      override def store(line: String): Unit = {
+        eventString = line
+      }
+    }
+
+    val method = "POST"
+    val reasonCode = 401
+    val reasonType = getReasonType(reasonCode.toString)
+    val entityName = "hello123"
+    val entityType = "action"
+    val namespace = "a88c0a24-853b-4477-82f8-6876e72bebf2"
+    val account = "eb2e36585c91a27a709c44e2652a381a"
+    val resourceGroup = "ca23a1a3f0a84e2ab6b70c22ec6b1324"
+    val initiatorId = "IBMid-310000GN7M"
+    val initiator = "john.doe@acme.com"
+    val ipAdress = "192.168.0.1"
+    val region = "us-south"
+
+    val url =
+      s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/$entityName"
+
+    val settings = Seq(
+      (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
+      (TransactionId.tagHttpMethod, method),
+      (TransactionId.tagInitiatorId, initiatorId),
+      (TransactionId.tagInitiatorIp, ipAdress),
+      (TransactionId.tagInitiatorName, initiator),
+      (TransactionId.tagNamespaceId, namespace),
+      (TransactionId.tagRequestedStatus, ""), // only filled for rules
+      (TransactionId.tagResourceGroupId, resourceGroup),
+      (TransactionId.tagTargetId, "crn:v1:bluemix:public:functions:us-south:a/" + account + "::" + namespace + "::"),
+      (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
+      (TransactionId.tagUri, url),
+      (TransactionId.tagUserAgent, "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"))
+
+    val transid = TransactionId("test_api")
+    for (setting <- settings) transid.setTag(setting._1, setting._2)
+
+    Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.Unauthorized)), waitTime)
+
+    val expectedString = s"""
+  {
+  "requestData": {
+    "method": "$method",
+    "url": "$url",
+    "userAgent": "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64",
+    "actionName": "$entityName",
+    "requestId": "test_api"
+  },
+  "observer": {
+    "name": "ActivityTracker"
+  },
+  "resourceGroupId": "crn:v1:bluemix:public:resource-controller:global:a/$account::resource-group:$resourceGroup",
+  "outcome": "failure",
+  "saveServiceCopy": true,
+  "reason": {
+    "reasonCode": $reasonCode,
+    "reasonType": "$reasonType",
+    "reasonForFailure": "$reasonType"
+  },
+  "eventTime": "2021-02-22T01:17:18.85+0000",
+  "message": "Functions: activate $entityType $entityName for namespace $namespace -failure",
+  "target": {
+    "id": "crn:v1:bluemix:public:functions:$region:a/$account::$namespace::",
+    "name": "",
+    "typeURI": "functions/namespace/$entityType"
+  },
+  "severity": "critical",
+  "logSourceCRN": "crn:v1:bluemix:public:functions:$region:a/$account:::",
+  "action": "functions.$entityType.activate",
+  "initiator": {
+    "name": "$initiator",
+    "host": {
+      "address": "$ipAdress",
+      "addressType": "IPv4"
+    },
+    "id": "$initiatorId",
+    "typeURI": "service/security/account/user",
+    "credential": {
+      "type": "apikey"
+    }
+  },
+  "dataEvent": true,
+  "responseData": {}
+}
+"""
+
+    verifyEvent(eventString, expectedString)
   }
 
   it should "create no event for firing a trigger (controller)" in {
