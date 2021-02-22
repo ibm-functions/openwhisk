@@ -1144,6 +1144,7 @@ class ActivityTrackerTests()
     val reasonType = getReasonType(reasonCode.toString)
     val entityName = "hello123"
     val entityType = "action"
+    val entityTypePlural = entityType + "s"
     val namespace = "a88c0a24-853b-4477-82f8-6876e72bebf2"
     val account = "eb2e36585c91a27a709c44e2652a381a"
     val resourceGroup = "ca23a1a3f0a84e2ab6b70c22ec6b1324"
@@ -1152,9 +1153,10 @@ class ActivityTrackerTests()
     val ipAdress = "192.168.0.1"
     val region = "us-south"
     val agent = "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
+    val targetId = s"crn:v1:bluemix:public:functions:$region:a/$account::$namespace::"
 
     val url =
-      s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/actions/$entityName"
+      s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/$entityTypePlural/$entityName"
 
     val settings = Seq(
       (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
@@ -1165,7 +1167,7 @@ class ActivityTrackerTests()
       (TransactionId.tagNamespaceId, namespace),
       (TransactionId.tagRequestedStatus, ""), // only filled for rules
       (TransactionId.tagResourceGroupId, resourceGroup),
-      (TransactionId.tagTargetId, "crn:v1:bluemix:public:functions:us-south:a/" + account + "::" + namespace + "::"),
+      (TransactionId.tagTargetId, targetId),
       (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
       (TransactionId.tagUri, url),
       (TransactionId.tagUserAgent, agent))
@@ -1197,7 +1199,7 @@ class ActivityTrackerTests()
   "eventTime": "2021-02-22T01:17:18.85+0000",
   "message": "Functions: activate $entityType $entityName for namespace $namespace -failure",
   "target": {
-    "id": "crn:v1:bluemix:public:functions:$region:a/$account::$namespace::",
+    "id": "$targetId",
     "name": "",
     "typeURI": "functions/namespace/$entityType"
   },
@@ -1225,7 +1227,7 @@ class ActivityTrackerTests()
     verifyEvent(eventString, expectedString)
   }
 
-  it should "create no event for firing a trigger (controller)" in {
+  it should "create no event for firing a trigger in case of success (controller)" in {
 
     var eventString: String = null
 
@@ -1262,6 +1264,106 @@ class ActivityTrackerTests()
     Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.OK)), waitTime)
 
     eventString shouldBe null
+  }
+
+  it should "create an event for firing a trigger in case of a failure (controller)" in {
+
+    var eventString: String = null
+
+    val activityTracker = new ActivityTracker(actorSystem, materializer, logging) {
+      override def isActive = true
+      override def getIsCrudController: Boolean = false
+      override def store(line: String): Unit = {
+        eventString = line
+      }
+    }
+
+    val method = "POST"
+    val reasonCode = 401
+    val reasonType = getReasonType(reasonCode.toString)
+    val entityName = "hello123"
+    val entityType = "trigger"
+    val entityTapePlural = entityType + "s"
+    val namespace = "a88c0a24-853b-4477-82f8-6876e72bebf2"
+    val account = "eb2e36585c91a27a709c44e2652a381a"
+    val resourceGroup = "ca23a1a3f0a84e2ab6b70c22ec6b1324"
+    val initiatorId = "IBMid-310000GN7M"
+    val initiator = "john.doe@acme.com"
+    val ipAdress = "192.168.0.1"
+    val region = "us-south"
+    val agent = "CloudFunctions-Plugin/1.0 (2020-03-27T16:04:13+00:00) darwin amd64"
+    val targetId = s"crn:v1:bluemix:public:functions:$region:a/$account::$namespace::"
+
+    val url =
+      s"https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/$entityTapePlural/$entityName"
+
+    val settings = Seq(
+      (TransactionId.tagGrantType, "urn:ibm:params:oauth:grant-type:apikey"),
+      (TransactionId.tagHttpMethod, method),
+      (TransactionId.tagInitiatorId, initiatorId),
+      (TransactionId.tagInitiatorIp, ipAdress),
+      (TransactionId.tagInitiatorName, initiator),
+      (TransactionId.tagNamespaceId, namespace),
+      (TransactionId.tagRequestedStatus, ""), // only filled for rules
+      (TransactionId.tagResourceGroupId, resourceGroup),
+      (TransactionId.tagTargetId, targetId),
+      (TransactionId.tagTargetIdEncoded, ""), // only filled for BasicAuth (in this case tagTargetId is empty)
+      (TransactionId.tagUri, url),
+      (TransactionId.tagUserAgent, agent))
+
+    val transid = TransactionId("test_api")
+    for (setting <- settings) transid.setTag(setting._1, setting._2)
+
+    Await.result(activityTracker.responseHandlerAsync(transid, HttpResponse(StatusCodes.Unauthorized)), waitTime)
+
+    val expectedString = s"""
+{
+  "requestData": {
+    "requestId": "test_api",
+    "method": "$method",
+    "url": "https://fn-dev-pg4.us-south.containers.appdomain.cloud/api/v1/namespaces/_/triggers/hello123",
+    "triggerName": "hello123"
+  },
+  "observer": {
+    "name": "ActivityTracker"
+  },
+  "resourceGroupId": "crn:v1:bluemix:public:resource-controller:global:a/$account::resource-group:$resourceGroup",
+  "outcome": "failure",
+  "saveServiceCopy": true,
+  "reason": {
+    "reasonCode": $reasonCode,
+    "reasonType": "$reasonType",
+    "reasonForFailure": "$reasonType"
+  },
+  "eventTime": "2021-02-22T17:37:50.05+0000",
+  "message": "Functions: activate $entityType $entityName for namespace $namespace -failure",
+  "target": {
+    "id": "$targetId",
+    "name": "",
+    "typeURI": "functions/namespace/$entityType"
+  },
+  "severity": "critical",
+  "logSourceCRN": "crn:v1:bluemix:public:functions:us-south:a/$account:::",
+  "action": "functions.$entityType.activate",
+  "initiator": {
+    "name": "$initiator",
+    "host": {
+      "address": "$ipAdress",
+      "addressType": "IPv4",
+      "agent": "$agent"
+    },
+    "id": "$initiatorId",
+    "typeURI": "service/security/account/user",
+    "credential": {
+      "type": "apikey"
+    }
+  },
+  "dataEvent": true,
+  "responseData": {}
+}
+"""
+
+    verifyEvent(eventString, expectedString)
   }
 
 }
