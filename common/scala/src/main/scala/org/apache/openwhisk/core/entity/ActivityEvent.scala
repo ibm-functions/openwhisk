@@ -320,9 +320,10 @@ trait ActivityUtils {
                       matchAPI(transid, "trigger", triggersAPIMatcher, method, urlPath, reasonCode) // triggers API
                         .getOrElse(matchOther(transid, method, urlPath, logger).orNull)))) // nothing to add to the log
         else // code is running  as controller (handles POST rule API call for enable/disable rule)
-          matchRulesAPI(transid, method, urlPath, logger, reasonCode) // rules API
-            .getOrElse(matchOther(transid, method, urlPath, logger).orNull) // nothing to add to the log
-
+          matchFailedActionInvocation(transid, "action", actionsAPIMatcher, method, urlPath, reasonCode) // actions API
+            .getOrElse(
+              matchRulesAPI(transid, method, urlPath, logger, reasonCode) // rules API
+                .getOrElse(matchOther(transid, method, urlPath, logger).orNull)) // nothing to add to the log
       }
     }
   }
@@ -441,7 +442,7 @@ trait ActivityUtils {
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, severity_normal)))
           case "PUT" =>
-            val isUpdate = !transid.getTag(TransactionId.tagUpdateInfo).isEmpty
+            val isUpdate = transid.getTag(TransactionId.tagUpdateInfo).nonEmpty
             val operation = if (isUpdate) "update" else "create"
             Some(
               ApiMatcherResult(
@@ -460,6 +461,52 @@ trait ActivityUtils {
                 targetName = targetName,
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, severity_critical)))
+          case _ => None
+        }
+      case _ =>
+        None
+    }
+  }
+
+  /**
+   * a matcher for failed action invocations (we do not log successful invocations)
+   *
+   * @param transid transaction id
+   * @param entityType action, trigger, package
+   * @param matcher actionsAPIMatcher, packagesAPIMatcher, triggersAPIMatcher
+   * @param method http method of the request
+   * @param uri uri of the request
+   * @return Some(ApiMatcherResult) or None
+   */
+  def matchFailedActionInvocation(transid: TransactionId,
+                                  entityType: String,
+                                  matcher: Regex,
+                                  method: String,
+                                  uri: String,
+                                  reasonCode: String): Option[ApiMatcherResult] = {
+
+    // ignored: invoke action, list all actions
+    val entityTypePathSelector = entityType + "s" // plural of entityType
+    val targetType = prefixTypeURI + entityType
+    val actionTypePrefix = thisService + "." + entityType
+    val targetIdentifier = entityType + "Name"
+
+    uri match {
+      case matcher() =>
+        val pos = uri.indexOf("/" + entityTypePathSelector + "/") + ("/" + entityTypePathSelector + "/").length
+        val targetName = uri.substring(pos)
+        method match {
+          case "POST" =>
+            if ((Array("action", "trigger") contains entityType) && Try { reasonCode.toInt }.getOrElse(0) >= 400) {
+              Some(
+                ApiMatcherResult(
+                  actionType = actionTypePrefix + ".activate",
+                  logMessage = messagePrefix + "activate " + entityType + " " + targetName,
+                  targetIdentifier = targetIdentifier,
+                  targetName = targetName,
+                  targetType = targetType,
+                  severity = adjustSeverityByReasonCode(reasonCode, severity_critical)))
+            } else None
           case _ => None
         }
       case _ =>
@@ -497,7 +544,7 @@ trait ActivityUtils {
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, severity_normal)))
           case "PUT" =>
-            val isUpdate = !transid.getTag(TransactionId.tagUpdateInfo).isEmpty
+            val isUpdate = transid.getTag(TransactionId.tagUpdateInfo).nonEmpty
             val operation = if (isUpdate) "update" else "create"
             Some(
               ApiMatcherResult(
