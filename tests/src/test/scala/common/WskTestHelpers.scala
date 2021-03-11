@@ -255,8 +255,8 @@ trait WskTestHelpers extends Matchers {
     wsk: ActivationOperations,
     run: RunResult,
     initialWait: Duration = 1.second,
-    pollPeriod: Duration = 1.second,
-    totalWait: Duration = 60.seconds)(check: ActivationResult => Unit)(implicit wskprops: WskProps): Unit = {
+    pollPeriod: Duration = 3.second,
+    totalWait: Duration = 180.seconds)(check: ActivationResult => Unit)(implicit wskprops: WskProps): Unit = {
     val activationId = wsk.extractActivationId(run)
 
     withClue(s"did not find an activation id in '$run'") {
