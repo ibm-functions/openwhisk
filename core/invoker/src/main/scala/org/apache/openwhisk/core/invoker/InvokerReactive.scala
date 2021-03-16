@@ -227,7 +227,7 @@ class InvokerReactive(
         WhiskTracerProvider.tracer.setTraceContext(transid, msg.traceContext)
 
         logging.info(this, s"${msg.user.subject} ${msg.user.namespace.name} ${msg.action.name} ${msg.activationId}")
-        if (namespaceBlacklist.isBlacklisted(EntityName(instance.uniqueName.getOrElse(""))) && msg.user.namespace.name == namespaceWhiskSystem && msg.action.name.asString
+        if (namespaceBlacklist.isBlacklisted(EntityName(instance.uniqueName.getOrElse(""))) && msg.user.namespace.name.asString == namespaceWhiskSystem && msg.action.name.asString
               .startsWith(actionInvokerHealthTest)) {
           activationFeed ! MessageFeed.Processed
           logging.warn(

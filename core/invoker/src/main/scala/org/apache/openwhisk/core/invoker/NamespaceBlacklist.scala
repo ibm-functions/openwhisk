@@ -47,11 +47,11 @@ class NamespaceBlacklist(authStore: AuthStore) {
   def isBlacklisted(identity: Identity): Boolean = blacklist.contains(identity.namespace.name.asString)
 
   /**
-    * Check if the namespace, for which the activation is invoked, is in the blacklist.
-    *
-    * @param namespace for which the action is invoked.
-    * @return whether or not the current namespace is considered blacklisted
-    */
+   * Check if the namespace, for which the activation is invoked, is in the blacklist.
+   *
+   * @param namespace for which the action is invoked.
+   * @return whether or not the current namespace is considered blacklisted
+   */
   def isBlacklisted(name: EntityName): Boolean = blacklist.contains(name.asString)
 
   /** Refreshes the current blacklist from the database. */
