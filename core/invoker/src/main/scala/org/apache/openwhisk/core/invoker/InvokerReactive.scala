@@ -210,6 +210,9 @@ class InvokerReactive(
   private val pool =
     actorSystem.actorOf(ContainerPool.props(childFactory, poolConfig, activationFeed, prewarmingConfigs))
 
+  private val namespaceWhiskSystem = "whisk.system"
+  private val actionInvokerHealthTest = "invokerHealthTestAction"
+
   /** Is called when an ActivationMessage is read from Kafka */
   def processActivationMessage(bytes: Array[Byte]): Future[Unit] = {
     Future(ActivationMessage.parse(new String(bytes, StandardCharsets.UTF_8)))
@@ -223,7 +226,15 @@ class InvokerReactive(
         //set trace context to continue tracing
         WhiskTracerProvider.tracer.setTraceContext(transid, msg.traceContext)
 
-        if (!namespaceBlacklist.isBlacklisted(msg.user)) {
+        logging.info(this, s"${msg.user.subject} ${msg.user.namespace.name} ${msg.action.name} ${msg.activationId}")
+        if (namespaceBlacklist.isBlacklisted(EntityName(instance.uniqueName.getOrElse(""))) && msg.user.namespace.name == namespaceWhiskSystem && msg.action.name.asString
+              .startsWith(actionInvokerHealthTest)) {
+          activationFeed ! MessageFeed.Processed
+          logging.warn(
+            this,
+            s"namespace ${msg.user.namespace.name} for action ${msg.action.name} was blocked in invoker.")
+          Future.successful(())
+        } else if (!namespaceBlacklist.isBlacklisted(msg.user)) {
           val start = transid.started(this, LoggingMarkers.INVOKER_ACTIVATION, logLevel = InfoLevel)
           val namespace = msg.action.path
           val name = msg.action.name
@@ -336,8 +347,16 @@ class InvokerReactive(
 
   private val healthProducer = msgProvider.getProducer(config)
   Scheduler.scheduleWaitAtMost(1.seconds)(() => {
-    healthProducer.send("health", PingMessage(instance)).andThen {
-      case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
+    if (!namespaceBlacklist.isBlacklisted(EntityName(instance.uniqueName.getOrElse("")))) {
+      logging.info(this, s"send ping to healt topic for invoker ${instance.uniqueName.getOrElse("")}")
+      healthProducer.send("health", PingMessage(instance)).andThen {
+        case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
+      }
+    } else {
+      logging.info(
+        this,
+        s"do not send ping to healt topic as invoker ${instance.uniqueName.getOrElse("")} is in blacklist ${namespaceBlacklist}")
+      Future.successful(())
     }
   })
 }

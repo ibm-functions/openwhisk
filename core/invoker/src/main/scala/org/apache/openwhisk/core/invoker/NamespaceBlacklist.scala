@@ -19,7 +19,7 @@ package org.apache.openwhisk.core.invoker
 
 import org.apache.openwhisk.common.TransactionId
 import org.apache.openwhisk.core.database.StaleParameter
-import org.apache.openwhisk.core.entity.{Identity, View}
+import org.apache.openwhisk.core.entity.{EntityName, Identity, View}
 import org.apache.openwhisk.core.entity.types.AuthStore
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -45,6 +45,14 @@ class NamespaceBlacklist(authStore: AuthStore) {
    * @return whether or not the current identity is considered blacklisted
    */
   def isBlacklisted(identity: Identity): Boolean = blacklist.contains(identity.namespace.name.asString)
+
+  /**
+    * Check if the namespace, for which the activation is invoked, is in the blacklist.
+    *
+    * @param namespace for which the action is invoked.
+    * @return whether or not the current namespace is considered blacklisted
+    */
+  def isBlacklisted(name: EntityName): Boolean = blacklist.contains(name.asString)
 
   /** Refreshes the current blacklist from the database. */
   /** Limit query parameter set to 0 for limitless record query. */
