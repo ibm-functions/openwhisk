@@ -215,9 +215,6 @@ class InvokerReactive(
   private val pool =
     actorSystem.actorOf(ContainerPool.props(childFactory, poolConfig, activationFeed, prewarmingConfigs))
 
-  private val namespaceWhiskSystem = "whisk.system"
-  private val actionInvokerHealthTest = "invokerHealthTestAction"
-
   /** Is called when an ActivationMessage is read from Kafka */
   def processActivationMessage(bytes: Array[Byte]): Future[Unit] = {
     Future(ActivationMessage.parse(new String(bytes, StandardCharsets.UTF_8)))
