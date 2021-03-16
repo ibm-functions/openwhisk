@@ -158,8 +158,13 @@ class InvokerReactive(
   Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) { () =>
     logging.debug(this, "running background job to update blacklist")
     namespaceBlacklist.refreshBlacklist()(ec, TransactionId.invoker).andThen {
-      case Success(set) => logging.info(this, s"updated blacklist to ${set.size} entries")
-      case Failure(t)   => logging.error(this, s"error on updating the blacklist: ${t.getMessage}")
+      case Success(set) => {
+        logging.info(this, s"updated blacklist to ${set.size} entries")
+        if (set.contains(instance.displayedName.getOrElse(""))) {
+          logging.info(this, s"invoker ${instance.toString} is blacklisted, no controller pings will be done")
+        }
+      }
+      case Failure(t) => logging.error(this, s"error on updating the blacklist: ${t.getMessage}")
     }
   }
 
@@ -226,15 +231,7 @@ class InvokerReactive(
         //set trace context to continue tracing
         WhiskTracerProvider.tracer.setTraceContext(transid, msg.traceContext)
 
-        logging.info(this, s"${msg.user.subject} ${msg.user.namespace.name} ${msg.action.name} ${msg.activationId}")
-        if (namespaceBlacklist.isBlacklisted(EntityName(instance.uniqueName.getOrElse(""))) && msg.user.namespace.name.asString == namespaceWhiskSystem && msg.action.name.asString
-              .startsWith(actionInvokerHealthTest)) {
-          activationFeed ! MessageFeed.Processed
-          logging.warn(
-            this,
-            s"namespace ${msg.user.namespace.name} for action ${msg.action.name} was blocked in invoker.")
-          Future.successful(())
-        } else if (!namespaceBlacklist.isBlacklisted(msg.user)) {
+        if (!namespaceBlacklist.isBlacklisted(msg.user)) {
           val start = transid.started(this, LoggingMarkers.INVOKER_ACTIVATION, logLevel = InfoLevel)
           val namespace = msg.action.path
           val name = msg.action.name
@@ -347,15 +344,11 @@ class InvokerReactive(
 
   private val healthProducer = msgProvider.getProducer(config)
   Scheduler.scheduleWaitAtMost(1.seconds)(() => {
-    if (!namespaceBlacklist.isBlacklisted(EntityName(instance.uniqueName.getOrElse("")))) {
-      logging.info(this, s"send ping to healt topic for invoker ${instance.uniqueName.getOrElse("")}")
+    if (!namespaceBlacklist.isBlacklisted(EntityName(instance.displayedName.getOrElse("")))) {
       healthProducer.send("health", PingMessage(instance)).andThen {
         case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
       }
     } else {
-      logging.info(
-        this,
-        s"do not send ping to healt topic as invoker ${instance.uniqueName.getOrElse("")} is in blacklist ${namespaceBlacklist}")
       Future.successful(())
     }
   })
