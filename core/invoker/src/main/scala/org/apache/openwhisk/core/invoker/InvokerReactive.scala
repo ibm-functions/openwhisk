@@ -161,7 +161,7 @@ class InvokerReactive(
       case Success(set) => {
         logging.info(this, s"updated blacklist to ${set.size} entries")
         if (set.contains(instance.displayedName.getOrElse(""))) {
-          logging.info(this, s"invoker ${instance.toString} is blacklisted, no controller pings will be done")
+          logging.info(this, s"invoker ${instance.toString} is blacklisted, no controller pings will be sent")
         }
       }
       case Failure(t) => logging.error(this, s"error on updating the blacklist: ${t.getMessage}")
