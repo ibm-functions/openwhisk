@@ -26,7 +26,9 @@ ROOTDIR="$SCRIPTDIR/../.."
 
 cd $ROOTDIR
 cat whisk.properties
-TERM=dumb ./gradlew :tests:testCoverageLean :tests:reportCoverage :tests:testSwaggerCodegen
+#TERM=dumb ./gradlew :tests:testCoverageLean :tests:reportCoverage :tests:testSwaggerCodegen
+#TERM=dumb ./gradlew :tests:testCoverageLean --tests system.basic.WskActionTests
+TERM=dumb ./gradlew :tests:testCoverageLean --tests services.HeadersTests
 
 bash <(curl -s https://codecov.io/bash)
 echo "Time taken for ${0##*/} is $SECONDS secs"
