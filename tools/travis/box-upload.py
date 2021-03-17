@@ -81,6 +81,18 @@ if __name__ == "__main__":
         print("Directory doesn't exist: %s." % dir_path)
         sys.exit(0)
 
+    print("cat /home/travis/build/ibm-functions/openwhisk/logs/controller0/controller0_logs.log..")
+    subprocess.call(["cat", "/home/travis/build/ibm-functions/openwhisk/logs/controller0/controller0_logs.log"])
+
+    print("cat /home/travis/build/ibm-functions/openwhisk/logs/invoker0.log..")
+    subprocess.call(["cat", "/home/travis/build/ibm-functions/openwhisk/logs/invoker0.log"])    
+
+    print("cat /home/travis/build/ibm-functions/openwhisk/logs/nginx.log..")
+    subprocess.call(["cat", "/home/travis/build/ibm-functions/openwhisk/logs/nginx.log"])
+
+    print("cat /home/travis/build/ibm-functions/openwhisk/logs/nginx/nginx_access.log..")
+    subprocess.call(["cat", "/home/travis/build/ibm-functions/openwhisk/logs/nginx/nginx_access.log"])
+
     print("Compressing logs dir...")
     tar = tar_gz_dir(dir_path)
     print_tarball_size(tar)
