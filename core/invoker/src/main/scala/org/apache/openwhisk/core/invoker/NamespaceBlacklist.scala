@@ -19,7 +19,7 @@ package org.apache.openwhisk.core.invoker
 
 import org.apache.openwhisk.common.TransactionId
 import org.apache.openwhisk.core.database.StaleParameter
-import org.apache.openwhisk.core.entity.{EntityName, Identity, View}
+import org.apache.openwhisk.core.entity.{Identity, View}
 import org.apache.openwhisk.core.entity.types.AuthStore
 
 import scala.concurrent.{ExecutionContext, Future}
