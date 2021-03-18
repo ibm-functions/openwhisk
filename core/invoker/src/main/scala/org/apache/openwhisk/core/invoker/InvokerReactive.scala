@@ -41,7 +41,7 @@ import spray.json._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success, Try}
+import scala.util.{Failure, Success}
 
 object InvokerReactive extends InvokerProvider {
 
@@ -341,9 +341,7 @@ class InvokerReactive(
 
   private val healthProducer = msgProvider.getProducer(config)
   Scheduler.scheduleWaitAtMost(1.seconds)(() => {
-    val isBlacklisted =
-      Try(namespaceBlacklist.isBlacklisted(EntityName(instance.displayedName.getOrElse("")))).getOrElse(false)
-    if (!isBlacklisted) {
+    if (!namespaceBlacklist.isBlacklisted(instance.displayedName.getOrElse(""))) {
       healthProducer.send("health", PingMessage(instance)).andThen {
         case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
       }
