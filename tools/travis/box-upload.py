@@ -81,8 +81,8 @@ if __name__ == "__main__":
         print("Directory doesn't exist: %s." % dir_path)
         sys.exit(0)
 
-    print("cat /home/travis/build/ibm-functions/openwhisk/logs/invoker0.log..")
-    subprocess.call(["cat", "/home/travis/build/ibm-functions/openwhisk/logs/invoker0.log"])    
+    print("cat /home/travis/build/ibm-functions/openwhisk/logs/invoker0/invoker0_logs.log..")
+    subprocess.call(["cat", "/home/travis/build/ibm-functions/openwhisk/logs/invoker0/invoker0_logs.log"])
 
     print("cat /home/travis/build/ibm-functions/openwhisk/logs/controller0/controller0_logs.log..")
     subprocess.call(["cat", "/home/travis/build/ibm-functions/openwhisk/logs/controller0/controller0_logs.log"])
