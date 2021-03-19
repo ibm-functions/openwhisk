@@ -44,302 +44,347 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
   val whiskConfig = new WhiskConfig(Map(WhiskConfig.actionSequenceMaxLimit -> "50"))
   val limit = whiskConfig.actionSequenceLimit.toInt
 
+  private val retriesOnTestFailures = 5
+  private val waitBeforeRetry = 1.second
+
   behavior of "Whisk conductor actions"
 
-  it should "invoke a conductor action with no continuation" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val echo = "echo" // echo conductor action
-    assetHelper.withCleaner(wsk.action, echo) { (action, _) =>
-      action.create(
-        echo,
-        Some(TestUtils.getTestActionFilename("echo.js")),
-        annotations = Map("conductor" -> true.toJson))
-    }
+  var testname: String = "invoke a conductor action with no continuation"
+  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val echo = "echo" // echo conductor action
+          assetHelper.withCleaner(wsk.action, echo) { (action, _) =>
+            action.create(
+              echo,
+              Some(TestUtils.getTestActionFilename("echo.js")),
+              annotations = Map("conductor" -> true.toJson))
+          }
 
-    // the conductor annotation should not affect the behavior of an action
-    // that returns a dictionary without a params or action field
-    val run = wsk.action.invoke(echo, Map("payload" -> testString.toJson, "state" -> testString.toJson))
-    withActivation(wsk.activation, run) { activation =>
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("payload" -> testString.toJson, "state" -> testString.toJson))
-      checkConductorLogsAndAnnotations(activation, 1) // echo
-    }
+          // the conductor annotation should not affect the behavior of an action
+          // that returns a dictionary without a params or action field
+          val run = wsk.action.invoke(echo, Map("payload" -> testString.toJson, "state" -> testString.toJson))
+          withActivation(wsk.activation, run) { activation =>
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(
+              JsObject("payload" -> testString.toJson, "state" -> testString.toJson))
+            checkConductorLogsAndAnnotations(activation, 1) // echo
+          }
 
-    // the conductor annotation should not affect the behavior of an action that returns an error
-    val secondrun = wsk.action.invoke(echo, Map("error" -> testString.toJson))
-    withActivation(wsk.activation, secondrun) { activation =>
-      activation.response.status shouldBe "application error"
-      activation.response.result shouldBe Some(JsObject("error" -> testString.toJson))
-      checkConductorLogsAndAnnotations(activation, 1) // echo
-    }
+          // the conductor annotation should not affect the behavior of an action that returns an error
+          val secondrun = wsk.action.invoke(echo, Map("error" -> testString.toJson))
+          withActivation(wsk.activation, secondrun) { activation =>
+            activation.response.status shouldBe "application error"
+            activation.response.result shouldBe Some(JsObject("error" -> testString.toJson))
+            checkConductorLogsAndAnnotations(activation, 1) // echo
+          }
 
-    // the controller should unwrap a wrapped result { params: result, ... } for an action with a conductor annotation
-    // discarding other fields if there is no action field
-    val thirdrun = wsk.action.invoke(
-      echo,
-      Map(
-        "params" -> JsObject("payload" -> testString.toJson),
-        "result" -> testString.toJson,
-        "state" -> testString.toJson))
-    withActivation(wsk.activation, thirdrun) { activation =>
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("payload" -> testString.toJson))
-      checkConductorLogsAndAnnotations(activation, 1) // echo
-    }
+          // the controller should unwrap a wrapped result { params: result, ... } for an action with a conductor annotation
+          // discarding other fields if there is no action field
+          val thirdrun = wsk.action.invoke(
+            echo,
+            Map(
+              "params" -> JsObject("payload" -> testString.toJson),
+              "result" -> testString.toJson,
+              "state" -> testString.toJson))
+          withActivation(wsk.activation, thirdrun) { activation =>
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(JsObject("payload" -> testString.toJson))
+            checkConductorLogsAndAnnotations(activation, 1) // echo
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > Whisk conductor actions should $testname not successful, retrying.."))
   }
 
-  it should "invoke a conductor action with an invalid continuation" in withAssetCleaner(wskprops) {
-    (wp, assetHelper) =>
-      val echo = "echo" // echo conductor action
-      assetHelper.withCleaner(wsk.action, echo) { (action, _) =>
-        action.create(
-          echo,
-          Some(TestUtils.getTestActionFilename("echo.js")),
-          annotations = Map("conductor" -> true.toJson))
-      }
+  testname = "invoke a conductor action with an invalid continuation"
+  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val echo = "echo" // echo conductor action
+          assetHelper.withCleaner(wsk.action, echo) { (action, _) =>
+            action.create(
+              echo,
+              Some(TestUtils.getTestActionFilename("echo.js")),
+              annotations = Map("conductor" -> true.toJson))
+          }
 
-      // an invalid action name
-      val invalidrun =
-        wsk.action.invoke(echo, Map("payload" -> testString.toJson, "action" -> invalid.toJson))
-      withActivation(wsk.activation, invalidrun) { activation =>
-        activation.response.status shouldBe "application error"
-        activation.response.result.get.fields.get("error") shouldBe Some(
-          JsString(compositionComponentInvalid(JsString(invalid))))
-        checkConductorLogsAndAnnotations(activation, 2) // echo
-      }
+          // an invalid action name
+          val invalidrun =
+            wsk.action.invoke(echo, Map("payload" -> testString.toJson, "action" -> invalid.toJson))
+          withActivation(wsk.activation, invalidrun) { activation =>
+            activation.response.status shouldBe "application error"
+            activation.response.result.get.fields.get("error") shouldBe Some(
+              JsString(compositionComponentInvalid(JsString(invalid))))
+            checkConductorLogsAndAnnotations(activation, 2) // echo
+          }
 
-      // an undefined action
-      val undefinedrun = wsk.action.invoke(echo, Map("payload" -> testString.toJson, "action" -> missing.toJson))
-      val namespace = wsk.namespace.whois()
+          // an undefined action
+          val undefinedrun = wsk.action.invoke(echo, Map("payload" -> testString.toJson, "action" -> missing.toJson))
+          val namespace = wsk.namespace.whois()
 
-      withActivation(wsk.activation, undefinedrun) { activation =>
-        activation.response.status shouldBe "application error"
-        activation.response.result.get.fields.get("error") shouldBe Some(
-          JsString(compositionComponentNotFound(s"$namespace/$missing")))
-        checkConductorLogsAndAnnotations(activation, 2) // echo
-      }
+          withActivation(wsk.activation, undefinedrun) { activation =>
+            activation.response.status shouldBe "application error"
+            activation.response.result.get.fields.get("error") shouldBe Some(
+              JsString(compositionComponentNotFound(s"$namespace/$missing")))
+            checkConductorLogsAndAnnotations(activation, 2) // echo
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > Whisk conductor actions should $testname not successful, retrying.."))
   }
 
-  it should "invoke a conductor action with a continuation" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val conductor = "conductor" // conductor action
-    assetHelper.withCleaner(wsk.action, conductor) { (action, _) =>
-      action.create(
-        conductor,
-        Some(TestUtils.getTestActionFilename("conductor.js")),
-        annotations = Map("conductor" -> true.toJson))
-    }
+  testname = "invoke a conductor action with a continuation"
+  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val conductor = "conductor" // conductor action
+          assetHelper.withCleaner(wsk.action, conductor) { (action, _) =>
+            action.create(
+              conductor,
+              Some(TestUtils.getTestActionFilename("conductor.js")),
+              annotations = Map("conductor" -> true.toJson))
+          }
 
-    val step = "step" // step action with higher memory limit than conductor to test max memory computation
-    assetHelper.withCleaner(wsk.action, step) { (action, _) =>
-      action.create(step, Some(TestUtils.getTestActionFilename("step.js")), memory = Some(257 MB))
-    }
+          val step = "step" // step action with higher memory limit than conductor to test max memory computation
+          assetHelper.withCleaner(wsk.action, step) { (action, _) =>
+            action.create(step, Some(TestUtils.getTestActionFilename("step.js")), memory = Some(257 MB))
+          }
 
-    // dynamically invoke step action
-    val run = wsk.action.invoke(conductor, Map("action" -> step.toJson, "n" -> 1.toJson))
-    withActivation(wsk.activation, run) { activation =>
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("n" -> 2.toJson))
-      checkConductorLogsAndAnnotations(activation, 3) // conductor, step, conductor
-    }
+          // dynamically invoke step action
+          val run = wsk.action.invoke(conductor, Map("action" -> step.toJson, "n" -> 1.toJson))
+          withActivation(wsk.activation, run) { activation =>
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(JsObject("n" -> 2.toJson))
+            checkConductorLogsAndAnnotations(activation, 3) // conductor, step, conductor
+          }
 
-    // dynamically invoke step action with an error result
-    val errorrun = wsk.action.invoke(conductor, Map("action" -> step.toJson))
-    withActivation(wsk.activation, errorrun) { activation =>
-      activation.response.status shouldBe "application error"
-      activation.response.result shouldBe Some(JsObject("error" -> JsString("missing parameter")))
-      checkConductorLogsAndAnnotations(activation, 3) // conductor, step, conductor
-    }
+          // dynamically invoke step action with an error result
+          val errorrun = wsk.action.invoke(conductor, Map("action" -> step.toJson))
+          withActivation(wsk.activation, errorrun) { activation =>
+            activation.response.status shouldBe "application error"
+            activation.response.result shouldBe Some(JsObject("error" -> JsString("missing parameter")))
+            checkConductorLogsAndAnnotations(activation, 3) // conductor, step, conductor
+          }
 
-    // dynamically invoke step action, blocking invocation
-    val blockingrun = wsk.action.invoke(conductor, Map("action" -> step.toJson, "n" -> 1.toJson), blocking = true)
-    val activation = wsk.parseJsonString(blockingrun.stdout).convertTo[ActivationResult]
+          // dynamically invoke step action, blocking invocation
+          val blockingrun = wsk.action.invoke(conductor, Map("action" -> step.toJson, "n" -> 1.toJson), blocking = true)
+          val activation = wsk.parseJsonString(blockingrun.stdout).convertTo[ActivationResult]
 
-    withClue(s"check failed for blocking conductor activation: $activation") {
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("n" -> 2.toJson))
-      checkConductorLogsAndAnnotations(activation, 3) // conductor, step, conductor
-    }
+          withClue(s"check failed for blocking conductor activation: $activation") {
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(JsObject("n" -> 2.toJson))
+            checkConductorLogsAndAnnotations(activation, 3) // conductor, step, conductor
+          }
 
-    // dynamically invoke step action, forwarding state
-    val secondrun = wsk.action.invoke(
-      conductor,
-      Map(
-        "action" -> step.toJson, // invoke step
-        "state" -> JsObject("witness" -> 42.toJson), // dummy state
-        "n" -> 1.toJson))
-    withActivation(wsk.activation, secondrun) { activation =>
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("n" -> 2.toJson, "witness" -> 42.toJson))
-      checkConductorLogsAndAnnotations(activation, 3) // conductor, step, conductor
-    }
+          // dynamically invoke step action, forwarding state
+          val secondrun = wsk.action.invoke(
+            conductor,
+            Map(
+              "action" -> step.toJson, // invoke step
+              "state" -> JsObject("witness" -> 42.toJson), // dummy state
+              "n" -> 1.toJson))
+          withActivation(wsk.activation, secondrun) { activation =>
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(JsObject("n" -> 2.toJson, "witness" -> 42.toJson))
+            checkConductorLogsAndAnnotations(activation, 3) // conductor, step, conductor
+          }
 
-    // dynamically invoke step action twice, forwarding state
-    val thirdrun = wsk.action.invoke(
-      conductor,
-      Map(
-        "action" -> step.toJson, // invoke step
-        "state" -> JsObject("action" -> step.toJson), // invoke step again
-        "n" -> 1.toJson))
-    withActivation(wsk.activation, thirdrun) { activation =>
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("n" -> 3.toJson))
-      checkConductorLogsAndAnnotations(activation, 5) // conductor, step, conductor, step, conductor
-    }
+          // dynamically invoke step action twice, forwarding state
+          val thirdrun = wsk.action.invoke(
+            conductor,
+            Map(
+              "action" -> step.toJson, // invoke step
+              "state" -> JsObject("action" -> step.toJson), // invoke step again
+              "n" -> 1.toJson))
+          withActivation(wsk.activation, thirdrun) { activation =>
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(JsObject("n" -> 3.toJson))
+            checkConductorLogsAndAnnotations(activation, 5) // conductor, step, conductor, step, conductor
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > Whisk conductor actions should $testname not successful, retrying.."))
   }
 
-  it should "invoke nested conductor actions" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val conductor = "conductor" // conductor action
-    assetHelper.withCleaner(wsk.action, conductor) { (action, _) =>
-      action.create(
-        conductor,
-        Some(TestUtils.getTestActionFilename("conductor.js")),
-        annotations = Map("conductor" -> true.toJson))
-    }
+  testname = "invoke nested conductor actions"
+  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val conductor = "conductor" // conductor action
+          assetHelper.withCleaner(wsk.action, conductor) { (action, _) =>
+            action.create(
+              conductor,
+              Some(TestUtils.getTestActionFilename("conductor.js")),
+              annotations = Map("conductor" -> true.toJson))
+          }
 
-    val step = "step" // step action with lower memory limit than conductor to test max memory computation
-    assetHelper.withCleaner(wsk.action, step) { (action, _) =>
-      action.create(step, Some(TestUtils.getTestActionFilename("step.js")), memory = Some(255 MB))
-    }
+          val step = "step" // step action with lower memory limit than conductor to test max memory computation
+          assetHelper.withCleaner(wsk.action, step) { (action, _) =>
+            action.create(step, Some(TestUtils.getTestActionFilename("step.js")), memory = Some(255 MB))
+          }
 
-    // invoke nested conductor with single step
-    val run = wsk.action.invoke(
-      conductor,
-      Map(
-        "action" -> conductor.toJson, // invoke nested conductor
-        "params" -> JsObject("action" -> step.toJson), // invoke step (level 1)
-        "n" -> 1.toJson))
-    withActivation(wsk.activation, run) { activation =>
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("n" -> 2.toJson))
-      checkConductorLogsAndAnnotations(activation, 3) // conductor, nested conductor, conductor
-      // check nested conductor invocation
-      withActivation(
-        wsk.activation,
-        activation.logs.get(1),
-        initialWait = 1 second,
-        pollPeriod = 60 seconds,
-        totalWait = allowedActionDuration) { nestedActivation =>
-        nestedActivation.response.status shouldBe "success"
-        nestedActivation.response.result shouldBe Some(JsObject("n" -> 2.toJson))
-        checkConductorLogsAndAnnotations(nestedActivation, 3) // conductor, step, conductor
-      }
-    }
+          // invoke nested conductor with single step
+          val run = wsk.action.invoke(
+            conductor,
+            Map(
+              "action" -> conductor.toJson, // invoke nested conductor
+              "params" -> JsObject("action" -> step.toJson), // invoke step (level 1)
+              "n" -> 1.toJson))
+          withActivation(wsk.activation, run) {
+            activation =>
+              activation.response.status shouldBe "success"
+              activation.response.result shouldBe Some(JsObject("n" -> 2.toJson))
+              checkConductorLogsAndAnnotations(activation, 3) // conductor, nested conductor, conductor
+              // check nested conductor invocation
+              withActivation(
+                wsk.activation,
+                activation.logs.get(1),
+                initialWait = 1 second,
+                pollPeriod = 60 seconds,
+                totalWait = allowedActionDuration) { nestedActivation =>
+                nestedActivation.response.status shouldBe "success"
+                nestedActivation.response.result shouldBe Some(JsObject("n" -> 2.toJson))
+                checkConductorLogsAndAnnotations(nestedActivation, 3) // conductor, step, conductor
+              }
+          }
 
-    // invoke nested conductor with single step, blocking invocation
-    val blockingrun = wsk.action.invoke(
-      conductor,
-      Map(
-        "action" -> conductor.toJson, // invoke nested conductor
-        "params" -> JsObject("action" -> step.toJson), // invoke step (level 1)
-        "n" -> 1.toJson),
-      blocking = true)
-    val activation = wsk.parseJsonString(blockingrun.stdout).convertTo[ActivationResult]
+          // invoke nested conductor with single step, blocking invocation
+          val blockingrun = wsk.action.invoke(
+            conductor,
+            Map(
+              "action" -> conductor.toJson, // invoke nested conductor
+              "params" -> JsObject("action" -> step.toJson), // invoke step (level 1)
+              "n" -> 1.toJson),
+            blocking = true)
+          val activation = wsk.parseJsonString(blockingrun.stdout).convertTo[ActivationResult]
 
-    withClue(s"check failed for blocking conductor activation: $activation") {
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("n" -> 2.toJson))
-      checkConductorLogsAndAnnotations(activation, 3) // conductor, nested conductor, conductor
-    }
+          withClue(s"check failed for blocking conductor activation: $activation") {
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(JsObject("n" -> 2.toJson))
+            checkConductorLogsAndAnnotations(activation, 3) // conductor, nested conductor, conductor
+          }
 
-    // nested step followed by outer step
-    val secondrun = wsk.action.invoke(
-      conductor,
-      Map(
-        "action" -> conductor.toJson, // invoke nested conductor
-        "state" -> JsObject("action" -> step.toJson), // invoked step on return of nested conductor (level 0)
-        "params" -> JsObject("action" -> step.toJson), // invoke step (level 1)
-        "n" -> 1.toJson))
-    withActivation(wsk.activation, secondrun) { activation =>
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("n" -> 3.toJson))
-      checkConductorLogsAndAnnotations(activation, 5)
-    }
+          // nested step followed by outer step
+          val secondrun = wsk.action.invoke(
+            conductor,
+            Map(
+              "action" -> conductor.toJson, // invoke nested conductor
+              "state" -> JsObject("action" -> step.toJson), // invoked step on return of nested conductor (level 0)
+              "params" -> JsObject("action" -> step.toJson), // invoke step (level 1)
+              "n" -> 1.toJson))
+          withActivation(wsk.activation, secondrun) { activation =>
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(JsObject("n" -> 3.toJson))
+            checkConductorLogsAndAnnotations(activation, 5)
+          }
 
-    // two levels of nesting, three steps
-    val thirdrun = wsk.action.invoke(
-      conductor,
-      Map(
-        "action" -> conductor.toJson, // invoke nested conductor
-        "state" -> JsObject("action" -> step.toJson), // invoke step on return (level 0)
-        "params" -> JsObject(
-          "action" -> conductor.toJson, // invoked nested nested conductor
-          "state" -> JsObject("action" -> step.toJson), // invoke step on return (level 1)
-          "params" -> JsObject("action" -> step.toJson)), // invoke step (level 2)
-        "n" -> 1.toJson))
-    withActivation(wsk.activation, thirdrun) { activation =>
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("n" -> 4.toJson))
-      checkConductorLogsAndAnnotations(activation, 5)
-    }
+          // two levels of nesting, three steps
+          val thirdrun = wsk.action.invoke(
+            conductor,
+            Map(
+              "action" -> conductor.toJson, // invoke nested conductor
+              "state" -> JsObject("action" -> step.toJson), // invoke step on return (level 0)
+              "params" -> JsObject(
+                "action" -> conductor.toJson, // invoked nested nested conductor
+                "state" -> JsObject("action" -> step.toJson), // invoke step on return (level 1)
+                "params" -> JsObject("action" -> step.toJson)), // invoke step (level 2)
+              "n" -> 1.toJson))
+          withActivation(wsk.activation, thirdrun) { activation =>
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(JsObject("n" -> 4.toJson))
+            checkConductorLogsAndAnnotations(activation, 5)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > Whisk conductor actions should $testname not successful, retrying.."))
   }
 
+  testname = "invoke a conductor action in a package binding"
   it should "invoke a conductor action in a package binding" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val ns = wsk.namespace.whois()
-    val actionName = "echo" // echo conductor action
-    val packageName = "package1"
-    val bindName = "package2"
-    val packageActionName = packageName + "/" + actionName
-    val bindActionName = bindName + "/" + actionName
-    val bindNameWithNamespace = ns + "/" + bindName
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val ns = wsk.namespace.whois()
+          val actionName = "echo" // echo conductor action
+          val packageName = "package1"
+          val bindName = "package2"
+          val packageActionName = packageName + "/" + actionName
+          val bindActionName = bindName + "/" + actionName
+          val bindNameWithNamespace = ns + "/" + bindName
 
-    assetHelper.withCleaner(wsk.pkg, packageName) { (pkg, _) =>
-      pkg.create(packageName)
-    }
-    assetHelper.withCleaner(wsk.pkg, bindName) { (pkg, _) =>
-      pkg.bind(packageName, bindName)
-    }
+          assetHelper.withCleaner(wsk.pkg, packageName) { (pkg, _) =>
+            pkg.create(packageName)
+          }
+          assetHelper.withCleaner(wsk.pkg, bindName) { (pkg, _) =>
+            pkg.bind(packageName, bindName)
+          }
 
-    assetHelper.withCleaner(wsk.action, packageActionName) { (action, _) =>
-      action.create(
-        packageActionName,
-        Some(TestUtils.getTestActionFilename("echo.js")),
-        annotations = Map("conductor" -> true.toJson))
-    }
+          assetHelper.withCleaner(wsk.action, packageActionName) { (action, _) =>
+            action.create(
+              packageActionName,
+              Some(TestUtils.getTestActionFilename("echo.js")),
+              annotations = Map("conductor" -> true.toJson))
+          }
 
-    // the conductor annotation should not affect the behavior of an action
-    // that returns a dictionary without a params or action field
-    val run = wsk.action.invoke(bindActionName, Map("payload" -> testString.toJson, "state" -> testString.toJson))
-    withActivation(wsk.activation, run) { activation =>
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("payload" -> testString.toJson, "state" -> testString.toJson))
+          // the conductor annotation should not affect the behavior of an action
+          // that returns a dictionary without a params or action field
+          val run = wsk.action.invoke(bindActionName, Map("payload" -> testString.toJson, "state" -> testString.toJson))
+          withActivation(wsk.activation, run) { activation =>
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(
+              JsObject("payload" -> testString.toJson, "state" -> testString.toJson))
 
-      val binding = activation.getAnnotationValue("binding")
-      binding shouldBe defined
-      binding.get shouldBe JsString(bindNameWithNamespace)
+            val binding = activation.getAnnotationValue("binding")
+            binding shouldBe defined
+            binding.get shouldBe JsString(bindNameWithNamespace)
 
-      checkConductorLogsAndAnnotations(activation, 1) // echo
-    }
+            checkConductorLogsAndAnnotations(activation, 1) // echo
+          }
 
-    // the conductor annotation should not affect the behavior of an action that returns an error
-    val secondrun = wsk.action.invoke(bindActionName, Map("error" -> testString.toJson))
-    withActivation(wsk.activation, secondrun) { activation =>
-      activation.response.status shouldBe "application error"
-      activation.response.result shouldBe Some(JsObject("error" -> testString.toJson))
+          // the conductor annotation should not affect the behavior of an action that returns an error
+          val secondrun = wsk.action.invoke(bindActionName, Map("error" -> testString.toJson))
+          withActivation(wsk.activation, secondrun) { activation =>
+            activation.response.status shouldBe "application error"
+            activation.response.result shouldBe Some(JsObject("error" -> testString.toJson))
 
-      val binding = activation.getAnnotationValue("binding")
-      binding shouldBe defined
-      binding.get shouldBe JsString(bindNameWithNamespace)
+            val binding = activation.getAnnotationValue("binding")
+            binding shouldBe defined
+            binding.get shouldBe JsString(bindNameWithNamespace)
 
-      checkConductorLogsAndAnnotations(activation, 1) // echo
-    }
+            checkConductorLogsAndAnnotations(activation, 1) // echo
+          }
 
-    // the controller should unwrap a wrapped result { params: result, ... } for an action with a conductor annotation
-    // discarding other fields if there is no action field
-    val thirdrun = wsk.action.invoke(
-      bindActionName,
-      Map(
-        "params" -> JsObject("payload" -> testString.toJson),
-        "result" -> testString.toJson,
-        "state" -> testString.toJson))
-    withActivation(wsk.activation, thirdrun) { activation =>
-      activation.response.status shouldBe "success"
-      activation.response.result shouldBe Some(JsObject("payload" -> testString.toJson))
+          // the controller should unwrap a wrapped result { params: result, ... } for an action with a conductor annotation
+          // discarding other fields if there is no action field
+          val thirdrun = wsk.action.invoke(
+            bindActionName,
+            Map(
+              "params" -> JsObject("payload" -> testString.toJson),
+              "result" -> testString.toJson,
+              "state" -> testString.toJson))
+          withActivation(wsk.activation, thirdrun) { activation =>
+            activation.response.status shouldBe "success"
+            activation.response.result shouldBe Some(JsObject("payload" -> testString.toJson))
 
-      val binding = activation.getAnnotationValue("binding")
-      binding shouldBe defined
-      binding.get shouldBe JsString(bindNameWithNamespace)
+            val binding = activation.getAnnotationValue("binding")
+            binding shouldBe defined
+            binding.get shouldBe JsString(bindNameWithNamespace)
 
-      checkConductorLogsAndAnnotations(activation, 1) // echo
-    }
+            checkConductorLogsAndAnnotations(activation, 1) // echo
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > Whisk conductor actions should $testname not successful, retrying.."))
   }
 
   /**
