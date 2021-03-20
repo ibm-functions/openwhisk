@@ -40,6 +40,11 @@ object retry {
 
     try fn
     catch {
+      case t: Throwable if N > 1 =>
+        println(s"caught exception: ${t.getMessage}")
+        retryMessage.foreach(println)
+        waitBeforeRetry.foreach(t => Thread.sleep(t.toMillis))
+        retry(fn, N - 1, waitBeforeRetry, retryMessage)
       case _ if N > 1 =>
         retryMessage.foreach(println)
         waitBeforeRetry.foreach(t => Thread.sleep(t.toMillis))

@@ -58,7 +58,8 @@ import org.apache.openwhisk.core.database.UserContext
 class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
 
   /** Triggers API tests */
-  behavior of "Triggers API"
+  val behaviorname = "Triggers API"
+  behavior of s"$behaviorname"
 
   val creds = WhiskAuthHelpers.newIdentity()
   val context = UserContext(creds)
@@ -73,10 +74,12 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
   private val waitBeforeRetry = 1.second
 
   //// GET /triggers
-  it should "list triggers by default/explicit namespace" in {
+  var testname = "list triggers by default/explicit namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val triggers = (1 to 2).map { i =>
             WhiskTrigger(namespace, aname(), Parameters("x", "b"))
@@ -106,14 +109,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should list triggers by default/explicit namespace not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject list when limit is greater than maximum allowed value" in {
+  testname = "reject list when limit is greater than maximum allowed value"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val exceededMaxLimit = Collection.MAX_LIST_LIMIT + 1
           val response = Get(s"$collectionPath?limit=$exceededMaxLimit") ~> Route.seal(routes(creds)) ~> check {
@@ -125,14 +129,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should reject list when limit is greater than maximum allowed value not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject list when limit is not an integer" in {
+  testname = "reject list when limit is not an integer"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val notAnInteger = "string"
           val response = Get(s"$collectionPath?limit=$notAnInteger") ~> Route.seal(routes(creds)) ~> check {
@@ -144,14 +149,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should reject list when limit is not an integer not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject list when skip is negative" in {
+  testname = "reject list when skip is negative"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val negativeSkip = -1
           val response = Get(s"$collectionPath?skip=$negativeSkip") ~> Route.seal(routes(creds)) ~> check {
@@ -163,14 +169,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should reject list when skip is negative not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject list when skip is not an integer" in {
+  testname = "reject list when skip is not an integer"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val notAnInteger = "string"
           val response = Get(s"$collectionPath?skip=$notAnInteger") ~> Route.seal(routes(creds)) ~> check {
@@ -182,15 +189,16 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should reject list when skip is not an integer not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   // ?docs disabled
-  ignore should "list triggers by default namespace with full docs" in {
+  testname = "list triggers by default namespace with full docs"
+  ignore should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val triggers = (1 to 2).map { i =>
             WhiskTrigger(namespace, aname(), Parameters("x", "b"))
@@ -206,15 +214,16 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should list triggers by default namespace with full docs not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   //// GET /triggers/name
-  it should "get trigger by name in default/explicit namespace" in {
+  testname = "get trigger by name in default/explicit namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname(), Parameters("x", "b"))
           put(entityStore, trigger)
@@ -239,14 +248,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should get trigger by name in default/explicit namespace not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "get trigger with updated field" in {
+  testname = "get trigger with updated field"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname(), Parameters("x", "b"))
           put(entityStore, trigger)
@@ -262,14 +272,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should get trigger with updated field not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "report Conflict if the name was of a different type" in {
+  testname = "report Conflict if the name was of a different type"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val rule = WhiskRule(
             namespace,
@@ -283,15 +294,16 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should report Conflict if the name was of a different type not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   //// DEL /triggers/name
-  it should "delete trigger by name" in {
+  testname = "delete trigger by name"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname(), Parameters("x", "b"))
           put(entityStore, trigger)
@@ -303,14 +315,16 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > Triggers API should delete trigger by name not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   //// PUT /triggers/name
-  it should "put should accept request with missing optional properties" in {
+  testname = "put should accept request with missing optional properties"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname())
           val content = WhiskTriggerPut()
@@ -323,14 +337,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should put should accept request with missing optional properties not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "put should accept request with valid feed parameter" in {
+  testname = "put should accept request with valid feed parameter"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname(), annotations = Parameters(Parameters.Feed, "xyz"))
           val content = WhiskTriggerPut(annotations = Some(trigger.annotations))
@@ -343,14 +358,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should put should accept request with valid feed parameter not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "put should reject request with undefined feed parameter" in {
+  testname = "put should reject request with undefined feed parameter"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname(), annotations = Parameters(Parameters.Feed, ""))
           val content = WhiskTriggerPut(annotations = Some(trigger.annotations))
@@ -360,14 +376,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should put should reject request with undefined feed parameter not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "put should reject request with bad feed parameters" in {
+  testname = "put should reject request with bad feed parameters"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname(), annotations = Parameters(Parameters.Feed, "a,b"))
           val content = WhiskTriggerPut(annotations = Some(trigger.annotations))
@@ -377,14 +394,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should put should reject request with bad feed parameters not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject activation with entity which is too big" in {
+  testname = "reject activation with entity which is too big"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val code = "a" * (allowedActivationEntitySize.toInt + 1)
           val content = s"""{"a":"$code"}""".stripMargin
@@ -398,14 +416,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should reject activation with entity which is too big not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject create with parameters which are too big" in {
+  testname = "reject create with parameters which are too big"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val keys: List[Long] =
             List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
@@ -422,14 +441,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should reject create with parameters which are too big not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject create with annotations which are too big" in {
+  testname = "reject create with annotations which are too big"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val keys: List[Long] =
             List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
@@ -446,14 +466,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should reject create with annotations which are too big not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject update with parameters which are too big" in {
+  testname = "reject update with parameters which are too big"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname())
           val keys: List[Long] =
@@ -472,14 +493,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should reject update with parameters which are too big not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "put should accept update request with missing optional properties" in {
+  testname = "put should accept update request with missing optional properties"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname(), Parameters("x", "b"))
           val content = WhiskTriggerPut()
@@ -500,14 +522,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should put should accept update request with missing optional properties not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "put should reject update request for trigger with existing feed" in {
+  testname = "put should reject update request for trigger with existing feed"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname(), annotations = Parameters(Parameters.Feed, "xyz"))
           val content = WhiskTriggerPut(annotations = Some(trigger.annotations))
@@ -519,14 +542,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should put should reject update request for trigger with existing feed not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "put should reject update request for trigger with new feed" in {
+  testname = "put should reject update request for trigger with new feed"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname())
           val content = WhiskTriggerPut(annotations = Some(Parameters(Parameters.Feed, "xyz")))
@@ -538,15 +562,16 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should put should reject update request for trigger with new feed not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   //// POST /triggers/name
-  it should "fire a trigger" in {
+  testname = "fire a trigger"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val rule =
             WhiskRule(namespace, aname(), afullname(namespace, aname().name), afullname(namespace, "bogus action"))
@@ -577,13 +602,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > Triggers API should fire a trigger not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "fire a trigger without args" in {
+  testname = "fire a trigger without args"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val rule =
             WhiskRule(namespace, aname(), afullname(namespace, aname().name), afullname(namespace, "bogus action"))
@@ -607,13 +634,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > Triggers API should fire a trigger without args not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "not fire a trigger without a rule" in {
+  testname = "not fire a trigger without a rule"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname())
           put(entityStore, trigger)
@@ -623,15 +652,16 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should not fire a trigger without a rule not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   //// invalid resource
-  it should "reject invalid resource" in {
+  testname = "reject invalid resource"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = WhiskTrigger(namespace, aname())
           put(entityStore, trigger)
@@ -641,14 +671,16 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > Triggers API should reject invalid resource not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   // migration path
-  it should "be able to handle a trigger as of the old schema" in {
+  testname = "be able to handle a trigger as of the old schema"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val trigger = OldWhiskTrigger(namespace, aname())
           put(entityStore, trigger)
@@ -660,14 +692,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should be able to handle a trigger as of the old schema not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "report proper error when record is corrupted on delete" in {
+  testname = "report proper error when record is corrupted on delete"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val entity = BadEntity(namespace, aname())
           put(entityStore, entity)
@@ -679,14 +712,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > report proper error when record is corrupted on delete not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "report proper error when record is corrupted on get" in {
+  testname = "report proper error when record is corrupted on get"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val entity = BadEntity(namespace, aname())
           put(entityStore, entity)
@@ -698,14 +732,15 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should report proper error when record is corrupted on get not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "report proper error when record is corrupted on put" in {
+  testname = "report proper error when record is corrupted on put"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val entity = BadEntity(namespace, aname())
           put(entityStore, entity)
@@ -718,7 +753,6 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(
-          s"${this.getClass.getName} > Triggers API should report proper error when record is corrupted on put not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 }
