@@ -46,8 +46,12 @@ import scala.language.postfixOps
 @RunWith(classOf[JUnitRunner])
 class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
 
+  private val retriesOnTestFailures = 5
+  private val waitBeforeRetry = 1.second
+
   /** Packages API tests */
-  behavior of "Packages API"
+  var behaviorname = "Packages API"
+  behavior of s"$behaviorname"
 
   val creds = WhiskAuthHelpers.newIdentity()
   val namespace = EntityPath(creds.subject.asString)
@@ -72,10 +76,12 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
   }
 
   //// GET /packages
-  it should "list all packages/references" in {
+  var testname = "list all packages/references"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           // create packages and package bindings, and confirm API lists all of them
           val providers = (1 to 4).map { i =>
@@ -109,15 +115,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(s"${this.getClass.getName} > Packages API should list all packages/references not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "list all public packages in explicit namespace excluding bindings" in {
+  testname = "list all public packages in explicit namespace excluding bindings"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           // create packages and package bindings, set some public and confirm API lists only public packages
           val namespaces = Seq(namespace, EntityPath(aname().toString), EntityPath(aname().toString))
@@ -161,16 +169,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should list all public packages in explicit namespace excluding bindings not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject list when limit is greater than maximum allowed value" in {
+  testname = "reject list when limit is greater than maximum allowed value"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val exceededMaxLimit = Collection.MAX_LIST_LIMIT + 1
           val response = Get(s"$collectionPath?limit=$exceededMaxLimit") ~> Route.seal(routes(creds)) ~> check {
@@ -180,13 +189,13 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject list when limit is greater than maximum allowed value not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject list when limit is not an integer" in {
+  testname = "reject list when limit is not an integer"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
@@ -199,16 +208,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject list when limit is not an integer not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject list when skip is negative" in {
+  testname = "reject list when skip is negative"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val negativeSkip = -1
           val response = Get(s"$collectionPath?skip=$negativeSkip") ~> Route.seal(routes(creds)) ~> check {
@@ -218,16 +228,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject list when skip is negative not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject list when skip is not an integer" in {
+  testname = "reject list when skip is not an integer"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val notAnInteger = "string"
           val response = Get(s"$collectionPath?skip=$notAnInteger") ~> Route.seal(routes(creds)) ~> check {
@@ -237,16 +248,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject list when skip is not an integer not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  ignore should "list all public packages excluding bindings" in {
+  testname = "list all public packages excluding bindings"
+  ignore should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           // create packages and package bindings, set some public and confirm API lists only public packages
           val namespaces = Seq(namespace, EntityPath(aname().toString), EntityPath(aname().toString))
@@ -273,14 +285,14 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             } should be(true)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should list all public packages excluding bindings not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   // ?public disabled
-  ignore should "list all public packages including ones with same name but in different namespaces" in {
+  testname = "list all public packages including ones with same name but in different namespaces"
+  ignore should s"$testname" in {
     implicit val tid = transid()
     // create packages and package bindings, set some public and confirm API lists only public packages
     val namespaces = Seq(namespace, EntityPath(aname().toString), EntityPath(aname().toString))
@@ -305,10 +317,12 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
   }
 
   // confirm ?public disabled
-  it should "ignore ?public on list all packages" in {
+  testname = "ignore ?public on list all packages"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           Get(s"$collectionPath?public=true") ~> Route.seal(routes(creds)) ~> check {
             implicit val tid = transid()
@@ -335,10 +349,9 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should ignore ?public on list all packages not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   // ?public disabled
@@ -350,10 +363,12 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
   }
 
   //// GET /packages/name
-  it should "get package" in {
+  testname = "get package"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname(), None)
           put(entityStore, provider)
@@ -363,15 +378,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             response should be(provider withActions ())
           }
         },
-        10,
-        Some(1.second),
-        Some(s"${this.getClass.getName} > Packages API should get package not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "get package with updated field" in {
+  testname = "get package with updated field"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname(), None)
           put(entityStore, provider)
@@ -385,16 +402,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             response should be(provider copy (updated = pkg.updated) withActions ())
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should get package with updated field not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "get package reference for private package in same namespace" in {
+  testname = "get package reference for private package in same namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname(), None, Parameters("a", "A") ++ Parameters("b", "B"))
           val reference = WhiskPackage(namespace, aname(), provider.bind, Parameters("b", "b") ++ Parameters("c", "C"))
@@ -408,16 +426,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             response.wp.parameters should be(Parameters("a", "A") ++ Parameters("b", "b") ++ Parameters("c", "C"))
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should get package reference for private package in same namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "not get package reference for a private package in other namespace" in {
+  testname = "not get package reference for a private package in other namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val privateCreds = WhiskAuthHelpers.newIdentity()
           val privateNamespace = EntityPath(privateCreds.subject.asString)
@@ -430,16 +449,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             status should be(Forbidden)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should not get package reference for a private package in other namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "get package with its actions and feeds" in {
+  testname = "get package with its actions and feeds"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val action = WhiskAction(provider.namespace.addPath(provider.name), aname(), jsDefault("??"))
@@ -464,16 +484,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             response should be(provider withActions (List(action, feed)))
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should get package with its actions and feeds not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "get package reference with its actions and feeds" in {
+  testname = "get package reference with its actions and feeds"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val reference = WhiskPackage(namespace, aname(), provider.bind)
@@ -503,16 +524,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             response should be(reference withActions List(action, feed))
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should get package reference with its actions and feeds not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "not get package reference with its actions and feeds from private package" in {
+  testname = "not get package reference with its actions and feeds from private package"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val privateCreds = WhiskAuthHelpers.newIdentity()
           val privateNamespace = EntityPath(privateCreds.subject.asString)
@@ -539,17 +561,18 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             status should be(Forbidden)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should not get package reference with its actions and feeds from private package not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   //// PUT /packages/name
-  it should "create package" in {
+  testname = "create package"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname(), None, annotations = Parameters("a", "b"))
           // binding annotation should be removed
@@ -562,15 +585,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             checkWhiskEntityResponse(response, provider)
           }
         },
-        10,
-        Some(1.second),
-        Some(s"${this.getClass.getName} > Packages API should create package not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject create/update package when package name is reserved" in {
+  testname = "reject create/update package when package name is reserved"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           Set(true, false) foreach { overwrite =>
             RESERVED_NAMES foreach { reservedName =>
@@ -584,16 +609,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject create/update package when package name is reserved not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "not allow package update of pre-existing package with a reserved" in {
+  testname = "not allow package update of pre-existing package with a reserved"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           RESERVED_NAMES foreach { reservedName =>
             val provider = WhiskPackage(namespace, EntityName(reservedName), None)
@@ -605,16 +631,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should not allow package update of pre-existing package with a reserved not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "allow package get/delete for pre-existing package with a reserved name" in {
+  testname = "allow package get/delete for pre-existing package with a reserved name"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           RESERVED_NAMES foreach {
             reservedName =>
@@ -630,16 +657,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
               }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should allow package get/delete for pre-existing package with a reserved name not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "create package reference with explicit namespace" in {
+  testname = "create package reference with explicit namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val reference = WhiskPackage(
@@ -666,16 +694,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             checkWhiskEntityResponse(response, reference)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should create package reference with explicit namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "not create package reference from private package in another namespace" in {
+  testname = "not create package reference from private package in another namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val privateCreds = WhiskAuthHelpers.newIdentity()
           val privateNamespace = EntityPath(privateCreds.subject.asString)
@@ -690,16 +719,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             status should be(Forbidden)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should not create package reference from private package in another namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "create package reference with implicit namespace" in {
+  testname = "create package reference with implicit namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val reference = WhiskPackage(namespace, aname(), Some(Binding(EntityPath.DEFAULT.root, provider.name)))
@@ -718,16 +748,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
                 annotations = bindingAnnotation(provider.bind.get)))
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should create package reference with implicit namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject create package reference when referencing non-existent package in same namespace" in {
+  testname = "reject create package reference when referencing non-existent package in same namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val binding = Some(Binding(namespace.root, aname()))
           val content = WhiskPackagePut(binding)
@@ -736,16 +767,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             responseAs[ErrorResponse].error should include(Messages.bindingDoesNotExist)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject create package reference when referencing non-existent package in same namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject create package reference when referencing non-existent package in another namespace" in {
+  testname = "reject create package reference when referencing non-existent package in another namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val privateCreds = WhiskAuthHelpers.newIdentity()
           val privateNamespace = EntityPath(privateCreds.subject.asString)
@@ -756,16 +788,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             status should be(Forbidden)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > reject create package reference when referencing non-existent package in another namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject create package reference when referencing a non-package" in {
+  testname = "reject create package reference when referencing a non-package"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val reference = WhiskPackage(namespace, aname(), provider.bind)
@@ -777,19 +810,22 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             responseAs[ErrorResponse].error should include(Messages.bindingCannotReferenceBinding)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject create package reference when referencing a non-package not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject create package reference when annotations are too big" in {
+  testname = "reject create package reference when annotations are too big"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val keys: List[Long] =
-            List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
+            List.range(
+              Math.pow(retriesOnTestFailures, 9) toLong,
+              (parametersLimit.toBytes / 20 + Math.pow(retriesOnTestFailures, 9) + 2) toLong)
           val annotations = keys map { key =>
             Parameters(key.toString, "a" * 10)
           } reduce (_ ++ _)
@@ -801,19 +837,22 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject create package reference when annotations are too bigreject create package reference when annotations are too big not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject create package reference when parameters are too big" in {
+  testname = "reject create package reference when parameters are too big"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val keys: List[Long] =
-            List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
+            List.range(
+              Math.pow(retriesOnTestFailures, 9) toLong,
+              (parametersLimit.toBytes / 20 + Math.pow(retriesOnTestFailures, 9) + 2) toLong)
           val parameters = keys map { key =>
             Parameters(key.toString, "a" * 10)
           } reduce (_ ++ _)
@@ -825,18 +864,22 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(s"${this.getClass.getName} > Packages API should list all packages/references not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject update package reference when parameters are too big" in {
+  testname = "reject update package reference when parameters are too big"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val keys: List[Long] =
-            List.range(Math.pow(10, 9) toLong, (parametersLimit.toBytes / 20 + Math.pow(10, 9) + 2) toLong)
+            List.range(
+              Math.pow(retriesOnTestFailures, 9) toLong,
+              (parametersLimit.toBytes / 20 + Math.pow(retriesOnTestFailures, 9) + 2) toLong)
           val parameters = keys map { key =>
             Parameters(key.toString, "a" * 10)
           } reduce (_ ++ _)
@@ -850,16 +893,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             }
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject update package reference when parameters are too big not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "update package" in {
+  testname = "update package"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val content = WhiskPackagePut(publish = Some(true))
@@ -880,15 +924,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
               WhiskPackage(namespace, provider.name, None, version = provider.version.upPatch, publish = true))
           }
         },
-        10,
-        Some(1.second),
-        Some(s"${this.getClass.getName} > Packages API should update package not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "update package reference" in {
+  testname = "update package reference"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val reference =
@@ -921,15 +967,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
                 annotations = reference.annotations ++ Parameters("a", "b")))
           }
         },
-        10,
-        Some(1.second),
-        Some(s"${this.getClass.getName} > Packages API should update package reference not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject update package with binding" in {
+  testname = "reject update package with binding"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val content = WhiskPackagePut(provider.bind)
@@ -939,16 +987,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             responseAs[ErrorResponse].error should include(Messages.packageCannotBecomeBinding)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject update package with binding not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject update package reference when new binding refers to non-existent package in same namespace" in {
+  testname = "reject update package reference when new binding refers to non-existent package in same namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val reference = WhiskPackage(namespace, aname(), provider.bind)
@@ -959,16 +1008,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             responseAs[ErrorResponse].error should include(Messages.bindingDoesNotExist)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject update package reference when new binding refers to non-existent package in same namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject update package reference when new binding refers to non-existent package in another namespace" in {
+  testname = "reject update package reference when new binding refers to non-existent package in another namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val privateCreds = WhiskAuthHelpers.newIdentity()
           val privateNamespace = EntityPath(privateCreds.subject.asString)
@@ -981,16 +1031,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             status should be(Forbidden)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject update package reference when new binding refers to non-existent package in another namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject update package reference when new binding refers to itself" in {
+  testname = "reject update package reference when new binding refers to itself"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           // create package and valid reference binding to it
           val provider = WhiskPackage(namespace, aname())
@@ -1011,16 +1062,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             response.binding should be(provider.bind)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject update package reference when new binding refers to itself not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject update package reference when new binding refers to private package in another namespace" in {
+  testname = "reject update package reference when new binding refers to private package in another namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val privateCreds = WhiskAuthHelpers.newIdentity()
           val privateNamespace = EntityPath(privateCreds.subject.asString)
@@ -1034,17 +1086,18 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             status should be(Forbidden)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject update package reference when new binding refers to private package in another namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   //// DEL /packages/name
-  it should "delete package" in {
+  testname = "delete package"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           put(entityStore, provider)
@@ -1061,15 +1114,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             response should be(provider)
           }
         },
-        10,
-        Some(1.second),
-        Some(s"${this.getClass.getName} > Packages API should delete package not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "delete package reference regardless of package existence" in {
+  testname = "delete package reference regardless of package existence"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val reference = WhiskPackage(namespace, aname(), provider.bind)
@@ -1087,16 +1142,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             response should be(reference)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should delete package reference regardless of package existence not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject delete non-empty package" in {
+  testname = "reject delete non-empty package"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           val action = WhiskAction(provider.namespace.addPath(provider.name), aname(), jsDefault("??"))
@@ -1117,17 +1173,18 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             response.code.id should not be empty
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should reject delete non-empty package not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   //// invalid resource
-  it should "reject invalid resource" in {
+  testname = "reject invalid resource"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val provider = WhiskPackage(namespace, aname())
           put(entityStore, provider)
@@ -1135,15 +1192,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             status should be(NotFound)
           }
         },
-        10,
-        Some(1.second),
-        Some(s"${this.getClass.getName} > Packages API should reject invalid resource not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "return empty list for invalid namespace" in {
+  testname = "return empty list for invalid namespace"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val path = s"/whisk.systsdf/${collection.path}"
           Get(path) ~> Route.seal(routes(creds)) ~> check {
@@ -1151,16 +1210,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             responseAs[List[JsObject]] should be(List.empty)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should return empty list for invalid namespace not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "reject bind to non-package" in {
+  testname = "reject bind to non-package"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val action = WhiskAction(namespace, aname(), jsDefault("??"))
           val reference = WhiskPackage(namespace, aname(), Some(Binding(action.namespace.root, action.name)))
@@ -1173,15 +1233,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             responseAs[ErrorResponse].error should include(Messages.requestedBindingIsNotValid)
           }
         },
-        10,
-        Some(1.second),
-        Some(s"${this.getClass.getName} > Packages API should reject bind to non-package not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "report proper error when record is corrupted on delete" in {
+  testname = "report proper error when record is corrupted on delete"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val entity = BadEntity(namespace, aname())
           put(entityStore, entity)
@@ -1191,16 +1253,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should report proper error when record is corrupted on delete not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "report proper error when record is corrupted on get" in {
+  testname = "report proper error when record is corrupted on get"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val entity = BadEntity(namespace, aname())
           put(entityStore, entity)
@@ -1209,16 +1272,17 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             status should be(InternalServerError)
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should report proper error when record is corrupted on get not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  it should "report proper error when record is corrupted on put" in {
+  testname = "report proper error when record is corrupted on put"
+  it should s"$testname" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val entity = BadEntity(namespace, aname())
           put(entityStore, entity)
@@ -1229,9 +1293,8 @@ class PackagesApiTests extends ControllerTestCommon with WhiskPackagesApi {
             responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"${this.getClass.getName} > Packages API should report proper error when record is corrupted on put not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 }
