@@ -74,8 +74,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
   private val waitBeforeRetry = 1.second
 
   //// GET /triggers
-  var testname = "list triggers by default/explicit namespace"
-  it should s"$testname" in {
+  it should "list triggers by default/explicit namespace" in {
+    val testname = "list triggers by default/explicit namespace"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -112,8 +112,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject list when limit is greater than maximum allowed value"
-  it should s"$testname" in {
+  it should "reject list when limit is greater than maximum allowed value" in {
+    val testname = "reject list when limit is greater than maximum allowed value"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -132,8 +132,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject list when limit is not an integer"
-  it should s"$testname" in {
+  it should "reject list when limit is not an integer" in {
+    val testname = "reject list when limit is not an integer"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -152,8 +152,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject list when skip is negative"
-  it should s"$testname" in {
+  it should "reject list when skip is negative" in {
+    val testname = "reject list when skip is negative"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -172,8 +172,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject list when skip is not an integer"
-  it should s"$testname" in {
+  it should "reject list when skip is not an integer" in {
+    val testname = "reject list when skip is not an integer"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -193,8 +193,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
   }
 
   // ?docs disabled
-  testname = "list triggers by default namespace with full docs"
-  ignore should s"$testname" in {
+  ignore should "list triggers by default namespace with full docs" in {
+    val testname = "list triggers by default namespace with full docs"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -218,8 +218,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
   }
 
   //// GET /triggers/name
-  testname = "get trigger by name in default/explicit namespace"
-  it should s"$testname" in {
+  it should "get trigger by name in default/explicit namespace" in {
+    val testname = "get trigger by name in default/explicit namespace"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -251,8 +251,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "get trigger with updated field"
-  it should s"$testname" in {
+  it should "get trigger with updated field" in {
+    val testname = "get trigger with updated field"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -275,8 +275,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "report Conflict if the name was of a different type"
-  it should s"$testname" in {
+  it should "report Conflict if the name was of a different type" in {
+    val testname = "report Conflict if the name was of a different type"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -298,8 +298,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
   }
 
   //// DEL /triggers/name
-  testname = "delete trigger by name"
-  it should s"$testname" in {
+  it should "delete trigger by name" in {
+    val testname = "delete trigger by name"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -319,8 +319,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
   }
 
   //// PUT /triggers/name
-  testname = "put should accept request with missing optional properties"
-  it should s"$testname" in {
+  it should "put should accept request with missing optional properties" in {
+    val testname = "put should accept request with missing optional properties"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -340,8 +340,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "put should accept request with valid feed parameter"
-  it should s"$testname" in {
+  it should "put should accept request with valid feed parameter" in {
+    val testname = "put should accept request with valid feed parameter"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -361,8 +361,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "put should reject request with undefined feed parameter"
-  it should s"$testname" in {
+  it should "put should reject request with undefined feed parameter" in {
+    val testname = "put should reject request with undefined feed parameter"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -379,8 +379,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "put should reject request with bad feed parameters"
-  it should s"$testname" in {
+  it should "put should reject request with bad feed parameters" in {
+    val testname = "put should reject request with bad feed parameters"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -397,8 +397,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject activation with entity which is too big"
-  it should s"$testname" in {
+  it should "reject activation with entity which is too big" in {
+    val testname = "reject activation with entity which is too big"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -419,8 +419,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject create with parameters which are too big"
-  it should s"$testname" in {
+  it should "reject create with parameters which are too big" in {
+    val testname = "reject create with parameters which are too big"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -444,8 +444,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject create with annotations which are too big"
-  it should s"$testname" in {
+  it should "reject create with annotations which are too big" in {
+    val testname = "reject create with annotations which are too big"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -469,8 +469,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject update with parameters which are too big"
-  it should s"$testname" in {
+  it should "reject update with parameters which are too big" in {
+    val testname = "reject update with parameters which are too big"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -496,8 +496,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "put should accept update request with missing optional properties"
-  it should s"$testname" in {
+  it should "put should accept update request with missing optional properties" in {
+    val testname = "put should accept update request with missing optional properties"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -525,8 +525,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "put should reject update request for trigger with existing feed"
-  it should s"$testname" in {
+  it should "put should reject update request for trigger with existing feed" in {
+    val testname = "put should reject update request for trigger with existing feed"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -545,8 +545,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "put should reject update request for trigger with new feed"
-  it should s"$testname" in {
+  it should "put should reject update request for trigger with new feed" in {
+    val testname = "put should reject update request for trigger with new feed"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -566,8 +566,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
   }
 
   //// POST /triggers/name
-  testname = "fire a trigger"
-  it should s"$testname" in {
+  it should "fire a trigger" in {
+    val testname = "fire a trigger"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -605,8 +605,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "fire a trigger without args"
-  it should s"$testname" in {
+  it should "fire a trigger without args" in {
+    val testname = "fire a trigger without args"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -637,8 +637,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "not fire a trigger without a rule"
-  it should s"$testname" in {
+  it should "not fire a trigger without a rule" in {
+    val testname = "not fire a trigger without a rule"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -656,8 +656,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
   }
 
   //// invalid resource
-  testname = "reject invalid resource"
-  it should s"$testname" in {
+  it should "reject invalid resource" in {
+    val testname = "reject invalid resource"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -675,8 +675,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
   }
 
   // migration path
-  testname = "be able to handle a trigger as of the old schema"
-  it should s"$testname" in {
+  it should "be able to handle a trigger as of the old schema" in {
+    val testname = "be able to handle a trigger as of the old schema"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -695,8 +695,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "report proper error when record is corrupted on delete"
-  it should s"$testname" in {
+  it should "report proper error when record is corrupted on delete" in {
+    val testname = "report proper error when record is corrupted on delete"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -715,8 +715,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "report proper error when record is corrupted on get"
-  it should s"$testname" in {
+  it should "report proper error when record is corrupted on get" in {
+    val testname = "report proper error when record is corrupted on get"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -735,8 +735,8 @@ class TriggersApiTests extends ControllerTestCommon with WhiskTriggersApi {
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "report proper error when record is corrupted on put"
-  it should s"$testname" in {
+  it should "report proper error when record is corrupted on put" in {
+    val testname = "report proper error when record is corrupted on put"
     org.apache.openwhisk.utils
       .retry(
         {

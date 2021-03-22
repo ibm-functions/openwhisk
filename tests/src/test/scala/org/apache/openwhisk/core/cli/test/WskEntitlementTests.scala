@@ -129,61 +129,63 @@ abstract class WskEntitlementTests()
   private val retriesOnTestFailures = 5
   private val waitBeforeRetry = 1.second
 
-  var behaviorname = "Wsk Package Entitlement"
-  behavior of s"$behaviorname"
+  behavior of "Wsk Package Entitlement"
 
-  var testname = "not allow unauthorized subject to operate on private action"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val privateAction = "privateAction"
+  it should "not allow unauthorized subject to operate on private action" in withAssetCleaner(guestWskProps) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk Package Entitlement"
+      val testname = "not allow unauthorized subject to operate on private action"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val privateAction = "privateAction"
 
-          assetHelper.withCleaner(wsk.action, privateAction) { (action, name) =>
-            action.create(name, Some(TestUtils.getTestActionFilename("hello.js")))(wp)
-          }
+            assetHelper.withCleaner(wsk.action, privateAction) { (action, name) =>
+              action.create(name, Some(TestUtils.getTestActionFilename("hello.js")))(wp)
+            }
 
-          val fullyQualifiedActionName = s"/$guestNamespace/$privateAction"
-          wsk.action
-            .get(fullyQualifiedActionName, expectedExitCode = forbiddenCode)(defaultWskProps)
-            .stderr should include("not authorized")
+            val fullyQualifiedActionName = s"/$guestNamespace/$privateAction"
+            wsk.action
+              .get(fullyQualifiedActionName, expectedExitCode = forbiddenCode)(defaultWskProps)
+              .stderr should include("not authorized")
 
-          withAssetCleaner(defaultWskProps) {
-            (wp, assetHelper) =>
-              assetHelper.withCleaner(wsk.action, fullyQualifiedActionName, confirmDelete = false) { (action, name) =>
-                val rr = action.create(name, None, update = true, expectedExitCode = forbiddenCode)(wp)
-                rr.stderr should include("not authorized")
-                rr
-              }
+            withAssetCleaner(defaultWskProps) {
+              (wp, assetHelper) =>
+                assetHelper.withCleaner(wsk.action, fullyQualifiedActionName, confirmDelete = false) { (action, name) =>
+                  val rr = action.create(name, None, update = true, expectedExitCode = forbiddenCode)(wp)
+                  rr.stderr should include("not authorized")
+                  rr
+                }
 
-              assetHelper.withCleaner(wsk.action, "unauthorized sequence", confirmDelete = false) { (action, name) =>
-                val rr = action.create(
-                  name,
-                  Some(fullyQualifiedActionName),
-                  kind = Some("sequence"),
-                  update = true,
-                  expectedExitCode = forbiddenCode)(wp)
-                rr.stderr should include("not authorized")
-                rr
-              }
-          }
+                assetHelper.withCleaner(wsk.action, "unauthorized sequence", confirmDelete = false) { (action, name) =>
+                  val rr = action.create(
+                    name,
+                    Some(fullyQualifiedActionName),
+                    kind = Some("sequence"),
+                    update = true,
+                    expectedExitCode = forbiddenCode)(wp)
+                  rr.stderr should include("not authorized")
+                  rr
+                }
+            }
 
-          wsk.action
-            .delete(fullyQualifiedActionName, expectedExitCode = forbiddenCode)(defaultWskProps)
-            .stderr should include("not authorized")
+            wsk.action
+              .delete(fullyQualifiedActionName, expectedExitCode = forbiddenCode)(defaultWskProps)
+              .stderr should include("not authorized")
 
-          wsk.action
-            .invoke(fullyQualifiedActionName, expectedExitCode = forbiddenCode)(defaultWskProps)
-            .stderr should include("not authorized")
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            wsk.action
+              .invoke(fullyQualifiedActionName, expectedExitCode = forbiddenCode)(defaultWskProps)
+              .stderr should include("not authorized")
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject deleting action in shared package not owned by authkey"
-  it should s"$testname" in withAssetCleaner(guestWskProps) {
+  it should "reject deleting action in shared package not owned by authkey" in withAssetCleaner(guestWskProps) {
+    val behaviorname = "Wsk Package Entitlement"
+    val testname = "reject deleting action in shared package not owned by authkey"
     val samplePackage = "samplePackage-" + System.currentTimeMillis()
     val sampleAction = "sampleAction"
     val fullSampleActionName = s"$samplePackage/$sampleAction"
@@ -211,8 +213,9 @@ abstract class WskEntitlementTests()
           Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject create action in shared package not owned by authkey"
-  it should s"$testname" in withAssetCleaner(guestWskProps) {
+  it should "reject create action in shared package not owned by authkey" in withAssetCleaner(guestWskProps) {
+    val behaviorname = "Wsk Package Entitlement"
+    val testname = "reject create action in shared package not owned by authkey"
     val samplePackage = "samplePackage-" + System.currentTimeMillis()
     (wp, assetHelper) =>
       org.apache.openwhisk.utils
@@ -237,8 +240,9 @@ abstract class WskEntitlementTests()
           Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "reject update action in shared package not owned by authkey"
   it should "reject update action in shared package not owned by authkey" in withAssetCleaner(guestWskProps) {
+    val behaviorname = "Wsk Package Entitlement"
+    val testname = "reject update action in shared package not owned by authkey"
     val samplePackage = "samplePackage-" + System.currentTimeMillis()
     val sampleAction = "sampleAction"
     val fullSampleActionName = s"$samplePackage/$sampleAction"
@@ -266,11 +270,11 @@ abstract class WskEntitlementTests()
           Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk Package Listing"
-  behavior of s"$behaviorname"
+  behavior of "Wsk Package Listing"
 
-  testname = "list shared packages"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+  it should "list shared packages" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+    val behaviorname = "Wsk Package Listing"
+    val testname = "list shared packages"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -290,8 +294,9 @@ abstract class WskEntitlementTests()
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "list shared packages when package is turned into public"
-  it should s"$testname" in withAssetCleaner(guestWskProps) {
+  it should "list shared packages when package is turned into public" in withAssetCleaner(guestWskProps) {
+    val behaviorname = "Wsk Package Listing"
+    val testname = "list shared packages when package is turned into public"
     val samplePackage = "samplePackage-" + System.currentTimeMillis()
     (wp, assetHelper) =>
       org.apache.openwhisk.utils
@@ -320,8 +325,9 @@ abstract class WskEntitlementTests()
   }
 
   //TODO: convert to API-level test under whisk.core.controller once issues/3959 is resolved
-  testname = "reject getting package from invalid namespace"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+  it should "reject getting package from invalid namespace" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+    val behaviorname = "Wsk Package Listing"
+    val testname = "reject getting package from invalid namespace"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -336,19 +342,21 @@ abstract class WskEntitlementTests()
   }
 
   //TODO: convert to API-level test under whisk.core.controller once issues/3959 is resolved
-  testname = "reject getting invalid package from valid namespace"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val invalidPackage = "utilssss"
-          wsk.pkg.get(s"/whisk.system/${invalidPackage}", expectedExitCode = forbiddenCode)(wp).stderr should include(
-            "not authorized")
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+  it should "reject getting invalid package from valid namespace" in withAssetCleaner(guestWskProps) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk Package Listing"
+      val testname = "reject getting invalid package from valid namespace"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val invalidPackage = "utilssss"
+            wsk.pkg.get(s"/whisk.system/${invalidPackage}", expectedExitCode = forbiddenCode)(wp).stderr should include(
+              "not authorized")
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   def verifyPackageSharedList(packageList: RunResult, namespace: String, packageName: String): Unit = {
@@ -358,6 +366,8 @@ abstract class WskEntitlementTests()
   }
 
   it should "not list private packages" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+    val behaviorname = "Wsk Package Listing"
+    val testname = "not list private packages"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -384,6 +394,8 @@ abstract class WskEntitlementTests()
   }
 
   it should "list shared package actions" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+    val behaviorname = "Wsk Package Listing"
+    val testname = "list shared package actions"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -417,11 +429,11 @@ abstract class WskEntitlementTests()
     result should include(s"/$namespace/$packageName/$actionName")
   }
 
-  behaviorname = "Wsk Package Binding"
-  behavior of s"$behaviorname"
+  behavior of "Wsk Package Binding"
 
-  testname = "create a package binding"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+  it should "create a package binding" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+    val behaviorname = "Wsk Package Binding"
+    val testname = "create a package binding"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -454,8 +466,9 @@ abstract class WskEntitlementTests()
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "not create a package binding for private package"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+  it should "not create a package binding for private package" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+    val behaviorname = "Wsk Package Binding"
+    val testname = "not create a package binding for private package"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -478,11 +491,11 @@ abstract class WskEntitlementTests()
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk Package Action"
-  behavior of s"$behaviorname"
+  behavior of "Wsk Package Action"
 
-  testname = "get and invoke an action from package"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+  it should "get and invoke an action from package" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+    val behaviorname = "Wsk Package Action"
+    val testname = "get and invoke an action from package"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -524,8 +537,9 @@ abstract class WskEntitlementTests()
     stdout should include(""""value": "A"""")
   }
 
-  testname = "invoke an action sequence from package"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+  it should "invoke an action sequence from package" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
+    val behaviorname = "Wsk Package Action"
+    val testname = "invoke an action sequence from package"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -561,8 +575,11 @@ abstract class WskEntitlementTests()
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "not allow invoke an action sequence with more than one component from package after entitlement change"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (guestwp, assetHelper) =>
+  it should "not allow invoke an action sequence with more than one component from package after entitlement change" in withAssetCleaner(
+    guestWskProps) { (guestwp, assetHelper) =>
+    val behaviorname = "Wsk Package Action"
+    val testname =
+      "not allow invoke an action sequence with more than one component from package after entitlement change"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -605,8 +622,10 @@ abstract class WskEntitlementTests()
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke a packaged action not owned by the subject to get the subject's namespace"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (_, assetHelper) =>
+  it should "invoke a packaged action not owned by the subject to get the subject's namespace" in withAssetCleaner(
+    guestWskProps) { (_, assetHelper) =>
+    val behaviorname = "Wsk Package Action"
+    val testname = "invoke a packaged action not owned by the subject to get the subject's namespace"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -639,39 +658,39 @@ abstract class WskEntitlementTests()
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk Trigger Feed"
-  behavior of s"$behaviorname"
+  behavior of "Wsk Trigger Feed"
 
-  testname = "not create a trigger with timeout error when feed fails to initialize"
-  it should s"$testname" in withAssetCleaner(guestWskProps) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val samplePackage = "samplePackage-" + System.currentTimeMillis()
-          assetHelper.withCleaner(wsk.pkg, samplePackage) { (pkg, _) =>
-            pkg.create(samplePackage, shared = Some(true))(wp)
-          }
-
-          val sampleFeed = s"$samplePackage/sampleFeed"
-          assetHelper.withCleaner(wsk.action, sampleFeed) {
-            val file = Some(TestUtils.getTestActionFilename("empty.js"))
-            (action, _) =>
-              action.create(sampleFeed, file, kind = Some("nodejs:default"))(wp)
-          }
-
-          val fullyQualifiedFeedName = s"/$guestNamespace/$sampleFeed"
-          withAssetCleaner(defaultWskProps) { (wp, assetHelper) =>
-            assetHelper.withCleaner(wsk.trigger, "badfeed", confirmDelete = false) { (trigger, name) =>
-              trigger.create(name, feed = Some(fullyQualifiedFeedName), expectedExitCode = timeoutCode)(wp)
+  it should "not create a trigger with timeout error when feed fails to initialize" in withAssetCleaner(guestWskProps) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk Trigger Feed"
+      val testname = "not create a trigger with timeout error when feed fails to initialize"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val samplePackage = "samplePackage-" + System.currentTimeMillis()
+            assetHelper.withCleaner(wsk.pkg, samplePackage) { (pkg, _) =>
+              pkg.create(samplePackage, shared = Some(true))(wp)
             }
-            // with several active controllers race condition with cache invalidation might occur, thus retry
-            retry(wsk.trigger.get("badfeed", expectedExitCode = notFoundCode)(wp))
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
-  }
 
+            val sampleFeed = s"$samplePackage/sampleFeed"
+            assetHelper.withCleaner(wsk.action, sampleFeed) {
+              val file = Some(TestUtils.getTestActionFilename("empty.js"))
+              (action, _) =>
+                action.create(sampleFeed, file, kind = Some("nodejs:default"))(wp)
+            }
+
+            val fullyQualifiedFeedName = s"/$guestNamespace/$sampleFeed"
+            withAssetCleaner(defaultWskProps) { (wp, assetHelper) =>
+              assetHelper.withCleaner(wsk.trigger, "badfeed", confirmDelete = false) { (trigger, name) =>
+                trigger.create(name, feed = Some(fullyQualifiedFeedName), expectedExitCode = timeoutCode)(wp)
+              }
+              // with several active controllers race condition with cache invalidation might occur, thus retry
+              retry(wsk.trigger.get("badfeed", expectedExitCode = notFoundCode)(wp))
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+  }
 }

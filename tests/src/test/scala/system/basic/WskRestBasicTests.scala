@@ -54,11 +54,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
   private val retriesOnTestFailures = 5
   private val waitBeforeRetry = 1.second
 
-  var behaviorname = "Wsk REST"
-  behavior of s"$behaviorname"
+  val behaviorwsk = "Wsk REST"
+  behavior of s"$behaviorwsk"
 
-  var testname = "reject creating duplicate entity"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "reject creating duplicate entity" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "reject creating duplicate entity"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -73,11 +73,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsk should $testname not successful, retrying.."))
   }
 
-  testname = "reject deleting entity in wrong collection"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "reject deleting entity in wrong collection" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "reject deleting entity in wrong collection"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -90,11 +90,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsk should $testname not successful, retrying.."))
   }
 
-  testname = "reject unauthenticated access"
-  it should s"$testname" in {
+  it should "reject unauthenticated access" in {
+    val testname = "reject unauthenticated access"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -104,14 +104,14 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsk should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk Package REST"
-  behavior of s"$behaviorname"
+  val behaviorwskpkg = "Wsk Package REST"
+  behavior of s"$behaviorwskpkg"
 
-  testname = "create, update, get and list a package"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create, update, get and list a package" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create, update, get and list a package"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -138,11 +138,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskpkg should $testname not successful, retrying.."))
   }
 
-  testname = "create, and get a package summary"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create, and get a package summary" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create, and get a package summary"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -240,11 +240,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskpkg should $testname not successful, retrying.."))
   }
 
-  testname = "create a package with a name that contains spaces"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create a package with a name that contains spaces" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create a package with a name that contains spaces"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -260,11 +260,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskpkg should $testname not successful, retrying.."))
   }
 
-  testname = "create a package, and get its individual fields"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "create a package, and get its individual fields" in withAssetCleaner(wskprops) {
+    val testname = "create a package, and get its individual fields"
     val name = "packageFields"
     val paramInput = Map("payload" -> "test".toJson)
 
@@ -290,11 +290,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskpkg should $testname not successful, retrying.."))
   }
 
-  testname = "reject creation of duplication packages"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "reject creation of duplication packages" in withAssetCleaner(wskprops) {
+    val testname = "reject creation of duplication packages"
     val name = "dupePackage"
 
     (wp, assetHelper) =>
@@ -311,11 +311,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskpkg should $testname not successful, retrying.."))
   }
 
-  testname = "reject delete of package that does not exist"
-  it should s"$testname" in {
+  it should "reject delete of package that does not exist" in {
+    val testname = "reject delete of package that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -325,11 +325,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskpkg should $testname not successful, retrying.."))
   }
 
-  testname = "reject get of package that does not exist"
-  it should s"$testname" in {
+  it should "reject get of package that does not exist" in {
+    val testname = "reject get of package that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -340,14 +340,14 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskpkg should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk Action REST"
-  behavior of s"$behaviorname"
+  val behaviorwskaction = "Wsk Action REST"
+  behavior of s"$behaviorwskaction"
 
-  testname = "create the same action twice with different cases"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create the same action twice with different cases" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create the same action twice with different cases"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -361,11 +361,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create, update, get and list an action"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create, update, get and list an action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create, update, get and list an action"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -393,11 +393,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "reject create of an action that already exists"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "reject create of an action that already exists" in withAssetCleaner(wskprops) {
+    val testname = "reject create of an action that already exists"
     val name = "dupeAction"
     val file = Some(TestUtils.getTestActionFilename("echo.js"))
 
@@ -415,11 +415,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "reject delete of action that does not exist"
-  it should s"$testname" in {
+  it should "reject delete of action that does not exist" in {
+    val testname = "reject delete of action that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -429,11 +429,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "reject invocation of action that does not exist"
-  it should s"$testname" in {
+  it should "reject invocation of action that does not exist" in {
+    val testname = "reject invocation of action that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -443,11 +443,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "reject get of an action that does not exist"
-  it should s"$testname" in {
+  it should "reject get of an action that does not exist" in {
+    val testname = "reject get of an action that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -457,11 +457,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create, and invoke an action that utilizes a docker container"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "create, and invoke an action that utilizes a docker container" in withAssetCleaner(wskprops) {
+    val testname = "create, and invoke an action that utilizes a docker container"
     val name = "dockerContainer"
     (wp, assetHelper) =>
       org.apache.openwhisk.utils
@@ -483,11 +483,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create, and invoke an action that utilizes dockerskeleton with native zip"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "create, and invoke an action that utilizes dockerskeleton with native zip" in withAssetCleaner(wskprops) {
+    val testname = "create, and invoke an action that utilizes dockerskeleton with native zip"
     val name = "dockerContainerWithZip"
     (wp, assetHelper) =>
       org.apache.openwhisk.utils
@@ -511,11 +511,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create, and invoke an action using a parameter file"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "create, and invoke an action using a parameter file" in withAssetCleaner(wskprops) {
+    val testname = "create, and invoke an action using a parameter file"
     val name = "paramFileAction"
     val file = Some(TestUtils.getTestActionFilename("argCheck.js"))
     val argInput = Some(TestUtils.getTestActionFilename("validInput2.json"))
@@ -537,11 +537,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create an action, and get its individual fields"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "create an action, and get its individual fields" in withAssetCleaner(wskprops) {
+    val testname = "create an action, and get its individual fields"
     val runtime = "nodejs:default"
     val name = "actionFields"
     val paramInput = Map("payload" -> "test".toJson)
@@ -599,7 +599,7 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
   /**
@@ -608,31 +608,33 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
    * surely when it runs there should be some indication in the logs. Don't
    * think this is true currently.
    */
-  testname = "create and invoke action with malformed js resulting in activation error"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "MALFORMED"
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, Some(TestUtils.getTestActionFilename("malformed.js")))
-          }
+  it should "create and invoke action with malformed js resulting in activation error" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val testname = "create and invoke action with malformed js resulting in activation error"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "MALFORMED"
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, Some(TestUtils.getTestActionFilename("malformed.js")))
+            }
 
-          val run = wsk.action.invoke(name, Map("payload" -> "whatever".toJson))
-          withActivation(wsk.activation, run) { activation =>
-            activation.response.status shouldBe "action developer error"
-            // representing nodejs giving an error when given malformed.js
-            activation.response.result.get.toString should include("ReferenceError")
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            val run = wsk.action.invoke(name, Map("payload" -> "whatever".toJson))
+            withActivation(wsk.activation, run) { activation =>
+              activation.response.status shouldBe "action developer error"
+              // representing nodejs giving an error when given malformed.js
+              activation.response.result.get.toString should include("ReferenceError")
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create and invoke a blocking action resulting in an application error response"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create and invoke a blocking action resulting in an application error response" in withAssetCleaner(
+    wskprops) { (wp, assetHelper) =>
+    val testname = "create and invoke a blocking action resulting in an application error response"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -665,32 +667,33 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create and invoke a blocking action resulting in an failed promise"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "errorResponseObject"
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, Some(TestUtils.getTestActionFilename("asyncError.js")))
-          }
+  it should "create and invoke a blocking action resulting in an failed promise" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val testname = "create and invoke a blocking action resulting in an failed promise"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "errorResponseObject"
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, Some(TestUtils.getTestActionFilename("asyncError.js")))
+            }
 
-          val result = wsk.action.invoke(name, blocking = true, expectedExitCode = BadGateway.intValue)
-          val response = result.getFieldJsObject("response")
-          val res = RestResult.getFieldJsObject(response, "result")
-          res shouldBe JsObject("error" -> JsObject("msg" -> "failed activation on purpose".toJson))
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            val result = wsk.action.invoke(name, blocking = true, expectedExitCode = BadGateway.intValue)
+            val response = result.getFieldJsObject("response")
+            val res = RestResult.getFieldJsObject(response, "result")
+            res shouldBe JsObject("error" -> JsObject("msg" -> "failed activation on purpose".toJson))
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "invoke a blocking action and get only the result"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "invoke a blocking action and get only the result" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "invoke a blocking action and get only the result"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -706,11 +709,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create, and get an action summary"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create, and get an action summary" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create, and get an action summary"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -785,11 +788,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create an action with a name that contains spaces"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create an action with a name that contains spaces" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create an action with a name that contains spaces"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -804,31 +807,33 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create an action, and invoke an action that returns an empty JSON object"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "emptyJSONAction"
+  it should "create an action, and invoke an action that returns an empty JSON object" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val testname = "create an action, and invoke an action that returns an empty JSON object"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "emptyJSONAction"
 
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, Some(TestUtils.getTestActionFilename("emptyJSONResult.js")))
-          }
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, Some(TestUtils.getTestActionFilename("emptyJSONResult.js")))
+            }
 
-          val result = wsk.action.invoke(name, blocking = true, result = true)
-          result.stdout.parseJson.asJsObject shouldBe JsObject.empty
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            val result = wsk.action.invoke(name, blocking = true, result = true)
+            result.stdout.parseJson.asJsObject shouldBe JsObject.empty
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create, and invoke an action that times out to ensure the proper response is received"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create, and invoke an action that times out to ensure the proper response is received" in withAssetCleaner(
+    wskprops) { (wp, assetHelper) =>
+    val testname = "create, and invoke an action that times out to ensure the proper response is received"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -848,11 +853,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  testname = "create, and get docker action get ensure exec code is omitted"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "create, and get docker action get ensure exec code is omitted" in withAssetCleaner(wskprops) {
+    val testname = "create, and get docker action get ensure exec code is omitted"
     val name = "dockerContainer"
     (wp, assetHelper) =>
       org.apache.openwhisk.utils
@@ -867,14 +872,14 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskaction should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk Trigger REST"
-  behavior of s"$behaviorname"
+  val behaviorwsktrg = "Wsk Trigger REST"
+  behavior of s"$behaviorwsktrg"
 
-  testname = "create, update, get, fire and list trigger"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create, update, get, fire and list trigger" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create, update, get, fire and list trigger"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -950,11 +955,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "create, and get a trigger summary"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create, and get a trigger summary" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create, and get a trigger summary"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -986,11 +991,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "create a trigger with a name that contains spaces"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create a trigger with a name that contains spaces" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create a trigger with a name that contains spaces"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1006,11 +1011,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "create, and fire a trigger using a parameter file"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "create, and fire a trigger using a parameter file" in withAssetCleaner(wskprops) {
+    val testname = "create, and fire a trigger using a parameter file"
     val ruleName = withTimestamp("r1toa1")
     val triggerName = withTimestamp("paramFileTrigger")
     val actionName = withTimestamp("a1")
@@ -1041,11 +1046,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "create a trigger, and get its individual fields"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "create a trigger, and get its individual fields" in withAssetCleaner(wskprops) {
+    val testname = "create a trigger, and get its individual fields"
     val name = "triggerFields"
     val paramInput = Map("payload" -> "test".toJson)
 
@@ -1075,11 +1080,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "create, and fire a trigger to ensure result is empty"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create, and fire a trigger to ensure result is empty" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create, and fire a trigger to ensure result is empty"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1107,11 +1112,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "reject creation of duplicate triggers"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "reject creation of duplicate triggers" in withAssetCleaner(wskprops) {
+    val testname = "reject creation of duplicate triggers"
     val name = "dupeTrigger"
 
     (wp, assetHelper) =>
@@ -1128,11 +1133,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "reject delete of trigger that does not exist"
-  it should s"$testname" in {
+  it should "reject delete of trigger that does not exist" in {
+    val testname = "reject delete of trigger that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1142,11 +1147,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "reject get of trigger that does not exist"
-  it should s"$testname" in {
+  it should "reject get of trigger that does not exist" in {
+    val testname = "reject get of trigger that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1156,11 +1161,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "reject firing of a trigger that does not exist"
-  it should s"$testname" in {
+  it should "reject firing of a trigger that does not exist" in {
+    val testname = "reject firing of a trigger that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1170,152 +1175,154 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "create and fire a trigger with a rule whose action has been deleted"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val ruleName1 = withTimestamp("r1toa1")
-          val ruleName2 = withTimestamp("r2toa2")
-          val triggerName = withTimestamp("t1tor1r2")
-          val actionName1 = withTimestamp("a1")
-          val actionName2 = withTimestamp("a2")
-          val ns = wsk.namespace.whois()
+  it should "create and fire a trigger with a rule whose action has been deleted" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val testname = "create and fire a trigger with a rule whose action has been deleted"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val ruleName1 = withTimestamp("r1toa1")
+            val ruleName2 = withTimestamp("r2toa2")
+            val triggerName = withTimestamp("t1tor1r2")
+            val actionName1 = withTimestamp("a1")
+            val actionName2 = withTimestamp("a2")
+            val ns = wsk.namespace.whois()
 
-          assetHelper.withCleaner(wsk.trigger, triggerName) { (trigger, _) =>
-            trigger.create(triggerName)
-            trigger.create(triggerName, update = true)
-          }
+            assetHelper.withCleaner(wsk.trigger, triggerName) { (trigger, _) =>
+              trigger.create(triggerName)
+              trigger.create(triggerName, update = true)
+            }
 
-          assetHelper.withCleaner(wsk.action, actionName1) { (action, name) =>
-            action.create(name, defaultAction)
-          }
-          wsk.action.create(actionName2, defaultAction) // Delete this after the rule is created
+            assetHelper.withCleaner(wsk.action, actionName1) { (action, name) =>
+              action.create(name, defaultAction)
+            }
+            wsk.action.create(actionName2, defaultAction) // Delete this after the rule is created
 
-          assetHelper.withCleaner(wsk.rule, ruleName1) { (rule, name) =>
-            rule.create(name, trigger = triggerName, action = actionName1)
-          }
-          assetHelper.withCleaner(wsk.rule, ruleName2) { (rule, name) =>
-            rule.create(name, trigger = triggerName, action = actionName2)
-          }
-          wsk.action.delete(actionName2)
+            assetHelper.withCleaner(wsk.rule, ruleName1) { (rule, name) =>
+              rule.create(name, trigger = triggerName, action = actionName1)
+            }
+            assetHelper.withCleaner(wsk.rule, ruleName2) { (rule, name) =>
+              rule.create(name, trigger = triggerName, action = actionName2)
+            }
+            wsk.action.delete(actionName2)
 
-          val run = wsk.trigger.fire(triggerName)
-          withActivation(wsk.activation, run) {
-            activation =>
-              activation.duration shouldBe 0L // shouldn't exist but CLI generates it
-              activation.end shouldBe Instant.EPOCH // shouldn't exist but CLI generates it
-              activation.logs shouldBe defined
-              activation.logs.get.size shouldBe 2
+            val run = wsk.trigger.fire(triggerName)
+            withActivation(wsk.activation, run) {
+              activation =>
+                activation.duration shouldBe 0L // shouldn't exist but CLI generates it
+                activation.end shouldBe Instant.EPOCH // shouldn't exist but CLI generates it
+                activation.logs shouldBe defined
+                activation.logs.get.size shouldBe 2
 
-              val logEntry1 = activation.logs.get(0).parseJson.asJsObject
-              val logEntry2 = activation.logs.get(1).parseJson.asJsObject
-              val logs = JsArray(logEntry1, logEntry2)
-              val ruleActivationId: String = if (logEntry1.getFields("activationId").size == 1) {
-                logEntry1.getFields("activationId")(0).convertTo[String]
-              } else {
-                logEntry2.getFields("activationId")(0).convertTo[String]
-              }
-              val expectedLogs = JsArray(
-                JsObject(
-                  "statusCode" -> JsNumber(0),
-                  "activationId" -> JsString(ruleActivationId),
-                  "success" -> JsTrue,
-                  "rule" -> JsString(ns + "/" + ruleName1),
-                  "action" -> JsString(ns + "/" + actionName1)),
-                JsObject(
-                  "statusCode" -> JsNumber(1),
-                  "success" -> JsFalse,
-                  "error" -> JsString("The requested resource does not exist."),
-                  "rule" -> JsString(ns + "/" + ruleName2),
-                  "action" -> JsString(ns + "/" + actionName2)))
-              logs shouldBe expectedLogs
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+                val logEntry1 = activation.logs.get(0).parseJson.asJsObject
+                val logEntry2 = activation.logs.get(1).parseJson.asJsObject
+                val logs = JsArray(logEntry1, logEntry2)
+                val ruleActivationId: String = if (logEntry1.getFields("activationId").size == 1) {
+                  logEntry1.getFields("activationId")(0).convertTo[String]
+                } else {
+                  logEntry2.getFields("activationId")(0).convertTo[String]
+                }
+                val expectedLogs = JsArray(
+                  JsObject(
+                    "statusCode" -> JsNumber(0),
+                    "activationId" -> JsString(ruleActivationId),
+                    "success" -> JsTrue,
+                    "rule" -> JsString(ns + "/" + ruleName1),
+                    "action" -> JsString(ns + "/" + actionName1)),
+                  JsObject(
+                    "statusCode" -> JsNumber(1),
+                    "success" -> JsFalse,
+                    "error" -> JsString("The requested resource does not exist."),
+                    "rule" -> JsString(ns + "/" + ruleName2),
+                    "action" -> JsString(ns + "/" + actionName2)))
+                logs shouldBe expectedLogs
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  testname = "create and fire a trigger having an active rule and an inactive rule"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val ruleName1 = withTimestamp("r1toa1")
-          val ruleName2 = withTimestamp("r2toa2")
-          val triggerName = withTimestamp("t1tor1r2")
-          val actionName1 = withTimestamp("a1")
-          val actionName2 = withTimestamp("a2")
-          val ns = wsk.namespace.whois()
+  it should "create and fire a trigger having an active rule and an inactive rule" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val testname = "create and fire a trigger having an active rule and an inactive rule"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val ruleName1 = withTimestamp("r1toa1")
+            val ruleName2 = withTimestamp("r2toa2")
+            val triggerName = withTimestamp("t1tor1r2")
+            val actionName1 = withTimestamp("a1")
+            val actionName2 = withTimestamp("a2")
+            val ns = wsk.namespace.whois()
 
-          assetHelper.withCleaner(wsk.trigger, triggerName) { (trigger, _) =>
-            trigger.create(triggerName)
-            trigger.create(triggerName, update = true)
-          }
+            assetHelper.withCleaner(wsk.trigger, triggerName) { (trigger, _) =>
+              trigger.create(triggerName)
+              trigger.create(triggerName, update = true)
+            }
 
-          assetHelper.withCleaner(wsk.action, actionName1) { (action, name) =>
-            action.create(name, defaultAction)
-          }
-          assetHelper.withCleaner(wsk.action, actionName2) { (action, name) =>
-            action.create(name, defaultAction)
-          }
+            assetHelper.withCleaner(wsk.action, actionName1) { (action, name) =>
+              action.create(name, defaultAction)
+            }
+            assetHelper.withCleaner(wsk.action, actionName2) { (action, name) =>
+              action.create(name, defaultAction)
+            }
 
-          assetHelper.withCleaner(wsk.rule, ruleName1) { (rule, name) =>
-            rule.create(name, trigger = triggerName, action = actionName1)
-          }
-          assetHelper.withCleaner(wsk.rule, ruleName2) { (rule, name) =>
-            rule.create(name, trigger = triggerName, action = actionName2)
-            rule.disable(ruleName2)
-          }
+            assetHelper.withCleaner(wsk.rule, ruleName1) { (rule, name) =>
+              rule.create(name, trigger = triggerName, action = actionName1)
+            }
+            assetHelper.withCleaner(wsk.rule, ruleName2) { (rule, name) =>
+              rule.create(name, trigger = triggerName, action = actionName2)
+              rule.disable(ruleName2)
+            }
 
-          val run = wsk.trigger.fire(triggerName)
-          withActivation(wsk.activation, run) {
-            activation =>
-              activation.duration shouldBe 0L // shouldn't exist but CLI generates it
-              activation.end shouldBe Instant.EPOCH // shouldn't exist but CLI generates it
-              activation.logs shouldBe defined
-              activation.logs.get.size shouldBe 2
+            val run = wsk.trigger.fire(triggerName)
+            withActivation(wsk.activation, run) {
+              activation =>
+                activation.duration shouldBe 0L // shouldn't exist but CLI generates it
+                activation.end shouldBe Instant.EPOCH // shouldn't exist but CLI generates it
+                activation.logs shouldBe defined
+                activation.logs.get.size shouldBe 2
 
-              val logEntry1 = activation.logs.get(0).parseJson.asJsObject
-              val logEntry2 = activation.logs.get(1).parseJson.asJsObject
-              val logs = JsArray(logEntry1, logEntry2)
-              val ruleActivationId: String = if (logEntry1.getFields("activationId").size == 1) {
-                logEntry1.getFields("activationId")(0).convertTo[String]
-              } else {
-                logEntry2.getFields("activationId")(0).convertTo[String]
-              }
-              val expectedLogs = JsArray(
-                JsObject(
-                  "statusCode" -> JsNumber(0),
-                  "activationId" -> JsString(ruleActivationId),
-                  "success" -> JsTrue,
-                  "rule" -> JsString(ns + "/" + ruleName1),
-                  "action" -> JsString(ns + "/" + actionName1)),
-                JsObject(
-                  "statusCode" -> JsNumber(1),
-                  "success" -> JsFalse,
-                  "error" -> JsString(Messages.triggerWithInactiveRule(s"$ns/$ruleName2", s"$ns/$actionName2")),
-                  "rule" -> JsString(ns + "/" + ruleName2),
-                  "action" -> JsString(ns + "/" + actionName2)))
-              logs shouldBe expectedLogs
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+                val logEntry1 = activation.logs.get(0).parseJson.asJsObject
+                val logEntry2 = activation.logs.get(1).parseJson.asJsObject
+                val logs = JsArray(logEntry1, logEntry2)
+                val ruleActivationId: String = if (logEntry1.getFields("activationId").size == 1) {
+                  logEntry1.getFields("activationId")(0).convertTo[String]
+                } else {
+                  logEntry2.getFields("activationId")(0).convertTo[String]
+                }
+                val expectedLogs = JsArray(
+                  JsObject(
+                    "statusCode" -> JsNumber(0),
+                    "activationId" -> JsString(ruleActivationId),
+                    "success" -> JsTrue,
+                    "rule" -> JsString(ns + "/" + ruleName1),
+                    "action" -> JsString(ns + "/" + actionName1)),
+                  JsObject(
+                    "statusCode" -> JsNumber(1),
+                    "success" -> JsFalse,
+                    "error" -> JsString(Messages.triggerWithInactiveRule(s"$ns/$ruleName2", s"$ns/$actionName2")),
+                    "rule" -> JsString(ns + "/" + ruleName2),
+                    "action" -> JsString(ns + "/" + actionName2)))
+                logs shouldBe expectedLogs
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorwsktrg should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk Rule REST"
-  behavior of s"$behaviorname"
+  val behaviorwskrule = "Wsk Rule REST"
+  behavior of s"$behaviorwskrule"
 
-  testname = "create rule, get rule, update rule and list rule"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create rule, get rule, update rule and list rule" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "create rule, get rule, update rule and list rule"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1353,71 +1360,73 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskrule should $testname not successful, retrying.."))
   }
 
-  testname = "create rule, get rule, ensure rule is enabled by default"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val ruleName = "enabledRule"
-          val triggerName = "enabledRuleTrigger"
-          val actionName = "enabledRuleAction"
+  it should "create rule, get rule, ensure rule is enabled by default" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val testname = "create rule, get rule, ensure rule is enabled by default"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val ruleName = "enabledRule"
+            val triggerName = "enabledRuleTrigger"
+            val actionName = "enabledRuleAction"
 
-          assetHelper.withCleaner(wsk.trigger, triggerName) { (trigger, name) =>
-            trigger.create(name)
-          }
-          assetHelper.withCleaner(wsk.action, actionName) { (action, name) =>
-            action.create(name, defaultAction)
-          }
-          assetHelper.withCleaner(wsk.rule, ruleName) { (rule, name) =>
-            rule.create(name, trigger = triggerName, action = actionName)
-          }
+            assetHelper.withCleaner(wsk.trigger, triggerName) { (trigger, name) =>
+              trigger.create(name)
+            }
+            assetHelper.withCleaner(wsk.action, actionName) { (action, name) =>
+              action.create(name, defaultAction)
+            }
+            assetHelper.withCleaner(wsk.rule, ruleName) { (rule, name) =>
+              rule.create(name, trigger = triggerName, action = actionName)
+            }
 
-          val rule = wsk.rule.get(ruleName)
-          rule.getField("status") shouldBe "active"
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            val rule = wsk.rule.get(ruleName)
+            rule.getField("status") shouldBe "active"
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorwskrule should $testname not successful, retrying.."))
   }
 
-  testname = "display a rule summary when --summary flag is used with 'wsk rule get"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val ruleName = "mySummaryRule"
-          val triggerName = "summaryRuleTrigger"
-          val actionName = "summaryRuleAction"
+  it should "display a rule summary when --summary flag is used with 'wsk rule get" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val testname = "display a rule summary when --summary flag is used with 'wsk rule get"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val ruleName = "mySummaryRule"
+            val triggerName = "summaryRuleTrigger"
+            val actionName = "summaryRuleAction"
 
-          assetHelper.withCleaner(wsk.trigger, triggerName) { (trigger, name) =>
-            trigger.create(name)
-          }
-          assetHelper.withCleaner(wsk.action, actionName) { (action, name) =>
-            action.create(name, defaultAction)
-          }
-          assetHelper.withCleaner(wsk.rule, ruleName, confirmDelete = false) { (rule, name) =>
-            rule.create(name, trigger = triggerName, action = actionName)
-          }
+            assetHelper.withCleaner(wsk.trigger, triggerName) { (trigger, name) =>
+              trigger.create(name)
+            }
+            assetHelper.withCleaner(wsk.action, actionName) { (action, name) =>
+              action.create(name, defaultAction)
+            }
+            assetHelper.withCleaner(wsk.rule, ruleName, confirmDelete = false) { (rule, name) =>
+              rule.create(name, trigger = triggerName, action = actionName)
+            }
 
-          // Summary namespace should match one of the allowable namespaces (typically 'guest')
-          val ns = wsk.namespace.whois()
-          val result = wsk.rule.get(ruleName)
-          result.getField("name") shouldBe ruleName
-          result.getField("namespace") shouldBe ns
-          result.getField("status") shouldBe "active"
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            // Summary namespace should match one of the allowable namespaces (typically 'guest')
+            val ns = wsk.namespace.whois()
+            val result = wsk.rule.get(ruleName)
+            result.getField("name") shouldBe ruleName
+            result.getField("namespace") shouldBe ns
+            result.getField("status") shouldBe "active"
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorwskrule should $testname not successful, retrying.."))
   }
 
-  testname = "create a rule, and get its individual fields"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "create a rule, and get its individual fields" in withAssetCleaner(wskprops) {
+    val testname = "create a rule, and get its individual fields"
     val ruleName = "ruleFields"
     val triggerName = "ruleTriggerFields"
     val actionName = "ruleActionFields"
@@ -1454,11 +1463,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskrule should $testname not successful, retrying.."))
   }
 
-  testname = "reject creation of duplicate rules"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "reject creation of duplicate rules" in withAssetCleaner(wskprops) {
+    val testname = "reject creation of duplicate rules"
     val ruleName = "dupeRule"
     val triggerName = "triggerName"
     val actionName = "actionName"
@@ -1486,11 +1495,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskrule should $testname not successful, retrying.."))
   }
 
-  testname = "reject delete of rule that does not exist"
-  it should s"$testname" in {
+  it should "reject delete of rule that does not exist" in {
+    val testname = "reject delete of rule that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1500,11 +1509,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskrule should $testname not successful, retrying.."))
   }
 
-  testname = "reject enable of rule that does not exist"
-  it should s"$testname" in {
+  it should "reject enable of rule that does not exist" in {
+    val testname = "reject enable of rule that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1514,11 +1523,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskrule should $testname not successful, retrying.."))
   }
 
-  testname = "reject disable of rule that does not exist"
-  it should s"$testname" in {
+  it should "reject disable of rule that does not exist" in {
+    val testname = "reject disable of rule that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1528,11 +1537,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskrule should $testname not successful, retrying.."))
   }
 
-  testname = "reject status of rule that does not exist"
-  it should s"$testname" in {
+  it should "reject status of rule that does not exist" in {
+    val testname = "reject status of rule that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1542,11 +1551,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskrule should $testname not successful, retrying.."))
   }
 
-  testname = "reject get of rule that does not exist"
-  it should s"$testname" in {
+  it should "reject get of rule that does not exist" in {
+    val testname = "reject get of rule that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1556,14 +1565,14 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskrule should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk Namespace REST"
-  behavior of s"$behaviorname"
+  val behaviorwskns = "Wsk Namespace REST"
+  behavior of s"$behaviorwskns"
 
-  testname = "return a list of exactly one namespace"
-  it should s"$testname" in {
+  it should "return a list of exactly one namespace" in {
+    val testname = "return a list of exactly one namespace"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1572,14 +1581,15 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskns should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk Activation REST"
-  behavior of s"$behaviorname"
+  val behaviorwskactivation = "Wsk Activation REST"
+  behavior of s"$behaviorwskactivation"
 
-  testname = "create a trigger, and fire a trigger to get its individual fields from an activation"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "create a trigger, and fire a trigger to get its individual fields from an activation" in withAssetCleaner(
+    wskprops) { (wp, assetHelper) =>
+    val testname = "create a trigger, and fire a trigger to get its individual fields from an activation"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1618,11 +1628,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskactivation should $testname not successful, retrying.."))
   }
 
-  testname = "reject get of activation that does not exist"
-  it should s"$testname" in {
+  it should "reject get of activation that does not exist" in {
+    val testname = "reject get of activation that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1632,11 +1642,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskactivation should $testname not successful, retrying.."))
   }
 
-  testname = "reject logs of activation that does not exist"
-  it should s"$testname" in {
+  it should "reject logs of activation that does not exist" in {
+    val testname = "reject logs of activation that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1646,11 +1656,11 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskactivation should $testname not successful, retrying.."))
   }
 
-  testname = "reject result of activation that does not exist"
-  it should s"$testname" in {
+  it should "reject result of activation that does not exist" in {
+    val testname = "reject result of activation that does not exist"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -1660,6 +1670,6 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskactivation should $testname not successful, retrying.."))
   }
 }

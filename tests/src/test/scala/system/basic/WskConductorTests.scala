@@ -50,8 +50,8 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
   val behaviorname = "Whisk conductor actions"
   behavior of s"$behaviorname"
 
-  var testname: String = "invoke a conductor action with no continuation"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "invoke a conductor action with no continuation" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname: String = "invoke a conductor action with no continuation"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -101,48 +101,49 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke a conductor action with an invalid continuation"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val echo = "echo" // echo conductor action
-          assetHelper.withCleaner(wsk.action, echo) { (action, _) =>
-            action.create(
-              echo,
-              Some(TestUtils.getTestActionFilename("echo.js")),
-              annotations = Map("conductor" -> true.toJson))
-          }
+  it should "invoke a conductor action with an invalid continuation" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val testname = "invoke a conductor action with an invalid continuation"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val echo = "echo" // echo conductor action
+            assetHelper.withCleaner(wsk.action, echo) { (action, _) =>
+              action.create(
+                echo,
+                Some(TestUtils.getTestActionFilename("echo.js")),
+                annotations = Map("conductor" -> true.toJson))
+            }
 
-          // an invalid action name
-          val invalidrun =
-            wsk.action.invoke(echo, Map("payload" -> testString.toJson, "action" -> invalid.toJson))
-          withActivation(wsk.activation, invalidrun) { activation =>
-            activation.response.status shouldBe "application error"
-            activation.response.result.get.fields.get("error") shouldBe Some(
-              JsString(compositionComponentInvalid(JsString(invalid))))
-            checkConductorLogsAndAnnotations(activation, 2) // echo
-          }
+            // an invalid action name
+            val invalidrun =
+              wsk.action.invoke(echo, Map("payload" -> testString.toJson, "action" -> invalid.toJson))
+            withActivation(wsk.activation, invalidrun) { activation =>
+              activation.response.status shouldBe "application error"
+              activation.response.result.get.fields.get("error") shouldBe Some(
+                JsString(compositionComponentInvalid(JsString(invalid))))
+              checkConductorLogsAndAnnotations(activation, 2) // echo
+            }
 
-          // an undefined action
-          val undefinedrun = wsk.action.invoke(echo, Map("payload" -> testString.toJson, "action" -> missing.toJson))
-          val namespace = wsk.namespace.whois()
+            // an undefined action
+            val undefinedrun = wsk.action.invoke(echo, Map("payload" -> testString.toJson, "action" -> missing.toJson))
+            val namespace = wsk.namespace.whois()
 
-          withActivation(wsk.activation, undefinedrun) { activation =>
-            activation.response.status shouldBe "application error"
-            activation.response.result.get.fields.get("error") shouldBe Some(
-              JsString(compositionComponentNotFound(s"$namespace/$missing")))
-            checkConductorLogsAndAnnotations(activation, 2) // echo
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            withActivation(wsk.activation, undefinedrun) { activation =>
+              activation.response.status shouldBe "application error"
+              activation.response.result.get.fields.get("error") shouldBe Some(
+                JsString(compositionComponentNotFound(s"$namespace/$missing")))
+              checkConductorLogsAndAnnotations(activation, 2) // echo
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke a conductor action with a continuation"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "invoke a conductor action with a continuation" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "invoke a conductor action with a continuation"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -217,8 +218,8 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke nested conductor actions"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "invoke nested conductor actions" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "invoke nested conductor actions"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -313,8 +314,8 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke a conductor action in a package binding"
   it should "invoke a conductor action in a package binding" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val testname = "invoke a conductor action in a package binding"
     org.apache.openwhisk.utils
       .retry(
         {

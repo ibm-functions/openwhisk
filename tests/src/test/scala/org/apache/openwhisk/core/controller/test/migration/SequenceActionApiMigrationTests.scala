@@ -62,8 +62,8 @@ class SequenceActionApiMigrationTests
 
   private def seqParameters(seq: Vector[String]) = Parameters("_actions", seq.toJson)
 
-  var testname = "list old-style sequence action with explicit namespace"
-  it should s"$testname" in {
+  it should "list old-style sequence action with explicit namespace" in {
+    val testname = "list old-style sequence action with explicit namespace"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -87,8 +87,8 @@ class SequenceActionApiMigrationTests
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "get old-style sequence action by name in default namespace"
-  it should s"$testname" in {
+  it should "get old-style sequence action by name in default namespace" in {
+    val testname = "get old-style sequence action by name in default namespace"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -109,8 +109,8 @@ class SequenceActionApiMigrationTests
   }
 
   // this test is a repeat from ActionsApiTest BUT with old style sequence
-  testname = "preserve new parameters when changing old-style sequence action to non sequence"
-  it should s"$testname" in {
+  it should "preserve new parameters when changing old-style sequence action to non sequence" in {
+    val testname = "preserve new parameters when changing old-style sequence action to non sequence"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -137,8 +137,8 @@ class SequenceActionApiMigrationTests
   }
 
   // this test is a repeat from ActionsApiTest BUT with old style sequence
-  testname = "reset parameters when changing old-style sequence action to non sequence"
-  it should s"$testname" in {
+  it should "reset parameters when changing old-style sequence action to non sequence" in {
+    val testname = "reset parameters when changing old-style sequence action to non sequence"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -164,8 +164,8 @@ class SequenceActionApiMigrationTests
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "update old-style sequence action with new annotations"
-  it should s"$testname" in {
+  it should "update old-style sequence action with new annotations" in {
+    val testname = "update old-style sequence action with new annotations"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -196,8 +196,8 @@ class SequenceActionApiMigrationTests
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "update an old-style sequence with new sequence"
-  it should s"$testname" in {
+  it should "update an old-style sequence with new sequence" in {
+    val testname = "update an old-style sequence with new sequence"
     org.apache.openwhisk.utils
       .retry(
         {

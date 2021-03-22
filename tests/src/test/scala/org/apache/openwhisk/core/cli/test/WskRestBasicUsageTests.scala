@@ -60,54 +60,55 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
   private val retriesOnTestFailures = 5
   private val waitBeforeRetry = 1.second
 
-  var behaviorname = "Wsk API basic usage"
-  behavior of s"$behaviorname"
+  behavior of "Wsk API basic usage"
 
-  var testname = "allow a 3 part Fully Qualified Name (FQN) without a leading '/'"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val guestNamespace = wsk.namespace.whois()
-          val packageName = "packageName3ptFQN"
-          val actionName = "actionName3ptFQN"
-          val triggerName = "triggerName3ptFQN"
-          val ruleName = "ruleName3ptFQN"
-          val fullQualifiedName = s"${guestNamespace}/${packageName}/${actionName}"
-          // Used for action and rule creation below
-          assetHelper.withCleaner(wsk.pkg, packageName) { (pkg, _) =>
-            pkg.create(packageName)
-          }
-          assetHelper.withCleaner(wsk.trigger, triggerName) { (trigger, _) =>
-            trigger.create(triggerName)
-          }
-          // Test action and rule creation where action name is 3 part FQN w/out leading slash
-          assetHelper.withCleaner(wsk.action, fullQualifiedName) { (action, _) =>
-            action.create(fullQualifiedName, defaultAction)
-          }
-          assetHelper.withCleaner(wsk.rule, ruleName) { (rule, _) =>
-            rule.create(ruleName, trigger = triggerName, action = fullQualifiedName)
-          }
+  it should "allow a 3 part Fully Qualified Name (FQN) without a leading '/'" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk API basic usage"
+      val testname = "allow a 3 part Fully Qualified Name (FQN) without a leading '/'"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val guestNamespace = wsk.namespace.whois()
+            val packageName = "packageName3ptFQN"
+            val actionName = "actionName3ptFQN"
+            val triggerName = "triggerName3ptFQN"
+            val ruleName = "ruleName3ptFQN"
+            val fullQualifiedName = s"${guestNamespace}/${packageName}/${actionName}"
+            // Used for action and rule creation below
+            assetHelper.withCleaner(wsk.pkg, packageName) { (pkg, _) =>
+              pkg.create(packageName)
+            }
+            assetHelper.withCleaner(wsk.trigger, triggerName) { (trigger, _) =>
+              trigger.create(triggerName)
+            }
+            // Test action and rule creation where action name is 3 part FQN w/out leading slash
+            assetHelper.withCleaner(wsk.action, fullQualifiedName) { (action, _) =>
+              action.create(fullQualifiedName, defaultAction)
+            }
+            assetHelper.withCleaner(wsk.rule, ruleName) { (rule, _) =>
+              rule.create(ruleName, trigger = triggerName, action = fullQualifiedName)
+            }
 
-          val run = wsk.action.invoke(fullQualifiedName)
-          withActivation(wsk.activation, run) { activation =>
-            activation.response.status shouldBe "success"
-          }
-          val action = wsk.action.get(fullQualifiedName)
-          action.getField("name") shouldBe actionName
-          action.getField("namespace") shouldBe s"${guestNamespace}/${packageName}"
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            val run = wsk.action.invoke(fullQualifiedName)
+            withActivation(wsk.activation, run) { activation =>
+              activation.response.status shouldBe "success"
+            }
+            val action = wsk.action.get(fullQualifiedName)
+            action.getField("name") shouldBe actionName
+            action.getField("namespace") shouldBe s"${guestNamespace}/${packageName}"
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk actions"
-  behavior of s"$behaviorname"
+  behavior of "Wsk actions"
 
-  testname = "reject creating entities with invalid names"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "reject creating entities with invalid names" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val behaviorname = "Wsk actions"
+    val testname = "reject creating entities with invalid names"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -132,164 +133,178 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "create, and get an action to verify parameter and annotation parsing"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "actionAnnotations"
-          val file = Some(TestUtils.getTestActionFilename("hello.js"))
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, file, annotations = getValidJSONTestArgInput, parameters = getValidJSONTestArgInput)
-          }
+  it should "create, and get an action to verify parameter and annotation parsing" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "create, and get an action to verify parameter and annotation parsing"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "actionAnnotations"
+            val file = Some(TestUtils.getTestActionFilename("hello.js"))
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, file, annotations = getValidJSONTestArgInput, parameters = getValidJSONTestArgInput)
+            }
 
-          val action = wsk.action.get(name)
-          action.getField("name") shouldBe name
+            val action = wsk.action.get(name)
+            action.getField("name") shouldBe name
 
-          val receivedParams = wsk.parseJsonString(action.stdout).fields("parameters").convertTo[JsArray].elements
-          val receivedAnnots = wsk.parseJsonString(action.stdout).fields("annotations").convertTo[JsArray].elements
-          val escapedJSONArr = getValidJSONTestArgOutput.convertTo[JsArray].elements
+            val receivedParams = wsk.parseJsonString(action.stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(action.stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getValidJSONTestArgOutput.convertTo[JsArray].elements
 
-          for (expectedItem <- escapedJSONArr) {
-            receivedParams should contain(expectedItem)
-            receivedAnnots should contain(expectedItem)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            for (expectedItem <- escapedJSONArr) {
+              receivedParams should contain(expectedItem)
+              receivedAnnots should contain(expectedItem)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "create, and get an action to verify file parameter and annotation parsing"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "actionAnnotAndParamParsing"
-          val file = Some(TestUtils.getTestActionFilename("hello.js"))
-          val argInput = Some(TestUtils.getTestActionFilename("validInput1.json"))
+  it should "create, and get an action to verify file parameter and annotation parsing" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "create, and get an action to verify file parameter and annotation parsing"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "actionAnnotAndParamParsing"
+            val file = Some(TestUtils.getTestActionFilename("hello.js"))
+            val argInput = Some(TestUtils.getTestActionFilename("validInput1.json"))
 
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, file, annotationFile = argInput, parameterFile = argInput)
-          }
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, file, annotationFile = argInput, parameterFile = argInput)
+            }
 
-          val action = wsk.action.get(name)
-          action.getField("name") shouldBe name
+            val action = wsk.action.get(name)
+            action.getField("name") shouldBe name
 
-          val receivedParams = wsk.parseJsonString(action.stdout).fields("parameters").convertTo[JsArray].elements
-          val receivedAnnots = wsk.parseJsonString(action.stdout).fields("annotations").convertTo[JsArray].elements
-          val escapedJSONArr = getJSONFileOutput.convertTo[JsArray].elements
+            val receivedParams = wsk.parseJsonString(action.stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(action.stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getJSONFileOutput.convertTo[JsArray].elements
 
-          for (expectedItem <- escapedJSONArr) {
-            receivedParams should contain(expectedItem)
-            receivedAnnots should contain(expectedItem)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            for (expectedItem <- escapedJSONArr) {
+              receivedParams should contain(expectedItem)
+              receivedAnnots should contain(expectedItem)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "create an action with the proper parameter and annotation escapes"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "actionEscapes"
-          val file = Some(TestUtils.getTestActionFilename("hello.js"))
+  it should "create an action with the proper parameter and annotation escapes" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "create an action with the proper parameter and annotation escapes"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "actionEscapes"
+            val file = Some(TestUtils.getTestActionFilename("hello.js"))
 
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, file, parameters = getEscapedJSONTestArgInput, annotations = getEscapedJSONTestArgInput)
-          }
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action
+                .create(name, file, parameters = getEscapedJSONTestArgInput, annotations = getEscapedJSONTestArgInput)
+            }
 
-          val action = wsk.action.get(name)
-          action.getField("name") shouldBe name
+            val action = wsk.action.get(name)
+            action.getField("name") shouldBe name
 
-          val receivedParams = wsk.parseJsonString(action.stdout).fields("parameters").convertTo[JsArray].elements
-          val receivedAnnots = wsk.parseJsonString(action.stdout).fields("annotations").convertTo[JsArray].elements
-          val escapedJSONArr = getEscapedJSONTestArgOutput.convertTo[JsArray].elements
+            val receivedParams = wsk.parseJsonString(action.stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(action.stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getEscapedJSONTestArgOutput.convertTo[JsArray].elements
 
-          for (expectedItem <- escapedJSONArr) {
-            receivedParams should contain(expectedItem)
-            receivedAnnots should contain(expectedItem)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            for (expectedItem <- escapedJSONArr) {
+              receivedParams should contain(expectedItem)
+              receivedAnnots should contain(expectedItem)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke an action that exits during initialization and get appropriate error"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "abort init"
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, Some(TestUtils.getTestActionFilename("initexit.js")))
-          }
+  it should "invoke an action that exits during initialization and get appropriate error" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "invoke an action that exits during initialization and get appropriate error"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "abort init"
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, Some(TestUtils.getTestActionFilename("initexit.js")))
+            }
 
-          withActivation(wsk.activation, wsk.action.invoke(name)) { activation =>
-            val response = activation.response
-            response.result.get.fields("error") shouldBe Messages.abnormalInitialization.toJson
-            response.status shouldBe ActivationResponse.messageForCode(ActivationResponse.DeveloperError)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            withActivation(wsk.activation, wsk.action.invoke(name)) { activation =>
+              val response = activation.response
+              response.result.get.fields("error") shouldBe Messages.abnormalInitialization.toJson
+              response.status shouldBe ActivationResponse.messageForCode(ActivationResponse.DeveloperError)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke an action that hangs during initialization and get appropriate error"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "hang init"
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, Some(TestUtils.getTestActionFilename("initforever.js")), timeout = Some(3 seconds))
-          }
+  it should "invoke an action that hangs during initialization and get appropriate error" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "invoke an action that hangs during initialization and get appropriate error"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "hang init"
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, Some(TestUtils.getTestActionFilename("initforever.js")), timeout = Some(3 seconds))
+            }
 
-          withActivation(wsk.activation, wsk.action.invoke(name)) { activation =>
-            val response = activation.response
-            response.result.get.fields("error") shouldBe Messages.timedoutActivation(3 seconds, true).toJson
-            response.status shouldBe ActivationResponse.messageForCode(ActivationResponse.DeveloperError)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            withActivation(wsk.activation, wsk.action.invoke(name)) { activation =>
+              val response = activation.response
+              response.result.get.fields("error") shouldBe Messages.timedoutActivation(3 seconds, true).toJson
+              response.status shouldBe ActivationResponse.messageForCode(ActivationResponse.DeveloperError)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke an action that exits during run and get appropriate error"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "abort run"
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, Some(TestUtils.getTestActionFilename("runexit.js")))
-          }
+  it should "invoke an action that exits during run and get appropriate error" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "invoke an action that exits during run and get appropriate error"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "abort run"
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, Some(TestUtils.getTestActionFilename("runexit.js")))
+            }
 
-          withActivation(wsk.activation, wsk.action.invoke(name)) { activation =>
-            val response = activation.response
-            response.result.get.fields("error") shouldBe Messages.abnormalRun.toJson
-            response.status shouldBe ActivationResponse.messageForCode(ActivationResponse.DeveloperError)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            withActivation(wsk.activation, wsk.action.invoke(name)) { activation =>
+              val response = activation.response
+              response.result.get.fields("error") shouldBe Messages.abnormalRun.toJson
+              response.status shouldBe ActivationResponse.messageForCode(ActivationResponse.DeveloperError)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "ensure keys are not omitted from activation record"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "ensure keys are not omitted from activation record" in withAssetCleaner(wskprops) {
+    val behaviorname = "Wsk actions"
+    val testname = "ensure keys are not omitted from activation record"
     val name = "activationRecordTest"
 
     (wp, assetHelper) =>
@@ -317,51 +332,55 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "write the action-path and the limits to the annotations"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "annotations"
-          val memoryLimit = 512 MB
-          val logLimit = 1 MB
-          val timeLimit = 60 seconds
+  it should "write the action-path and the limits to the annotations" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "write the action-path and the limits to the annotations"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "annotations"
+            val memoryLimit = 512 MB
+            val logLimit = 1 MB
+            val timeLimit = 60 seconds
 
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(
-              name,
-              Some(TestUtils.getTestActionFilename("helloAsync.js")),
-              memory = Some(memoryLimit),
-              timeout = Some(timeLimit),
-              logsize = Some(logLimit))
-          }
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(
+                name,
+                Some(TestUtils.getTestActionFilename("helloAsync.js")),
+                memory = Some(memoryLimit),
+                timeout = Some(timeLimit),
+                logsize = Some(logLimit))
+            }
 
-          val run = wsk.action.invoke(name, Map("payload" -> "this is a test".toJson))
-          withActivation(wsk.activation, run) {
-            activation =>
-              activation.response.status shouldBe "success"
-              val annotations = activation.annotations.get
+            val run = wsk.action.invoke(name, Map("payload" -> "this is a test".toJson))
+            withActivation(wsk.activation, run) {
+              activation =>
+                activation.response.status shouldBe "success"
+                val annotations = activation.annotations.get
 
-              val limitsObj = JsObject(
-                "key" -> JsString("limits"),
-                "value" -> ActionLimits(TimeLimit(timeLimit), MemoryLimit(memoryLimit), LogLimit(logLimit)).toJson)
+                val limitsObj = JsObject(
+                  "key" -> JsString("limits"),
+                  "value" -> ActionLimits(TimeLimit(timeLimit), MemoryLimit(memoryLimit), LogLimit(logLimit)).toJson)
 
-              val path = annotations.find {
-                _.fields("key").convertTo[String] == "path"
-              }.get
+                val path = annotations.find {
+                  _.fields("key").convertTo[String] == "path"
+                }.get
 
-              path.fields("value").convertTo[String] should fullyMatch regex (s""".*/$name""")
-              annotations should contain(limitsObj)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+                path.fields("value").convertTo[String] should fullyMatch regex (s""".*/$name""")
+                annotations should contain(limitsObj)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "create, and invoke an action that utilizes an invalid docker container with appropriate error"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "create, and invoke an action that utilizes an invalid docker container with appropriate error" in withAssetCleaner(
+    wskprops) {
+    val behaviorname = "Wsk actions"
+    val testname = "create, and invoke an action that utilizes an invalid docker container with appropriate error"
     val name = "invalidDockerContainer"
     val containerName = s"bogus${Random.alphanumeric.take(16).mkString.toLowerCase}"
 
@@ -395,8 +414,9 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke an action using npm openwhisk"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "invoke an action using npm openwhisk" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val behaviorname = "Wsk actions"
+    val testname = "invoke an action using npm openwhisk"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -423,8 +443,9 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke an action receiving context properties excluding api key"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "invoke an action receiving context properties excluding api key" in withAssetCleaner(wskprops) {
+    val behaviorname = "Wsk actions"
+    val testname = "invoke an action receiving context properties excluding api key"
     assume(requireAPIKeyAnnotation)
     (wp, assetHelper) =>
       org.apache.openwhisk.utils
@@ -456,84 +477,92 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke an action receiving context properties including api key"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val namespace = wsk.namespace.whois()
-          val name = "context"
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(
-              name,
-              Some(TestUtils.getTestActionFilename("helloContext.js")),
-              annotations = Map(Annotations.ProvideApiKeyAnnotationName -> JsTrue))
-          }
+  it should "invoke an action receiving context properties including api key" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "invoke an action receiving context properties including api key"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val namespace = wsk.namespace.whois()
+            val name = "context"
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(
+                name,
+                Some(TestUtils.getTestActionFilename("helloContext.js")),
+                annotations = Map(Annotations.ProvideApiKeyAnnotationName -> JsTrue))
+            }
 
-          val start = Instant.now(Clock.systemUTC()).toEpochMilli
-          val run = wsk.action.invoke(name)
-          withActivation(wsk.activation, run) { activation =>
-            activation.response.status shouldBe "success"
-            val fields = activation.response.result.get.convertTo[Map[String, String]]
-            fields("api_host") shouldBe WhiskProperties.getApiHostForAction
-            fields("api_key") shouldBe wskprops.authKey
-            fields("namespace") shouldBe namespace
-            fields("action_name") shouldBe s"/$namespace/$name"
-            fields("action_version") should fullyMatch regex ("""\d+.\d+.\d+""")
-            fields("activation_id") shouldBe activation.activationId
-            fields("deadline").toLong should be >= start
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            val start = Instant.now(Clock.systemUTC()).toEpochMilli
+            val run = wsk.action.invoke(name)
+            withActivation(wsk.activation, run) { activation =>
+              activation.response.status shouldBe "success"
+              val fields = activation.response.result.get.convertTo[Map[String, String]]
+              fields("api_host") shouldBe WhiskProperties.getApiHostForAction
+              fields("api_key") shouldBe wskprops.authKey
+              fields("namespace") shouldBe namespace
+              fields("action_name") shouldBe s"/$namespace/$name"
+              fields("action_version") should fullyMatch regex ("""\d+.\d+.\d+""")
+              fields("activation_id") shouldBe activation.activationId
+              fields("deadline").toLong should be >= start
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke an action successfully with options --blocking and --result"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "invokeResult"
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, Some(TestUtils.getTestActionFilename("echo.js")))
-          }
-          val args = Map("hello" -> "Robert".toJson)
-          val run = wsk.action.invoke(name, args, blocking = true, result = true)
-          //--result takes precedence over --blocking
-          run.stdout.parseJson shouldBe args.toJson
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+  it should "invoke an action successfully with options --blocking and --result" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "invoke an action successfully with options --blocking and --result"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "invokeResult"
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, Some(TestUtils.getTestActionFilename("echo.js")))
+            }
+            val args = Map("hello" -> "Robert".toJson)
+            val run = wsk.action.invoke(name, args, blocking = true, result = true)
+            //--result takes precedence over --blocking
+            run.stdout.parseJson shouldBe args.toJson
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke an action that returns a result by the deadline"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "deadline"
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, Some(TestUtils.getTestActionFilename("helloDeadline.js")), timeout = Some(3 seconds))
-          }
+  it should "invoke an action that returns a result by the deadline" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "invoke an action that returns a result by the deadline"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "deadline"
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, Some(TestUtils.getTestActionFilename("helloDeadline.js")), timeout = Some(3 seconds))
+            }
 
-          val run = wsk.action.invoke(name)
-          withActivation(wsk.activation, run) { activation =>
-            activation.response.status shouldBe "success"
-            activation.response.result shouldBe Some(JsObject("timedout" -> true.toJson))
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            val run = wsk.action.invoke(name)
+            withActivation(wsk.activation, run) { activation =>
+              activation.response.status shouldBe "success"
+              activation.response.result shouldBe Some(JsObject("timedout" -> true.toJson))
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke an action twice, where the first times out but the second does not and should succeed"
-  it should s"$testname" in withAssetCleaner(wskprops) {
+  it should "invoke an action twice, where the first times out but the second does not and should succeed" in withAssetCleaner(
+    wskprops) {
+    val behaviorname = "Wsk actions"
+    val testname = "invoke an action twice, where the first times out but the second does not and should succeed"
     // this test issues two activations: the first is forced to time out and not return a result by its deadline (ie it does not resolve
     // its promise). The invoker should reclaim its container so that a second activation of the same action (which must happen within a
     // short period of time (seconds, not minutes) is allocated a fresh container and hence runs as expected (vs. hitting in the container
@@ -571,8 +600,9 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "ensure --web flags set the proper annotations"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "ensure --web flags set the proper annotations" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val behaviorname = "Wsk actions"
+    val testname = "ensure --web flags set the proper annotations"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -624,59 +654,62 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "ensure action update creates an action with --web flag"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val runtime = "nodejs:default"
-          val name = "webaction"
-          val file = Some(TestUtils.getTestActionFilename("echo.js"))
+  it should "ensure action update creates an action with --web flag" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk actions"
+      val testname = "ensure action update creates an action with --web flag"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val runtime = "nodejs:default"
+            val name = "webaction"
+            val file = Some(TestUtils.getTestActionFilename("echo.js"))
 
-          assetHelper.withCleaner(wsk.action, name) { (action, _) =>
-            action.create(name, file, web = Some("true"), update = true, kind = Some(runtime))
-          }
+            assetHelper.withCleaner(wsk.action, name) { (action, _) =>
+              action.create(name, file, web = Some("true"), update = true, kind = Some(runtime))
+            }
 
-          val baseAnnotations =
-            Parameters("web-export", JsTrue) ++
-              Parameters("raw-http", JsFalse) ++
-              Parameters("final", JsTrue)
+            val baseAnnotations =
+              Parameters("web-export", JsTrue) ++
+                Parameters("raw-http", JsFalse) ++
+                Parameters("final", JsTrue)
 
-          val testAnnotations = if (requireAPIKeyAnnotation) {
-            baseAnnotations ++
-              Parameters(Annotations.ProvideApiKeyAnnotationName, JsFalse)
-          } else {
-            baseAnnotations
-          }
+            val testAnnotations = if (requireAPIKeyAnnotation) {
+              baseAnnotations ++
+                Parameters(Annotations.ProvideApiKeyAnnotationName, JsFalse)
+            } else {
+              baseAnnotations
+            }
 
-          val action = wsk.action.get(name)
+            val action = wsk.action.get(name)
 
-          // first check if we got 'nodejs:*' in the exec value
-          action
-            .getFieldJsValue("annotations")
-            .convertTo[Seq[JsObject]]
-            .find(_.fields("key").convertTo[String] == "exec")
-            .map(_.fields("value"))
-            .map(exec => { exec.convertTo[String] should startWith("nodejs:") })
-            .getOrElse(fail())
+            // first check if we got 'nodejs:*' in the exec value
+            action
+              .getFieldJsValue("annotations")
+              .convertTo[Seq[JsObject]]
+              .find(_.fields("key").convertTo[String] == "exec")
+              .map(_.fields("value"))
+              .map(exec => { exec.convertTo[String] should startWith("nodejs:") })
+              .getOrElse(fail())
 
-          // then we check the remaining annotations
-          // we ignore the exec field here, since we already compared it above
-          action
-            .getFieldJsValue("annotations")
-            .convertTo[Set[JsObject]]
-            .filter(annotation => annotation.fields("key").convertTo[String] != "exec") shouldBe testAnnotations.toJsArray
-            .convertTo[Set[JsObject]]
+            // then we check the remaining annotations
+            // we ignore the exec field here, since we already compared it above
+            action
+              .getFieldJsValue("annotations")
+              .convertTo[Set[JsObject]]
+              .filter(annotation => annotation.fields("key").convertTo[String] != "exec") shouldBe testAnnotations.toJsArray
+              .convertTo[Set[JsObject]]
 
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "invoke action while not encoding &, <, > characters"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "invoke action while not encoding &, <, > characters" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val behaviorname = "Wsk actions"
+    val testname = "invoke action while not encoding &, <, > characters"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -702,11 +735,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk packages"
-  behavior of s"$behaviorname"
+  behavior of "Wsk packages"
 
-  testname = "create, and delete a package"
-  it should s"$testname" in {
+  it should "create, and delete a package" in {
+    val behaviorname = "Wsk packages"
+    val testname = "create, and delete a package"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -719,92 +752,99 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "create, and get a package to verify parameter and annotation parsing"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "packageAnnotAndParamParsing"
+  it should "create, and get a package to verify parameter and annotation parsing" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk packages"
+      val testname = "create, and get a package to verify parameter and annotation parsing"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "packageAnnotAndParamParsing"
 
-          assetHelper.withCleaner(wsk.pkg, name) { (pkg, _) =>
-            pkg.create(name, annotations = getValidJSONTestArgInput, parameters = getValidJSONTestArgInput)
-          }
+            assetHelper.withCleaner(wsk.pkg, name) { (pkg, _) =>
+              pkg.create(name, annotations = getValidJSONTestArgInput, parameters = getValidJSONTestArgInput)
+            }
 
-          val pack = wsk.pkg.get(name)
+            val pack = wsk.pkg.get(name)
 
-          val receivedParams = wsk.parseJsonString(pack.stdout).fields("parameters").convertTo[JsArray].elements
-          val receivedAnnots = wsk.parseJsonString(pack.stdout).fields("annotations").convertTo[JsArray].elements
-          val escapedJSONArr = getValidJSONTestArgOutput.convertTo[JsArray].elements
+            val receivedParams = wsk.parseJsonString(pack.stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(pack.stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getValidJSONTestArgOutput.convertTo[JsArray].elements
 
-          for (expectedItem <- escapedJSONArr) {
-            receivedParams should contain(expectedItem)
-            receivedAnnots should contain(expectedItem)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            for (expectedItem <- escapedJSONArr) {
+              receivedParams should contain(expectedItem)
+              receivedAnnots should contain(expectedItem)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "create, and get a package to verify file parameter and annotation parsing"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "packageAnnotAndParamFileParsing"
-          val file = Some(TestUtils.getTestActionFilename("hello.js"))
-          val argInput = Some(TestUtils.getTestActionFilename("validInput1.json"))
+  it should "create, and get a package to verify file parameter and annotation parsing" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk packages"
+      val testname = "create, and get a package to verify file parameter and annotation parsing"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "packageAnnotAndParamFileParsing"
+            val file = Some(TestUtils.getTestActionFilename("hello.js"))
+            val argInput = Some(TestUtils.getTestActionFilename("validInput1.json"))
 
-          assetHelper.withCleaner(wsk.pkg, name) { (pkg, _) =>
-            pkg.create(name, annotationFile = argInput, parameterFile = argInput)
-          }
+            assetHelper.withCleaner(wsk.pkg, name) { (pkg, _) =>
+              pkg.create(name, annotationFile = argInput, parameterFile = argInput)
+            }
 
-          val stdout = wsk.pkg.get(name).stdout
-          val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
-          val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
-          val escapedJSONArr = getJSONFileOutput.convertTo[JsArray].elements
+            val stdout = wsk.pkg.get(name).stdout
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getJSONFileOutput.convertTo[JsArray].elements
 
-          for (expectedItem <- escapedJSONArr) {
-            receivedParams should contain(expectedItem)
-            receivedAnnots should contain(expectedItem)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            for (expectedItem <- escapedJSONArr) {
+              receivedParams should contain(expectedItem)
+              receivedAnnots should contain(expectedItem)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "create a package with the proper parameter and annotation escapes"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "packageEscapses"
+  it should "create a package with the proper parameter and annotation escapes" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk packages"
+      val testname = "create a package with the proper parameter and annotation escapes"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "packageEscapses"
 
-          assetHelper.withCleaner(wsk.pkg, name) { (pkg, _) =>
-            pkg.create(name, parameters = getEscapedJSONTestArgInput, annotations = getEscapedJSONTestArgInput)
-          }
+            assetHelper.withCleaner(wsk.pkg, name) { (pkg, _) =>
+              pkg.create(name, parameters = getEscapedJSONTestArgInput, annotations = getEscapedJSONTestArgInput)
+            }
 
-          val pack = wsk.pkg.get(name)
-          val receivedParams = wsk.parseJsonString(pack.stdout).fields("parameters").convertTo[JsArray].elements
-          val receivedAnnots = wsk.parseJsonString(pack.stdout).fields("annotations").convertTo[JsArray].elements
-          val escapedJSONArr = getEscapedJSONTestArgOutput.convertTo[JsArray].elements
+            val pack = wsk.pkg.get(name)
+            val receivedParams = wsk.parseJsonString(pack.stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(pack.stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getEscapedJSONTestArgOutput.convertTo[JsArray].elements
 
-          for (expectedItem <- escapedJSONArr) {
-            receivedParams should contain(expectedItem)
-            receivedAnnots should contain(expectedItem)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            for (expectedItem <- escapedJSONArr) {
+              receivedParams should contain(expectedItem)
+              receivedAnnots should contain(expectedItem)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "report conformance error accessing action as package"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "report conformance error accessing action as package" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val behaviorname = "Wsk packages"
+    val testname = "report conformance error accessing action as package"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -829,97 +869,103 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  behaviorname = "Wsk triggers"
-  behavior of s"$behaviorname"
+  behavior of "Wsk triggers"
 
-  testname = "create, and get a trigger to verify parameter and annotation parsing"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "triggerAnnotAndParamParsing"
+  it should "create, and get a trigger to verify parameter and annotation parsing" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk triggers"
+      val testname = "create, and get a trigger to verify parameter and annotation parsing"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "triggerAnnotAndParamParsing"
 
-          assetHelper.withCleaner(wsk.trigger, name) { (trigger, _) =>
-            trigger.create(name, annotations = getValidJSONTestArgInput, parameters = getValidJSONTestArgInput)
-          }
+            assetHelper.withCleaner(wsk.trigger, name) { (trigger, _) =>
+              trigger.create(name, annotations = getValidJSONTestArgInput, parameters = getValidJSONTestArgInput)
+            }
 
-          val stdout = wsk.trigger.get(name).stdout
+            val stdout = wsk.trigger.get(name).stdout
 
-          val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
-          val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
-          val escapedJSONArr = getValidJSONTestArgOutput.convertTo[JsArray].elements
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getValidJSONTestArgOutput.convertTo[JsArray].elements
 
-          for (expectedItem <- escapedJSONArr) {
-            receivedParams should contain(expectedItem)
-            receivedAnnots should contain(expectedItem)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            for (expectedItem <- escapedJSONArr) {
+              receivedParams should contain(expectedItem)
+              receivedAnnots should contain(expectedItem)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "create, and get a trigger to verify file parameter and annotation parsing"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "triggerAnnotAndParamFileParsing"
-          val file = Some(TestUtils.getTestActionFilename("hello.js"))
-          val argInput = Some(TestUtils.getTestActionFilename("validInput1.json"))
+  it should "create, and get a trigger to verify file parameter and annotation parsing" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk triggers"
+      val testname = "create, and get a trigger to verify file parameter and annotation parsing"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "triggerAnnotAndParamFileParsing"
+            val file = Some(TestUtils.getTestActionFilename("hello.js"))
+            val argInput = Some(TestUtils.getTestActionFilename("validInput1.json"))
 
-          assetHelper.withCleaner(wsk.trigger, name) { (trigger, _) =>
-            trigger.create(name, annotationFile = argInput, parameterFile = argInput)
-          }
+            assetHelper.withCleaner(wsk.trigger, name) { (trigger, _) =>
+              trigger.create(name, annotationFile = argInput, parameterFile = argInput)
+            }
 
-          val stdout = wsk.trigger.get(name).stdout
+            val stdout = wsk.trigger.get(name).stdout
 
-          val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
-          val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
-          val escapedJSONArr = getJSONFileOutput.convertTo[JsArray].elements
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getJSONFileOutput.convertTo[JsArray].elements
 
-          for (expectedItem <- escapedJSONArr) {
-            receivedParams should contain(expectedItem)
-            receivedAnnots should contain(expectedItem)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            for (expectedItem <- escapedJSONArr) {
+              receivedParams should contain(expectedItem)
+              receivedAnnots should contain(expectedItem)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "create a trigger with the proper parameter and annotation escapes"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils
-      .retry(
-        {
-          assetHelper.deleteAssets()
-          val name = "triggerEscapes"
+  it should "create a trigger with the proper parameter and annotation escapes" in withAssetCleaner(wskprops) {
+    (wp, assetHelper) =>
+      val behaviorname = "Wsk triggers"
+      val testname = "create a trigger with the proper parameter and annotation escapes"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            val name = "triggerEscapes"
 
-          assetHelper.withCleaner(wsk.trigger, name) { (trigger, _) =>
-            trigger.create(name, parameters = getEscapedJSONTestArgInput, annotations = getEscapedJSONTestArgInput)
-          }
+            assetHelper.withCleaner(wsk.trigger, name) { (trigger, _) =>
+              trigger.create(name, parameters = getEscapedJSONTestArgInput, annotations = getEscapedJSONTestArgInput)
+            }
 
-          val stdout = wsk.trigger.get(name).stdout
+            val stdout = wsk.trigger.get(name).stdout
 
-          val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
-          val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
-          val escapedJSONArr = getEscapedJSONTestArgOutput.convertTo[JsArray].elements
+            val receivedParams = wsk.parseJsonString(stdout).fields("parameters").convertTo[JsArray].elements
+            val receivedAnnots = wsk.parseJsonString(stdout).fields("annotations").convertTo[JsArray].elements
+            val escapedJSONArr = getEscapedJSONTestArgOutput.convertTo[JsArray].elements
 
-          for (expectedItem <- escapedJSONArr) {
-            receivedParams should contain(expectedItem)
-            receivedAnnots should contain(expectedItem)
-          }
-        },
-        retriesOnTestFailures,
-        Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+            for (expectedItem <- escapedJSONArr) {
+              receivedParams should contain(expectedItem)
+              receivedAnnots should contain(expectedItem)
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname = "not create a trigger when feed fails to initialize"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "not create a trigger when feed fails to initialize" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+    val behaviorname = "Wsk triggers"
+    val testname = "not create a trigger when feed fails to initialize"
     org.apache.openwhisk.utils
       .retry(
         {
@@ -939,9 +985,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
-  testname =
-    "invoke a feed action with the correct lifecyle event when creating, retrieving and deleting a feed trigger"
-  it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
+  it should "invoke a feed action with the correct lifecyle event when creating, retrieving and deleting a feed trigger" in withAssetCleaner(
+    wskprops) { (wp, assetHelper) =>
+    val behaviorname = "Wsk triggers"
+    val testname =
+      "invoke a feed action with the correct lifecyle event when creating, retrieving and deleting a feed trigger"
     org.apache.openwhisk.utils
       .retry(
         {
