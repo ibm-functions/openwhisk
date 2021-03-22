@@ -78,6 +78,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           // create two sets of activation records, and check that only one set is served back
           val creds1 = WhiskAuthHelpers.newAuth()
@@ -154,20 +155,30 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
 
   //// GET /activations?docs=true
   it should "return empty list when no activations exist" in {
-    implicit val tid = transid()
     org.apache.openwhisk.utils
-      .retry { // retry because view will be stale from previous test and result in null doc fields
-        Get(s"$collectionPath?docs=true") ~> Route.seal(routes(creds)) ~> check {
-          status should be(OK)
-          responseAs[List[JsObject]] shouldBe 'empty
-        }
-      }
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          org.apache.openwhisk.utils
+            .retry { // retry because view will be stale from previous test and result in null doc fields
+              Get(s"$collectionPath?docs=true") ~> Route.seal(routes(creds)) ~> check {
+                status should be(OK)
+                responseAs[List[JsObject]] shouldBe 'empty
+              }
+            }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Activations API should return empty list when no activations exist not successful, retrying.."))
   }
 
   it should "get full activation by namespace" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           // create two sets of activation records, and check that only one set is served back
           val creds1 = WhiskAuthHelpers.newAuth()
@@ -221,6 +232,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           // create two sets of activation records, and check that only one set is served back
           val creds1 = WhiskAuthHelpers.newAuth()
@@ -345,6 +357,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
 
           Seq(("", OK), ("name=", OK), ("name=abc", OK), ("name=abc/xyz", OK), ("name=abc/xyz/123", BadRequest))
@@ -368,6 +381,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
 
           // create two sets of activation records, and check that only one set is served back
@@ -443,20 +457,30 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
   }
 
   it should "reject invalid query parameter combinations" in {
-    implicit val tid = transid()
     org.apache.openwhisk.utils
-      .retry { // retry because view will be stale from previous test and result in null doc fields
-        Get(s"$collectionPath?docs=true&count=true") ~> Route.seal(routes(creds)) ~> check {
-          status should be(BadRequest)
-          responseAs[ErrorResponse].error shouldBe Messages.docsNotAllowedWithCount
-        }
-      }
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          org.apache.openwhisk.utils
+            .retry { // retry because view will be stale from previous test and result in null doc fields
+              Get(s"$collectionPath?docs=true&count=true") ~> Route.seal(routes(creds)) ~> check {
+                status should be(BadRequest)
+                responseAs[ErrorResponse].error shouldBe Messages.docsNotAllowedWithCount
+              }
+            }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > Activations API should reject invalid query parameter combinations not successful, retrying.."))
   }
 
   it should "reject list when limit is greater than maximum allowed value" in {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val exceededMaxLimit = Collection.MAX_LIST_LIMIT + 1
           val response = Get(s"$collectionPath?limit=$exceededMaxLimit") ~> Route.seal(routes(creds)) ~> check {
@@ -476,6 +500,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val notAnInteger = "string"
           val response = Get(s"$collectionPath?limit=$notAnInteger") ~> Route.seal(routes(creds)) ~> check {
@@ -495,6 +520,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val negativeSkip = -1
           val response = Get(s"$collectionPath?skip=$negativeSkip") ~> Route.seal(routes(creds)) ~> check {
@@ -514,6 +540,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val notAnInteger = "string"
           val response = Get(s"$collectionPath?skip=$notAnInteger") ~> Route.seal(routes(creds)) ~> check {
@@ -533,6 +560,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           Get(s"$collectionPath?name=0%20") ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
@@ -548,6 +576,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           Get(s"$collectionPath?since=xxx") ~> Route.seal(routes(creds)) ~> check {
             status should be(BadRequest)
@@ -566,6 +595,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val activations: Seq[WhiskActivation] = (1 to 3).map { i =>
             //make sure the time is different for each activation
@@ -598,6 +628,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val activations = (1 to 3).map { i =>
             //make sure the time is different for each activation
@@ -633,6 +664,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val activation =
             WhiskActivation(
@@ -679,6 +711,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val activation =
             WhiskActivation(
@@ -711,6 +744,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val activation =
             WhiskActivation(
@@ -742,6 +776,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val activation =
             WhiskActivation(
@@ -771,6 +806,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           val activationId = ActivationId.generate().toString
           val tooshort = activationId.substring(0, 31)
@@ -803,6 +839,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           Put(s"$collectionPath/${ActivationId.generate()}") ~> Route.seal(routes(creds)) ~> check {
             status should be(MethodNotAllowed)
@@ -817,6 +854,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           Post(s"$collectionPath/${ActivationId.generate()}") ~> Route.seal(routes(creds)) ~> check {
             status should be(MethodNotAllowed)
@@ -831,6 +869,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
           Delete(s"$collectionPath/${ActivationId.generate()}") ~> Route.seal(routes(creds)) ~> check {
             status should be(MethodNotAllowed)
@@ -846,6 +885,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid = transid()
 
           //A bad activation type which breaks the deserialization by removing the subject entry
