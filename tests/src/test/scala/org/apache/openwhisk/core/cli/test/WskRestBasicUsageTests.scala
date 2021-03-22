@@ -60,11 +60,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
   private val retriesOnTestFailures = 5
   private val waitBeforeRetry = 1.second
 
-  behavior of "Wsk API basic usage"
+  val behaviorwskapi = "Wsk API basic usage"
+  behavior of s"$behaviorwskapi"
 
   it should "allow a 3 part Fully Qualified Name (FQN) without a leading '/'" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk API basic usage"
       val testname = "allow a 3 part Fully Qualified Name (FQN) without a leading '/'"
       org.apache.openwhisk.utils
         .retry(
@@ -101,13 +101,13 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskapi should $testname not successful, retrying.."))
   }
 
-  behavior of "Wsk actions"
+  val behaviorwskactions = "Wsk actions"
+  behavior of s"$behaviorwskactions"
 
   it should "reject creating entities with invalid names" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val behaviorname = "Wsk actions"
     val testname = "reject creating entities with invalid names"
     org.apache.openwhisk.utils
       .retry(
@@ -130,12 +130,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "create, and get an action to verify parameter and annotation parsing" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "create, and get an action to verify parameter and annotation parsing"
       org.apache.openwhisk.utils
         .retry(
@@ -161,12 +160,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "create, and get an action to verify file parameter and annotation parsing" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "create, and get an action to verify file parameter and annotation parsing"
       org.apache.openwhisk.utils
         .retry(
@@ -194,12 +192,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "create an action with the proper parameter and annotation escapes" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "create an action with the proper parameter and annotation escapes"
       org.apache.openwhisk.utils
         .retry(
@@ -227,12 +224,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "invoke an action that exits during initialization and get appropriate error" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "invoke an action that exits during initialization and get appropriate error"
       org.apache.openwhisk.utils
         .retry(
@@ -251,12 +247,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "invoke an action that hangs during initialization and get appropriate error" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "invoke an action that hangs during initialization and get appropriate error"
       org.apache.openwhisk.utils
         .retry(
@@ -275,12 +270,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "invoke an action that exits during run and get appropriate error" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "invoke an action that exits during run and get appropriate error"
       org.apache.openwhisk.utils
         .retry(
@@ -299,11 +293,10 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "ensure keys are not omitted from activation record" in withAssetCleaner(wskprops) {
-    val behaviorname = "Wsk actions"
     val testname = "ensure keys are not omitted from activation record"
     val name = "activationRecordTest"
 
@@ -329,12 +322,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "write the action-path and the limits to the annotations" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "write the action-path and the limits to the annotations"
       org.apache.openwhisk.utils
         .retry(
@@ -374,12 +366,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "create, and invoke an action that utilizes an invalid docker container with appropriate error" in withAssetCleaner(
     wskprops) {
-    val behaviorname = "Wsk actions"
     val testname = "create, and invoke an action that utilizes an invalid docker container with appropriate error"
     val name = "invalidDockerContainer"
     val containerName = s"bogus${Random.alphanumeric.take(16).mkString.toLowerCase}"
@@ -411,11 +402,10 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "invoke an action using npm openwhisk" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val behaviorname = "Wsk actions"
     val testname = "invoke an action using npm openwhisk"
     org.apache.openwhisk.utils
       .retry(
@@ -440,11 +430,10 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "invoke an action receiving context properties excluding api key" in withAssetCleaner(wskprops) {
-    val behaviorname = "Wsk actions"
     val testname = "invoke an action receiving context properties excluding api key"
     assume(requireAPIKeyAnnotation)
     (wp, assetHelper) =>
@@ -474,12 +463,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "invoke an action receiving context properties including api key" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "invoke an action receiving context properties including api key"
       org.apache.openwhisk.utils
         .retry(
@@ -510,12 +498,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "invoke an action successfully with options --blocking and --result" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "invoke an action successfully with options --blocking and --result"
       org.apache.openwhisk.utils
         .retry(
@@ -532,12 +519,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "invoke an action that returns a result by the deadline" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "invoke an action that returns a result by the deadline"
       org.apache.openwhisk.utils
         .retry(
@@ -556,12 +542,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "invoke an action twice, where the first times out but the second does not and should succeed" in withAssetCleaner(
     wskprops) {
-    val behaviorname = "Wsk actions"
     val testname = "invoke an action twice, where the first times out but the second does not and should succeed"
     // this test issues two activations: the first is forced to time out and not return a result by its deadline (ie it does not resolve
     // its promise). The invoker should reclaim its container so that a second activation of the same action (which must happen within a
@@ -597,11 +582,10 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "ensure --web flags set the proper annotations" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val behaviorname = "Wsk actions"
     val testname = "ensure --web flags set the proper annotations"
     org.apache.openwhisk.utils
       .retry(
@@ -651,12 +635,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "ensure action update creates an action with --web flag" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk actions"
       val testname = "ensure action update creates an action with --web flag"
       org.apache.openwhisk.utils
         .retry(
@@ -704,11 +687,10 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
   it should "invoke action while not encoding &, <, > characters" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val behaviorname = "Wsk actions"
     val testname = "invoke action while not encoding &, <, > characters"
     org.apache.openwhisk.utils
       .retry(
@@ -732,13 +714,13 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskactions should $testname not successful, retrying.."))
   }
 
-  behavior of "Wsk packages"
+  val behaviorwskpkgs = "Wsk packages"
+  behavior of s"$behaviorwskpkgs"
 
   it should "create, and delete a package" in {
-    val behaviorname = "Wsk packages"
     val testname = "create, and delete a package"
     org.apache.openwhisk.utils
       .retry(
@@ -749,12 +731,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskpkgs should $testname not successful, retrying.."))
   }
 
   it should "create, and get a package to verify parameter and annotation parsing" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk packages"
       val testname = "create, and get a package to verify parameter and annotation parsing"
       org.apache.openwhisk.utils
         .retry(
@@ -779,12 +760,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskpkgs should $testname not successful, retrying.."))
   }
 
   it should "create, and get a package to verify file parameter and annotation parsing" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk packages"
       val testname = "create, and get a package to verify file parameter and annotation parsing"
       org.apache.openwhisk.utils
         .retry(
@@ -810,12 +790,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskpkgs should $testname not successful, retrying.."))
   }
 
   it should "create a package with the proper parameter and annotation escapes" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk packages"
       val testname = "create a package with the proper parameter and annotation escapes"
       org.apache.openwhisk.utils
         .retry(
@@ -839,11 +818,10 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwskpkgs should $testname not successful, retrying.."))
   }
 
   it should "report conformance error accessing action as package" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val behaviorname = "Wsk packages"
     val testname = "report conformance error accessing action as package"
     org.apache.openwhisk.utils
       .retry(
@@ -866,14 +844,14 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwskpkgs should $testname not successful, retrying.."))
   }
 
-  behavior of "Wsk triggers"
+  val behaviorwsktgs = "Wsk triggers"
+  behavior of s"$behaviorwsktgs"
 
   it should "create, and get a trigger to verify parameter and annotation parsing" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk triggers"
       val testname = "create, and get a trigger to verify parameter and annotation parsing"
       org.apache.openwhisk.utils
         .retry(
@@ -898,12 +876,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwsktgs should $testname not successful, retrying.."))
   }
 
   it should "create, and get a trigger to verify file parameter and annotation parsing" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk triggers"
       val testname = "create, and get a trigger to verify file parameter and annotation parsing"
       org.apache.openwhisk.utils
         .retry(
@@ -930,12 +907,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwsktgs should $testname not successful, retrying.."))
   }
 
   it should "create a trigger with the proper parameter and annotation escapes" in withAssetCleaner(wskprops) {
     (wp, assetHelper) =>
-      val behaviorname = "Wsk triggers"
       val testname = "create a trigger with the proper parameter and annotation escapes"
       org.apache.openwhisk.utils
         .retry(
@@ -960,11 +936,10 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
-          Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+          Some(s"${this.getClass.getName} > $behaviorwsktgs should $testname not successful, retrying.."))
   }
 
   it should "not create a trigger when feed fails to initialize" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val behaviorname = "Wsk triggers"
     val testname = "not create a trigger when feed fails to initialize"
     org.apache.openwhisk.utils
       .retry(
@@ -982,12 +957,11 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsktgs should $testname not successful, retrying.."))
   }
 
   it should "invoke a feed action with the correct lifecyle event when creating, retrieving and deleting a feed trigger" in withAssetCleaner(
     wskprops) { (wp, assetHelper) =>
-    val behaviorname = "Wsk triggers"
     val testname =
       "invoke a feed action with the correct lifecyle event when creating, retrieving and deleting a feed trigger"
     org.apache.openwhisk.utils
@@ -1011,6 +985,6 @@ class WskRestBasicUsageTests extends TestHelpers with WskTestHelpers with WskAct
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorwsktgs should $testname not successful, retrying.."))
   }
 }

@@ -186,7 +186,7 @@ abstract class WskEntitlementTests()
   it should "reject deleting action in shared package not owned by authkey" in withAssetCleaner(guestWskProps) {
     val behaviorname = "Wsk Package Entitlement"
     val testname = "reject deleting action in shared package not owned by authkey"
-    val samplePackage = "samplePackage-" + System.currentTimeMillis()
+    val samplePackage = "samplePackage-reject-deleting-action"
     val sampleAction = "sampleAction"
     val fullSampleActionName = s"$samplePackage/$sampleAction"
     (wp, assetHelper) =>
@@ -216,7 +216,7 @@ abstract class WskEntitlementTests()
   it should "reject create action in shared package not owned by authkey" in withAssetCleaner(guestWskProps) {
     val behaviorname = "Wsk Package Entitlement"
     val testname = "reject create action in shared package not owned by authkey"
-    val samplePackage = "samplePackage-" + System.currentTimeMillis()
+    val samplePackage = "samplePackage-reject-create-action"
     (wp, assetHelper) =>
       org.apache.openwhisk.utils
         .retry(
@@ -243,7 +243,7 @@ abstract class WskEntitlementTests()
   it should "reject update action in shared package not owned by authkey" in withAssetCleaner(guestWskProps) {
     val behaviorname = "Wsk Package Entitlement"
     val testname = "reject update action in shared package not owned by authkey"
-    val samplePackage = "samplePackage-" + System.currentTimeMillis()
+    val samplePackage = "samplePackage-reject-update-action"
     val sampleAction = "sampleAction"
     val fullSampleActionName = s"$samplePackage/$sampleAction"
     (wp, assetHelper) =>
@@ -279,7 +279,7 @@ abstract class WskEntitlementTests()
       .retry(
         {
           assetHelper.deleteAssets()
-          val samplePackage = "samplePackage-" + System.currentTimeMillis()
+          val samplePackage = "samplePackage-list-shared-packages"
           assetHelper.withCleaner(wsk.pkg, samplePackage) { (pkg, _) =>
             pkg.create(samplePackage, shared = Some(true))(wp)
           }
@@ -297,7 +297,7 @@ abstract class WskEntitlementTests()
   it should "list shared packages when package is turned into public" in withAssetCleaner(guestWskProps) {
     val behaviorname = "Wsk Package Listing"
     val testname = "list shared packages when package is turned into public"
-    val samplePackage = "samplePackage-" + System.currentTimeMillis()
+    val samplePackage = "samplePackage-list-shared-packages-when"
     (wp, assetHelper) =>
       org.apache.openwhisk.utils
         .retry(
@@ -372,7 +372,7 @@ abstract class WskEntitlementTests()
       .retry(
         {
           assetHelper.deleteAssets()
-          val samplePackage = "samplePackage-" + System.currentTimeMillis()
+          val samplePackage = "samplePackage-not-list-private-packages"
           assetHelper.withCleaner(wsk.pkg, samplePackage) { (pkg, _) =>
             pkg.create(samplePackage)(wp)
           }
@@ -400,7 +400,7 @@ abstract class WskEntitlementTests()
       .retry(
         {
           assetHelper.deleteAssets()
-          val samplePackage = "samplePackage-" + System.currentTimeMillis()
+          val samplePackage = "samplePackage-list-shared-package-actions"
           val sampleAction = "sampleAction"
           val fullSampleActionName = s"$samplePackage/$sampleAction"
           assetHelper.withCleaner(wsk.pkg, samplePackage) { (pkg, _) =>
@@ -438,7 +438,7 @@ abstract class WskEntitlementTests()
       .retry(
         {
           assetHelper.deleteAssets()
-          val samplePackage = "samplePackage-" + System.currentTimeMillis()
+          val samplePackage = "samplePackage-create-package-binding"
           assetHelper.withCleaner(wsk.pkg, samplePackage) { (pkg, _) =>
             pkg.create(samplePackage, shared = Some(true))(wp)
           }
@@ -473,7 +473,7 @@ abstract class WskEntitlementTests()
       .retry(
         {
           assetHelper.deleteAssets()
-          val samplePackage = "samplePackage-" + System.currentTimeMillis()
+          val samplePackage = "samplePackage-not-create-package-binding"
           assetHelper.withCleaner(wsk.pkg, samplePackage) { (pkg, _) =>
             pkg.create(samplePackage, shared = Some(false))(wp)
           }
@@ -500,7 +500,7 @@ abstract class WskEntitlementTests()
       .retry(
         {
           assetHelper.deleteAssets()
-          val samplePackage = "samplePackage-" + System.currentTimeMillis()
+          val samplePackage = "samplePackage-get-and-invoke-action"
           val sampleAction = "sampleAction"
           val fullSampleActionName = s"$samplePackage/$sampleAction"
           assetHelper.withCleaner(wsk.pkg, samplePackage) { (pkg, _) =>
@@ -544,7 +544,7 @@ abstract class WskEntitlementTests()
       .retry(
         {
           assetHelper.deleteAssets()
-          val samplePackage = "samplePackage-" + System.currentTimeMillis()
+          val samplePackage = "samplePackage-invoke-action-sequence"
           val sampleAction = "sampleAction"
           val fullSampleActionName = s"$samplePackage/$sampleAction"
           assetHelper.withCleaner(wsk.pkg, samplePackage) { (pkg, _) =>
@@ -584,7 +584,7 @@ abstract class WskEntitlementTests()
       .retry(
         {
           assetHelper.deleteAssets()
-          val samplePackage = "samplePackage-" + System.currentTimeMillis()
+          val samplePackage = "samplePackage-not-allow-invoke-action-sequence"
           val sampleAction = "sampleAction"
           val fullSampleActionName = s"$samplePackage/$sampleAction"
           val privateSamplePackage = samplePackage + "prv"
@@ -668,7 +668,7 @@ abstract class WskEntitlementTests()
         .retry(
           {
             assetHelper.deleteAssets()
-            val samplePackage = "samplePackage-" + System.currentTimeMillis()
+            val samplePackage = "samplePackage-not-create-trigger"
             assetHelper.withCleaner(wsk.pkg, samplePackage) { (pkg, _) =>
               pkg.create(samplePackage, shared = Some(true))(wp)
             }
