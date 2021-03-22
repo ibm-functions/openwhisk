@@ -47,13 +47,15 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
   private val retriesOnTestFailures = 5
   private val waitBeforeRetry = 1.second
 
-  behavior of "Whisk conductor actions"
+  val behaviorname = "Whisk conductor actions"
+  behavior of s"$behaviorname"
 
   var testname: String = "invoke a conductor action with no continuation"
   it should s"$testname" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           val echo = "echo" // echo conductor action
           assetHelper.withCleaner(wsk.action, echo) { (action, _) =>
             action.create(
@@ -96,7 +98,7 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > Whisk conductor actions should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   testname = "invoke a conductor action with an invalid continuation"
@@ -104,6 +106,7 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           val echo = "echo" // echo conductor action
           assetHelper.withCleaner(wsk.action, echo) { (action, _) =>
             action.create(
@@ -135,7 +138,7 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > Whisk conductor actions should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   testname = "invoke a conductor action with a continuation"
@@ -143,6 +146,7 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           val conductor = "conductor" // conductor action
           assetHelper.withCleaner(wsk.action, conductor) { (action, _) =>
             action.create(
@@ -210,7 +214,7 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > Whisk conductor actions should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   testname = "invoke nested conductor actions"
@@ -218,6 +222,7 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           val conductor = "conductor" // conductor action
           assetHelper.withCleaner(wsk.action, conductor) { (action, _) =>
             action.create(
@@ -305,7 +310,7 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > Whisk conductor actions should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   testname = "invoke a conductor action in a package binding"
@@ -313,6 +318,7 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           val ns = wsk.namespace.whois()
           val actionName = "echo" // echo conductor action
           val packageName = "package1"
@@ -384,7 +390,7 @@ class WskConductorTests extends TestHelpers with WskTestHelpers with JsHelpers w
         },
         retriesOnTestFailures,
         Some(waitBeforeRetry),
-        Some(s"${this.getClass.getName} > Whisk conductor actions should $testname not successful, retrying.."))
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
   }
 
   /**
