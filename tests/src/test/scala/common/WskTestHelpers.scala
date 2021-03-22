@@ -168,6 +168,7 @@ object RuleActivationResult extends DefaultJsonProtocol {
 trait WskTestHelpers extends Matchers {
   type Assets = ListBuffer[(DeleteFromCollectionOperations, String, Boolean)]
 
+
   /**
    * Helper to register an entity to delete once a test completes.
    * The helper sanitizes (deletes) a previous instance of the entity if it exists
@@ -181,31 +182,14 @@ trait WskTestHelpers extends Matchers {
       cli.sanitize(name)(wskprops)
 
       assetsToDeleteAfterTest += ((cli, name, confirmDelete))
+      println(s"assetsToDeleteAfterTest += $cli,$name,$confirmDelete")
       cmd(cli, name)
     }
-  }
-
-  /**
-   * Creates a test closure which records all entities created inside the test into a
-   * list that is iterated at the end of the test so that these entities are deleted
-   * (from most recently created to oldest).
-   */
-  def withAssetCleaner[T](wskprops: WskProps)(test: (WskProps, AssetCleaner) => T): T = {
-    // create new asset list to track what must be deleted after test completes
-    val assetsToDeleteAfterTest = new Assets()
-
-    try {
-      test(wskprops, new AssetCleaner(assetsToDeleteAfterTest, wskprops))
-    } catch {
-      case t: Throwable =>
-        // log the exception that occurred in the test and rethrow it
-        println(s"Exception occurred during test execution: $t")
-        t.printStackTrace()
-        throw t
-    } finally {
-      // delete assets in reverse order so that was created last is deleted first
+    def deleteAssets(): Unit = {
       val deletedAll = assetsToDeleteAfterTest.reverse map {
         case (cli, n, delete) =>
+          assetsToDeleteAfterTest -= ((cli, n, delete))
+          println(s"assetsToDeleteAfterTest -= $cli,$n,$delete")
           n -> Try {
             cli match {
               case _: PackageOperations if delete =>
@@ -243,6 +227,29 @@ trait WskTestHelpers extends Matchers {
           true
       }
       assert(deletedAll, "some assets were not deleted")
+    }
+  }
+
+  /**
+   * Creates a test closure which records all entities created inside the test into a
+   * list that is iterated at the end of the test so that these entities are deleted
+   * (from most recently created to oldest).
+   */
+  def withAssetCleaner[T](wskprops: WskProps)(test: (WskProps, AssetCleaner) => T): T = {
+    // create new asset list to track what must be deleted after test completes
+    val assetsToDeleteAfterTest = new Assets()
+
+    try {
+      test(wskprops, new AssetCleaner(assetsToDeleteAfterTest, wskprops))
+    } catch {
+      case t: Throwable =>
+        // log the exception that occurred in the test and rethrow it
+        println(s"Exception occurred during test execution: $t")
+        t.printStackTrace()
+        throw t
+    } finally {
+      // delete assets in reverse order so that was created last is deleted first
+      new AssetCleaner(assetsToDeleteAfterTest, wskprops).deleteAssets()
     }
   }
 
