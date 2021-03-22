@@ -168,7 +168,6 @@ object RuleActivationResult extends DefaultJsonProtocol {
 trait WskTestHelpers extends Matchers {
   type Assets = ListBuffer[(DeleteFromCollectionOperations, String, Boolean)]
 
-
   /**
    * Helper to register an entity to delete once a test completes.
    * The helper sanitizes (deletes) a previous instance of the entity if it exists
