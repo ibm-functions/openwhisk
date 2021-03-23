@@ -18,7 +18,6 @@
 package system.basic
 
 import java.io.File
-import java.util.UUID
 
 import io.restassured.RestAssured
 import org.junit.runner.RunWith
@@ -39,8 +38,8 @@ class WskUnicodeTests extends TestHelpers with WskTestHelpers with JsHelpers wit
   val activationMaxDuration = 2.minutes
   val activationPollDuration = 3.minutes
 
-  private val retriesOnTestFailures = 5
-  private val waitBeforeRetry = 1.second
+  private val retriesOnTestFailures = 7
+  private val waitBeforeRetry = 3.second
 
   import WskUnicodeTests._
 
@@ -84,7 +83,8 @@ class WskUnicodeTests extends TestHelpers with WskTestHelpers with JsHelpers wit
         org.apache.openwhisk.utils
           .retry(
             {
-              val name = s"unicodeGalore.${actionKind.replace(":", "")}" + UUID.randomUUID().toString()
+              assetHelper.deleteAssets()
+              val name = s"unicodeGalore.${actionKind.replace(":", "")}"
 
               assetHelper.withCleaner(wsk.action, name) { (action, _) =>
                 action

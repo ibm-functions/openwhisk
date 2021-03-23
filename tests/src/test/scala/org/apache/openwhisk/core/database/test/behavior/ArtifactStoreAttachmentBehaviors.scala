@@ -46,6 +46,7 @@ trait ArtifactStoreAttachmentBehaviors extends ArtifactStoreBehaviorBase with Ex
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
           val exec = javaDefault(nonInlinedCode(entityStore), Some("hello"))
           val javaAction =
@@ -80,6 +81,7 @@ trait ArtifactStoreAttachmentBehaviors extends ArtifactStoreBehaviorBase with Ex
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
           val code1 = nonInlinedCode(entityStore)
           val exec = javaDefault(code1, Some("hello"))
@@ -114,6 +116,7 @@ trait ArtifactStoreAttachmentBehaviors extends ArtifactStoreBehaviorBase with Ex
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           assumeAttachmentInliningEnabled(entityStore)
           implicit val tid: TransactionId = transid()
           val code1 = encodedRandomBytes(inlinedAttachmentSize(entityStore))
@@ -145,6 +148,7 @@ trait ArtifactStoreAttachmentBehaviors extends ArtifactStoreBehaviorBase with Ex
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
           val size = Math.max(nonInlinedAttachmentSize(entityStore), getAttachmentSizeForTest(entityStore))
           val base64 = encodedRandomBytes(size)
@@ -181,6 +185,7 @@ trait ArtifactStoreAttachmentBehaviors extends ArtifactStoreBehaviorBase with Ex
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           assumeAttachmentInliningEnabled(entityStore)
           implicit val tid: TransactionId = transid()
           val attachmentSize = inlinedAttachmentSize(entityStore) - 1
@@ -215,6 +220,7 @@ trait ArtifactStoreAttachmentBehaviors extends ArtifactStoreBehaviorBase with Ex
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
           val attachmentName = "foo-" + System.currentTimeMillis()
           val attachmentId =
@@ -239,6 +245,7 @@ trait ArtifactStoreAttachmentBehaviors extends ArtifactStoreBehaviorBase with Ex
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           val attachmentStore = getAttachmentStore(entityStore)
           assume(attachmentStore.isDefined, "ArtifactStore does not have attachmentStore configured")
 

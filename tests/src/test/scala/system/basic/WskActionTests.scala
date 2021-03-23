@@ -19,7 +19,6 @@ package system.basic
 
 import java.io.File
 import java.nio.charset.StandardCharsets
-import java.util.UUID
 
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
@@ -45,28 +44,34 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
   val testResult = JsObject("count" -> testString.split(" ").length.toJson)
   val guestNamespace = wskprops.namespace
 
-  behavior of "Whisk actions"
+  val retriesOnTestFailures = 5
+  val waitBeforeRetry = 1.second
+
+  val behaviorname = "Whisk actions"
+  behavior of s"$behaviorname"
 
   it should "create an action with an empty file" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "empty-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "empty"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             action.create(name, Some(TestUtils.getTestActionFilename("empty.js")))
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should create an action with an empty file not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should create an action with an empty file not successful, retrying.."))
   }
 
   it should "invoke an action returning a promise" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "hello promise-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "hello promise"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             action.create(name, Some(TestUtils.getTestActionFilename("helloPromise.js")))
           }
@@ -78,17 +83,18 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             activation.logs.get.mkString(" ") shouldBe empty
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should invoke an action returning a promise not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should invoke an action returning a promise not successful, retrying.."))
   }
 
   it should "invoke an action with a space in the name" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "hello Async-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "hello Async"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             action.create(name, Some(TestUtils.getTestActionFilename("helloAsync.js")))
           }
@@ -100,10 +106,10 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             activation.logs.get.mkString(" ") should include(testString)
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should invoke an action with a space in the name not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should invoke an action with a space in the name not successful, retrying.."))
   }
 
   it should "invoke an action that throws an uncaught exception and returns correct status code" in withAssetCleaner(
@@ -111,7 +117,8 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "throwExceptionAction-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "throwExceptionAction"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             action.create(name, Some(TestUtils.getTestActionFilename("runexception.js")))
           }
@@ -123,17 +130,18 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
               JsObject("error" -> "An error has occurred: Extraordinary exception".toJson))
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should invoke an action that throws an uncaught exception and returns correct status code not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should invoke an action that throws an uncaught exception and returns correct status code not successful, retrying.."))
   }
 
   it should "pass parameters bound on creation-time to the action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "printParams-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "printParams"
           val params = Map("param1" -> "test1", "param2" -> "test2")
 
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
@@ -154,18 +162,19 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             }
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should pass parameters bound on creation-time to the action not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should pass parameters bound on creation-time to the action not successful, retrying.."))
   }
 
   it should "copy an action and invoke it successfully" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "copied-" + UUID.randomUUID().toString()
-          val packageName = "samples-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "copied"
+          val packageName = "samples-copy-action-and-invoke"
           val actionName = "wordcount"
           val fullQualifiedName = s"/$guestNamespace/$packageName/$actionName"
 
@@ -190,10 +199,10 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             activation.logs.get.mkString(" ") should include(testString)
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should copy an action and invoke it successfully not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should copy an action and invoke it successfully not successful, retrying.."))
   }
 
   it should "copy an action and ensure exec, parameters, and annotations copied" in withAssetCleaner(wskprops) {
@@ -201,8 +210,9 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
       org.apache.openwhisk.utils
         .retry(
           {
-            val origActionName = "origAction-" + UUID.randomUUID().toString()
-            val copiedActionName = "copiedAction-" + UUID.randomUUID().toString()
+            assetHelper.deleteAssets()
+            val origActionName = "origAction"
+            val copiedActionName = "copiedAction"
             val params = Map("a" -> "A".toJson)
             val annots = Map("b" -> "B".toJson)
 
@@ -224,10 +234,10 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             copiedAction.fields("exec") shouldBe origAction.fields("exec")
             copiedAction.fields("version") shouldBe JsString("0.0.1")
           },
-          10,
-          Some(1.second),
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
           Some(
-            s"system.basic.WskActionTests.Whisk actions.should copy an action and ensure exec, parameters, and annotations copied not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should copy an action and ensure exec, parameters, and annotations copied not successful, retrying.."))
   }
 
   it should "add new parameters and annotations while copying an action" in withAssetCleaner(wskprops) {
@@ -235,9 +245,10 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
       org.apache.openwhisk.utils
         .retry(
           {
+            assetHelper.deleteAssets()
             val runtime = "nodejs:default"
-            val origName = "origAction-" + UUID.randomUUID().toString()
-            val copiedName = "copiedAction-" + UUID.randomUUID().toString()
+            val origName = "origAction"
+            val copiedName = "copiedAction"
             val origParams = Map("origParam1" -> "origParamValue1".toJson, "origParam2" -> 999.toJson)
             val copiedParams = Map("copiedParam1" -> "copiedParamValue1".toJson, "copiedParam2" -> 123.toJson)
             val origAnnots = Map("origAnnot1" -> "origAnnotValue1".toJson, "origAnnot2" -> true.toJson)
@@ -289,10 +300,10 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
               .convertTo[Seq[JsObject]]
               .filter(annotation => annotation.fields("key").convertTo[String] != "exec") diff resAnnots shouldBe List.empty
           },
-          10,
-          Some(1.second),
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
           Some(
-            s"system.basic.WskActionTests.Whisk actions.should add new parameters and annotations while copying an action not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should add new parameters and annotations while copying an action not successful, retrying.."))
 
   }
 
@@ -300,7 +311,8 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "recreatedAction-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "recreatedAction"
           assetHelper.withCleaner(wsk.action, name, false) { (action, _) =>
             action.create(name, Some(TestUtils.getTestActionFilename("wc.js")))
           }
@@ -322,17 +334,18 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             activation.logs.get.mkString(" ") should include(s"hello, $testString")
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should recreate and invoke a new action with different code not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should recreate and invoke a new action with different code not successful, retrying.."))
   }
 
   it should "fail to invoke an action with an empty file" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "empty-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "empty"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             action.create(name, Some(TestUtils.getTestActionFilename("empty.js")))
           }
@@ -342,17 +355,18 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             activation.response.result shouldBe Some(JsObject("error" -> "Missing main/no code to execute.".toJson))
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should fail to invoke an action with an empty file not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should fail to invoke an action with an empty file not successful, retrying.."))
   }
 
   it should "blocking invoke of nested blocking actions" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "nestedBlockingAction-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "nestedBlockingAction"
           val child = "wc"
 
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
@@ -375,17 +389,18 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
               "binaryCount" -> s"${wordCount.toBinaryString} (base 2)".toJson)
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should blocking invoke of nested blocking actions not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should blocking invoke of nested blocking actions not successful, retrying.."))
   }
 
   it should "blocking invoke an asynchronous action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "helloAsync-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "helloAsync"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             action.create(name, Some(TestUtils.getTestActionFilename("helloAsync.js")))
           }
@@ -399,17 +414,18 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             activation.logs shouldBe Some(List.empty)
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should blocking invoke an asynchronous action not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should blocking invoke an asynchronous action not successful, retrying.."))
   }
 
   it should "not be able to use 'ping' in an action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "ping-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "ping"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             action.create(name, Some(TestUtils.getTestActionFilename("ping.js")))
           }
@@ -425,17 +441,18 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             }
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should not be able to use 'ping' in an action not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should not be able to use 'ping' in an action not successful, retrying.."))
   }
 
   it should "support UTF-8 as input and output format" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "utf8Test-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "utf8Test"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             action.create(name, Some(TestUtils.getTestActionFilename("hello.js")))
           }
@@ -447,17 +464,18 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             activation.logs.get.mkString(" ") should include(s"hello, $utf8")
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should support UTF-8 as input and output format not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should support UTF-8 as input and output format not successful, retrying.."))
   }
 
   it should "invoke action with large code" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "big-hello-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "big-hello"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             val filePath = TestUtils.getTestActionFilename("hello.js")
             val code = FileUtils.readFileToString(new File(filePath), StandardCharsets.UTF_8)
@@ -476,10 +494,10 @@ class WskActionTests extends TestHelpers with WskTestHelpers with JsHelpers with
             activation.logs.get.mkString(" ") should include(s"hello, $hello")
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"system.basic.WskActionTests.Whisk actions.should invoke action with large code not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should invoke action with large code not successful, retrying.."))
   }
 
 }

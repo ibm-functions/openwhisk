@@ -21,7 +21,6 @@ import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 import common.TestHelpers
 import common.TestUtils
-import common.TestUtils.RunResult
 import common.WskOperations
 import common.WskProps
 import common.WskTestHelpers
@@ -41,8 +40,8 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
   val testString = "this is a test"
   val testResult = JsObject("count" -> testString.split(" ").length.toJson)
 
-  private val retriesOnTestFailures = 5
-  private val waitBeforeRetry = 1.second
+  val retriesOnTestFailures = 5
+  val waitBeforeRetry = 1.second
 
   /**
    * Sets up trigger -> rule -> action triplets. Deduplicates triggers and rules
@@ -78,13 +77,15 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
     }
   }
 
-  behavior of "Whisk rules"
+  val behaviorname = "Whisk rules"
+  behavior of s"$behaviorname"
 
   it should "invoke the action attached on trigger fire, creating an activation for each entity including the cause" in withAssetCleaner(
     wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           val ruleName = withTimestamp("r1to1")
           val triggerName = withTimestamp("t1to1")
           val actionName = withTimestamp("a1 to 1") // spaces in name intended for greater test coverage
@@ -112,7 +113,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
         retriesOnTestFailures,
         Some(waitBeforeRetry),
         Some(
-          s"${this.getClass.getName} > Whisk rules should invoke the action attached on trigger fire, creating an activation for each entity including the cause not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should invoke the action attached on trigger fire, creating an activation for each entity including the cause not successful, retrying.."))
   }
 
   it should "invoke the action from a package attached on trigger fire, creating an activation for each entity including the cause" in withAssetCleaner(
@@ -120,6 +121,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           val ruleName = withTimestamp("pr1to1")
           val triggerName = withTimestamp("pt1to1")
           val pkgName = withTimestamp("rule pkg") // spaces in name intended to test uri path encoding
@@ -153,7 +155,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
         retriesOnTestFailures,
         Some(waitBeforeRetry),
         Some(
-          s"${this.getClass.getName} > Whisk rules should invoke the action from a package attached on trigger fire, creating an activation for each entity including the cause not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should invoke the action from a package attached on trigger fire, creating an activation for each entity including the cause not successful, retrying.."))
   }
 
   it should "invoke the action from a package binding attached on trigger fire, creating an activation for each entity including the cause" in withAssetCleaner(
@@ -161,6 +163,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           val ruleName = withTimestamp("pr1to1")
           val triggerName = withTimestamp("pt1to1")
           val pkgName = withTimestamp("rule pkg") // spaces in name intended to test uri path encoding
@@ -201,7 +204,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
         retriesOnTestFailures,
         Some(waitBeforeRetry),
         Some(
-          s"${this.getClass.getName} > Whisk rules should invoke the action from a package binding attached on trigger fire, creating an activation for each entity including the cause not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should invoke the action from a package binding attached on trigger fire, creating an activation for each entity including the cause not successful, retrying.."))
   }
 
   it should "not activate an action if the rule is deleted when the trigger is fired" in withAssetCleaner(wskprops) {
@@ -209,6 +212,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
       org.apache.openwhisk.utils
         .retry(
           {
+            assetHelper.deleteAssets()
             val ruleName = withTimestamp("ruleDelete")
             val triggerName = withTimestamp("ruleDeleteTrigger")
             val actionName = withTimestamp("ruleDeleteAction")
@@ -233,7 +237,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
           retriesOnTestFailures,
           Some(waitBeforeRetry),
           Some(
-            s"${this.getClass.getName} > Whisk rules should not activate an action if the rule is deleted when the trigger is fired not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should not activate an action if the rule is deleted when the trigger is fired not successful, retrying.."))
   }
 
   it should "enable and disable a rule and check action is activated only when rule is enabled" in withAssetCleaner(
@@ -241,6 +245,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           val ruleName = withTimestamp("ruleDisable")
           val triggerName = withTimestamp("ruleDisableTrigger")
           val actionName = withTimestamp("ruleDisableAction")
@@ -276,7 +281,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
         retriesOnTestFailures,
         Some(waitBeforeRetry),
         Some(
-          s"${this.getClass.getName} > Whisk rules should enable and disable a rule and check action is activated only when rule is enabled not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should enable and disable a rule and check action is activated only when rule is enabled not successful, retrying.."))
   }
 
   it should "be able to recreate a rule with the same name and match it successfully" in withAssetCleaner(wskprops) {
@@ -284,6 +289,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
       org.apache.openwhisk.utils
         .retry(
           {
+            assetHelper.deleteAssets()
             val ruleName = withTimestamp("ruleRecreate")
             val triggerName1 = withTimestamp("ruleRecreateTrigger1")
             val triggerName2 = withTimestamp("ruleRecreateTrigger2")
@@ -321,7 +327,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
           retriesOnTestFailures,
           Some(waitBeforeRetry),
           Some(
-            s"${this.getClass.getName} > Whisk rules should be able to recreate a rule with the same name and match it successfully not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should be able to recreate a rule with the same name and match it successfully not successful, retrying.."))
   }
 
   it should "connect two triggers via rules to one action and activate it accordingly" in withAssetCleaner(wskprops) {
@@ -329,6 +335,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
       org.apache.openwhisk.utils
         .retry(
           {
+            assetHelper.deleteAssets()
             val triggerName1 = withTimestamp("t2to1a")
             val triggerName2 = withTimestamp("t2to1b")
             val actionName = withTimestamp("a2to1")
@@ -358,7 +365,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
           retriesOnTestFailures,
           Some(waitBeforeRetry),
           Some(
-            s"${this.getClass.getName} > Whisk rules should connect two triggers via rules to one action and activate it accordingly not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should connect two triggers via rules to one action and activate it accordingly not successful, retrying.."))
   }
 
   it should "connect one trigger to two different actions, invoking them both eventually" in withAssetCleaner(wskprops) {
@@ -366,6 +373,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
       org.apache.openwhisk.utils
         .retry(
           {
+            assetHelper.deleteAssets()
             val triggerName = withTimestamp("t1to2")
             val actionName1 = withTimestamp("a1to2a")
             val actionName2 = withTimestamp("a1to2b")
@@ -397,7 +405,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
           retriesOnTestFailures,
           Some(waitBeforeRetry),
           Some(
-            s"${this.getClass.getName} > Whisk rules should connect one trigger to two different actions, invoking them both eventually not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should connect one trigger to two different actions, invoking them both eventually not successful, retrying.."))
   }
 
   it should "connect two triggers to two different actions, invoking them both eventually" in withAssetCleaner(wskprops) {
@@ -405,6 +413,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
       org.apache.openwhisk.utils
         .retry(
           {
+            assetHelper.deleteAssets()
             val triggerName1 = withTimestamp("t1to1a")
             val triggerName2 = withTimestamp("t1to1b")
             val actionName1 = withTimestamp("a1to1a")
@@ -447,7 +456,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
           retriesOnTestFailures,
           Some(waitBeforeRetry),
           Some(
-            s"${this.getClass.getName} > Whisk rules should connect two triggers to two different actions, invoking them both eventually not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should connect two triggers to two different actions, invoking them both eventually not successful, retrying.."))
   }
 
   it should "disable a rule and check its status is displayed when listed" in withAssetCleaner(wskprops) {
@@ -455,6 +464,7 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
       org.apache.openwhisk.utils
         .retry(
           {
+            assetHelper.deleteAssets()
             val ruleName = withTimestamp("ruleDisable")
             val ruleName2 = withTimestamp("ruleEnable")
             val triggerName = withTimestamp("ruleDisableTrigger")
@@ -468,15 +478,16 @@ abstract class WskRuleTests extends TestHelpers with WskTestHelpers {
 
             wsk.rule.disable(ruleName)
             val ruleListResult = wsk.rule.list()
-            verifyRuleList(ruleListResult, ruleName2, ruleName)
+            verifyRuleList(ruleName2, ruleName)
           },
           retriesOnTestFailures,
           Some(waitBeforeRetry),
           Some(
-            s"${this.getClass.getName} > Whisk rules should disable a rule and check its status is displayed when listed not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should disable a rule and check its status is displayed when listed not successful, retrying.."))
   }
 
-  def verifyRuleList(ruleListResult: RunResult, ruleNameEnable: String, ruleName: String) = {
+  def verifyRuleList(ruleNameEnable: String, ruleName: String) = {
+    val ruleListResult = wsk.rule.list()
     val ruleList = ruleListResult.stdout
     val listOutput = ruleList.linesIterator
     listOutput.find(_.contains(ruleNameEnable)).get should (include(ruleNameEnable) and include("active"))

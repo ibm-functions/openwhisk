@@ -16,7 +16,6 @@
  */
 
 package system.basic
-import java.util.UUID
 
 import common.JsHelpers
 import common.TestHelpers
@@ -50,7 +49,8 @@ class WskMultiRuntimeTests extends TestHelpers with WskTestHelpers with JsHelper
       org.apache.openwhisk.utils
         .retry(
           {
-            val name = "updatedAction-" + UUID.randomUUID().toString()
+            assetHelper.deleteAssets()
+            val name = "updatedAction-update-action-with-different-language"
 
             assetHelper.withCleaner(wsk.action, name, false) { (action, _) =>
               wsk.action.create(

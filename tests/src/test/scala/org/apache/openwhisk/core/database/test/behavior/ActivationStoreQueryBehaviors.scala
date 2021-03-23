@@ -101,6 +101,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -124,6 +125,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -160,6 +162,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -179,6 +182,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -198,6 +202,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -217,6 +222,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
 
           a[IllegalArgumentException] should be thrownBy activationStore
@@ -237,6 +243,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -260,6 +267,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -299,6 +307,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -318,6 +327,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -342,6 +352,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -361,6 +372,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
 
           a[IllegalArgumentException] should be thrownBy activationStore.listActivationsMatchingName(
@@ -389,6 +401,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -408,6 +421,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -433,6 +447,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -472,6 +487,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
           val namespace = s"ns_${Random.alphanumeric.take(4).mkString}"
           val action1 = s"action1_${Random.alphanumeric.take(4).mkString}"
@@ -492,6 +508,7 @@ trait ActivationStoreQueryBehaviors extends ActivationStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transId()
 
           a[IllegalArgumentException] should be thrownBy activationStore

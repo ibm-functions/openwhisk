@@ -17,7 +17,7 @@
 
 package system.basic
 
-import java.util.{Date, UUID}
+import java.util.Date
 
 import scala.language.postfixOps
 import scala.collection.mutable.HashMap
@@ -42,12 +42,14 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
   private val retriesOnTestFailures = 5
   private val waitBeforeRetry = 1.second
 
-  behavior of "Wsk Package"
+  val behaviorname = "Wsk Package"
+  behavior of s"$behaviorname"
 
   it should "allow creation and deletion of a package" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils.retry(
       {
-        val name = "simplepackage-" + UUID.randomUUID().toString()
+        assetHelper.deleteAssets()
+        val name = "simplepackage-allow"
         assetHelper.withCleaner(wsk.pkg, name) { (pkg, _) =>
           pkg.create(name, Map.empty)
         }
@@ -55,7 +57,7 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
       retriesOnTestFailures,
       Some(waitBeforeRetry),
       Some(
-        s"${this.getClass.getName} > Wsk Package should allow creation and deletion of a package not successful, retrying.."))
+        s"${this.getClass.getName} > $behaviorname should allow creation and deletion of a package not successful, retrying.."))
   }
 
   val params1 = Map("p1" -> "v1".toJson, "p2" -> "".toJson)
@@ -64,7 +66,8 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
   it should "allow creation of a package with parameters" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils.retry(
       {
-        val name = "simplepackagewithparams-" + UUID.randomUUID().toString()
+        assetHelper.deleteAssets()
+        val name = "simplepackagewithparams"
         assetHelper.withCleaner(wsk.pkg, name) { (pkg, _) =>
           pkg.create(name, params1)
         }
@@ -72,13 +75,14 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
       retriesOnTestFailures,
       Some(waitBeforeRetry),
       Some(
-        s"${this.getClass.getName} > Wsk Package should allow creation of a package with parameters not successful, retrying.."))
+        s"${this.getClass.getName} > $behaviorname should allow creation of a package with parameters not successful, retrying.."))
   }
 
   it should "allow updating a package" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils.retry(
       {
-        val name = "simplepackagetoupdate-" + UUID.randomUUID().toString()
+        assetHelper.deleteAssets()
+        val name = "simplepackagetoupdate"
         assetHelper.withCleaner(wsk.pkg, name) { (pkg, _) =>
           pkg.create(name, params1)
           pkg.create(name, params2, update = true)
@@ -86,14 +90,15 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
       },
       retriesOnTestFailures,
       Some(waitBeforeRetry),
-      Some(s"${this.getClass.getName} > Wsk Package should allow updating a package not successful, retrying.."))
+      Some(s"${this.getClass.getName} > $behaviorname should allow updating a package not successful, retrying.."))
   }
 
   it should "allow binding of a package" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils.retry(
       {
-        val name = "simplepackagetobind-" + UUID.randomUUID().toString()
-        val bindName = "simplebind-" + UUID.randomUUID().toString()
+        assetHelper.deleteAssets()
+        val name = "simplepackagetobind"
+        val bindName = "simplebind"
         assetHelper.withCleaner(wsk.pkg, name) { (pkg, _) =>
           pkg.create(name, params1)
         }
@@ -103,15 +108,16 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
       },
       retriesOnTestFailures,
       Some(waitBeforeRetry),
-      Some(s"${this.getClass.getName} > Wsk Package should allow binding of a package not successful, retrying.."))
+      Some(s"${this.getClass.getName} > $behaviorname should allow binding of a package not successful, retrying.."))
   }
 
   it should "perform package binds so parameters are inherited" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val packageName = "package1-" + UUID.randomUUID().toString()
-          val bindName = "package2-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val packageName = "package1-perform-bind"
+          val bindName = "package2-perform-bind"
           val actionName = "print"
           val packageActionName = packageName + "/" + actionName
           val bindActionName = bindName + "/" + actionName
@@ -150,7 +156,7 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
         retriesOnTestFailures,
         Some(waitBeforeRetry),
         Some(
-          s"${this.getClass.getName} > Wsk Package should perform package binds so parameters are inherited not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should perform package binds so parameters are inherited not successful, retrying.."))
   }
 
   it should "contain an binding annotation if invoked action is in the package binding" in withAssetCleaner(wskprops) {
@@ -158,9 +164,10 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
       org.apache.openwhisk.utils
         .retry(
           {
+            assetHelper.deleteAssets()
             val ns = wsk.namespace.whois()
-            val packageName = "package1-" + UUID.randomUUID().toString()
-            val bindName = "package2-" + UUID.randomUUID().toString()
+            val packageName = "package1-contain-annotation"
+            val bindName = "package2-contain-annotation"
             val actionName = "print"
             val packageActionName = packageName + "/" + actionName
             val bindActionName = bindName + "/" + actionName
@@ -186,7 +193,7 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
           retriesOnTestFailures,
           Some(waitBeforeRetry),
           Some(
-            s"${this.getClass.getName} > Wsk Package should contain an binding annotation if invoked action is in the package binding not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should contain an binding annotation if invoked action is in the package binding not successful, retrying.."))
   }
 
   it should "not contain an binding annotation if invoked action is not in the package binding" in withAssetCleaner(
@@ -194,8 +201,9 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
     org.apache.openwhisk.utils
       .retry(
         {
-          val packageName = "package1-" + UUID.randomUUID().toString()
-          val actionName = "print-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val packageName = "package1-contain-annotation-if"
+          val actionName = "print"
           val packageActionName = packageName + "/" + actionName
 
           val file = TestUtils.getTestActionFilename("echo.js")
@@ -222,7 +230,7 @@ class WskPackageTests extends TestHelpers with WskTestHelpers with WskActorSyste
         retriesOnTestFailures,
         Some(waitBeforeRetry),
         Some(
-          s"${this.getClass.getName} > Wsk Package should not contain an binding annotation if invoked action is not in the package binding not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should not contain an binding annotation if invoked action is not in the package binding not successful, retrying.."))
   }
 
   /**

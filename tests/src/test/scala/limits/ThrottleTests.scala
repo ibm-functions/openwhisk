@@ -18,7 +18,6 @@
 package limits
 
 import java.time.Instant
-import java.util.UUID
 
 import akka.http.scaladsl.model.StatusCodes.TooManyRequests
 
@@ -167,13 +166,18 @@ class ThrottleTests
     }
   }
 
-  behavior of "Throttles"
+  val retriesOnTestFailures = 5
+  val waitBeforeRetry = 1.second
+
+  val behaviorname = "Throttles"
+  behavior of s"$behaviorname"
 
   it should "throttle multiple activations of one action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "checkPerMinuteActionThrottle-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "checkPerMinuteActionThrottle"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             action.create(name, defaultAction)
           }
@@ -207,17 +211,18 @@ class ThrottleTests
           println("waiting for activations to complete")
           waitForActivations(results.par)
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"limits.ThrottleTests.Throttles.should throttle multiple activations of one action not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should throttle multiple activations of one action not successful, retrying.."))
   }
 
   it should "throttle multiple activations of one trigger" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "checkPerMinuteTriggerThrottle-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "checkPerMinuteTriggerThrottle"
           assetHelper.withCleaner(wsk.trigger, name) { (trigger, _) =>
             trigger.create(name)
           }
@@ -238,17 +243,18 @@ class ThrottleTests
             settleThrottles(alreadyWaited)
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"limits.ThrottleTests.Throttles.should throttle multiple activations of one trigger not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should throttle multiple activations of one trigger not successful, retrying.."))
   }
 
   it should "throttle 'concurrent' activations of one action" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "checkConcurrentActionThrottle-" + UUID.randomUUID().toString()
+          assetHelper.deleteAssets()
+          val name = "checkConcurrentActionThrottle"
           assetHelper.withCleaner(wsk.action, name) {
             val timeoutAction = Some(TestUtils.getTestActionFilename("sleep.js"))
             (action, _) =>
@@ -310,10 +316,10 @@ class ThrottleTests
           println("waiting for activations to complete")
           waitForActivations(combinedResults.par)
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"limits.ThrottleTests.Throttles.should throttle 'concurrent' activations of one action not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should 'concurrent' activations of one action not successful, retrying.."))
   }
 }
 
@@ -381,15 +387,20 @@ class NamespaceSpecificThrottleTests
     sanitizeNamespaces(Seq(zeroProps, zeroConcProps, oneProps, oneSequenceProps, activationDisabled).map(_.namespace))
   }
 
-  behavior of "Namespace-specific throttles"
+  val retriesOnTestFailures = 5
+  val waitBeforeRetry = 1.second
+
+  val behaviorname = "Namespace-specific throttles"
+  behavior of s"$behaviorname"
 
   it should "respect overridden rate-throttles of 0" in withAssetCleaner(zeroProps) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           implicit val props = wp
-          val triggerName = "zeroTrigger" + UUID.randomUUID().toString()
-          val actionName = "zeroAction-" + UUID.randomUUID().toString()
+          val triggerName = "zeroTrigger"
+          val actionName = "zeroAction"
 
           assetHelper.withCleaner(wsk.action, actionName) { (action, _) =>
             action.create(actionName, defaultAction)
@@ -405,19 +416,20 @@ class NamespaceSpecificThrottleTests
             include(prefix(tooManyRequests(0, 0))) and include("allowed: 0")
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"limits.ThrottleTests.Namespace-specific throttles.should respect overridden rate-throttles of 0 not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should respect overridden rate-throttles of 0 not successful, retrying.."))
   }
 
   it should "respect overridden rate-throttles of 1" in withAssetCleaner(oneProps) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
+          assetHelper.deleteAssets()
           implicit val props = wp
-          val triggerName = "oneTrigger-" + UUID.randomUUID().toString()
-          val actionName = "oneAction-" + UUID.randomUUID().toString()
+          val triggerName = "oneTrigger"
+          val actionName = "oneAction"
 
           assetHelper.withCleaner(wsk.action, actionName) { (action, _) =>
             action.create(actionName, defaultAction)
@@ -456,101 +468,109 @@ class NamespaceSpecificThrottleTests
             }
           }, 2, Some(1.second))
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"limits.ThrottleTests.Namespace-specific throttles.should respect overridden rate-throttles of 1 not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should respect overridden rate-throttles of 1 not successful, retrying.."))
   }
 
   // One sequence invocation should count as one invocation for rate throttling purposes.
   // This is independent of the number of actions in the sequences.
   it should "respect overridden rate-throttles of 1 for sequences" in withAssetCleaner(oneSequenceProps) {
-    org.apache.openwhisk.utils.retry(
-      { (wp, assetHelper) =>
-        implicit val props = wp
+    (wp, assetHelper) =>
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            implicit val props = wp
 
-        val actionName = "oneAction-" + UUID.randomUUID().toString()
-        val sequenceName = "oneSequence-" + UUID.randomUUID().toString()
+            val actionName = "oneAction"
+            val sequenceName = "oneSequence"
 
-        assetHelper.withCleaner(wsk.action, actionName) { (action, _) =>
-          action.create(actionName, defaultAction)
-        }
+            assetHelper.withCleaner(wsk.action, actionName) { (action, _) =>
+              action.create(actionName, defaultAction)
+            }
 
-        assetHelper.withCleaner(wsk.action, sequenceName) { (action, _) =>
-          action.create(sequenceName, Some(s"$actionName,$actionName"), kind = Some("sequence"))
-        }
+            assetHelper.withCleaner(wsk.action, sequenceName) { (action, _) =>
+              action.create(sequenceName, Some(s"$actionName,$actionName"), kind = Some("sequence"))
+            }
 
-        val deployedControllers = WhiskProperties.getControllerHosts.split(",").length
-        System.out.println(
-          s"deployedControllers: ${WhiskProperties.getControllerHosts.split(",")}, count: $deployedControllers")
+            val deployedControllers = WhiskProperties.getControllerHosts.split(",").length
+            System.out.println(
+              s"deployedControllers: ${WhiskProperties.getControllerHosts.split(",")}, count: $deployedControllers")
 
-        // One invoke should be allowed.
-        wsk.action
-          .invoke(sequenceName, expectedExitCode = TestUtils.DONTCARE_EXIT)
-          .exitCode shouldBe TestUtils.SUCCESS_EXIT
+            // One invoke should be allowed.
+            wsk.action
+              .invoke(sequenceName, expectedExitCode = TestUtils.DONTCARE_EXIT)
+              .exitCode shouldBe TestUtils.SUCCESS_EXIT
 
-        // One invoke should be allowed, the second one throttled.
-        // Due to the current implementation of the rate throttling,
-        // it is possible that the counter gets deleted, because the minute switches.
-        retry({
-          val results = (1 to deployedControllers + 1).map { _ =>
-            wsk.action.invoke(sequenceName, expectedExitCode = TestUtils.DONTCARE_EXIT)
-          }
-          results.map(_.exitCode) should contain(TestUtils.THROTTLED)
-          results.map(_.stderr).mkString should {
-            include(prefix(tooManyRequests(0, 0))) and include(s"allowed: $deployedControllers")
-          }
-        }, 2, Some(1.second))
-      },
-      10,
-      Some(1.second),
-      Some(
-        s"limits.ThrottleTests.Namespace-specific throttles.should respect overridden rate-throttles of 1 for sequences not successful, retrying.."))
+            // One invoke should be allowed, the second one throttled.
+            // Due to the current implementation of the rate throttling,
+            // it is possible that the counter gets deleted, because the minute switches.
+            retry({
+              val results = (1 to deployedControllers + 1).map { _ =>
+                wsk.action.invoke(sequenceName, expectedExitCode = TestUtils.DONTCARE_EXIT)
+              }
+              results.map(_.exitCode) should contain(TestUtils.THROTTLED)
+              results.map(_.stderr).mkString should {
+                include(prefix(tooManyRequests(0, 0))) and include(s"allowed: $deployedControllers")
+              }
+            }, 2, Some(1.second))
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(
+            s"${this.getClass.getName} > $behaviorname should respect overridden rate-throttles of 1 for sequences not successful, retrying.."))
   }
 
   it should "respect overridden concurrent throttle of 0" in withAssetCleaner(zeroConcProps) { (wp, assetHelper) =>
-    org.apache.openwhisk.utils.retry(
-      {
-        implicit val props = wp
-        val actionName = "zeroConcurrentAction-" + UUID.randomUUID().toString()
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          assetHelper.deleteAssets()
+          implicit val props = wp
+          val actionName = "zeroConcurrentAction"
 
-        assetHelper.withCleaner(wsk.action, actionName) { (action, _) =>
-          action.create(actionName, defaultAction)
-        }
+          assetHelper.withCleaner(wsk.action, actionName) { (action, _) =>
+            action.create(actionName, defaultAction)
+          }
 
-        wsk.action.invoke(actionName, expectedExitCode = TooManyRequests.intValue).stderr should {
-          include(prefix(tooManyConcurrentRequests(0, 0))) and include("allowed: 0")
-        }
-      },
-      10,
-      Some(1.second),
-      Some(
-        s"limits.ThrottleTests.Namespace-specific throttles.should respect overridden concurrent throttle of 0 for sequences not successful, retrying.."))
+          wsk.action.invoke(actionName, expectedExitCode = TooManyRequests.intValue).stderr should {
+            include(prefix(tooManyConcurrentRequests(0, 0))) and include("allowed: 0")
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(
+          s"${this.getClass.getName} > $behaviorname should respect overridden concurrent throttle of 0 for sequences not successful, retrying.."))
   }
 
   it should "not store an activation if disabled for this namespace" in withAssetCleaner(activationDisabled) {
-    org.apache.openwhisk.utils.retry(
-      { (wp, assetHelper) =>
-        implicit val props = wp
-        val actionName = "activationDisabled-" + UUID.randomUUID().toString()
+    (wp, assetHelper) =>
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            assetHelper.deleteAssets()
+            implicit val props = wp
+            val actionName = "activationDisabled"
 
-        assetHelper.withCleaner(wsk.action, actionName) { (action, _) =>
-          action.create(actionName, defaultAction)
-        }
+            assetHelper.withCleaner(wsk.action, actionName) { (action, _) =>
+              action.create(actionName, defaultAction)
+            }
 
-        val runResult = wsk.action.invoke(actionName)
-        val activationId = wsk.activation.extractActivationId(runResult)
-        withClue(s"did not find an activation id in '$runResult'") {
-          activationId shouldBe a[Some[_]]
-        }
+            val runResult = wsk.action.invoke(actionName)
+            val activationId = wsk.activation.extractActivationId(runResult)
+            withClue(s"did not find an activation id in '$runResult'") {
+              activationId shouldBe a[Some[_]]
+            }
 
-        val activation = wsk.activation.waitForActivation(activationId.get)
+            val activation = wsk.activation.waitForActivation(activationId.get)
 
-        activation shouldBe 'Left
-      },
-      10,
-      Some(1.second),
-      Some(
-        s"limits.ThrottleTests.Namespace-specific throttles.should not store an activation if disabled for this namespace not successful, retrying.."))
+            activation shouldBe 'Left
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(
+            s"${this.getClass.getName} > $behaviorname should not store an activation if disabled for this namespace not successful, retrying.."))
   }
 }

@@ -77,7 +77,11 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
   // * With Docker 18.09.3, we observed test failures and changed to "openFileLimit - 24".
   val minExpectedOpenFiles = openFileLimit - 24
 
-  behavior of "Action limits"
+  val retriesOnTestFailures = 5
+  val waitBeforeRetry = 1.second
+
+  val behaviorname = "Action limits"
+  behavior of s"$behaviorname"
 
   /**
    * Helper class for the integration test following below.
@@ -219,7 +223,8 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
       org.apache.openwhisk.utils
         .retry(
           {
-            val name = "TestActionCausingTimeout-" + System.currentTimeMillis()
+            assetHelper.deleteAssets()
+            val name = "TestActionCausingTimeout"
             assetHelper.withCleaner(wsk.action, name, confirmDelete = true) { (action, _) =>
               action.create(name, Some(defaultSleepAction), timeout = Some(allowedActionDuration))
             }
@@ -236,10 +241,10 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
               }
             }
           },
-          10,
-          Some(1.second),
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
           Some(
-            s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should error with a proper warning if the action exceeds its time limits not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should error with a proper warning if the action exceeds its time limits not successful, retrying.."))
   }
 
   /**
@@ -251,7 +256,8 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "TestActionCausingNoTimeout-" + System.currentTimeMillis()
+          assetHelper.deleteAssets()
+          val name = "TestActionCausingNoTimeout"
           assetHelper.withCleaner(wsk.action, name, confirmDelete = true) { (action, _) =>
             action.create(name, Some(defaultSleepAction), timeout = Some(allowedActionDuration))
           }
@@ -265,10 +271,10 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
             }
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should succeed on an action staying within its time limits not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should succeed on an action staying within its time limits not successful, retrying.."))
   }
 
   it should "succeed but truncate logs, if log size exceeds its limit" in withAssetCleaner(wskprops) {
@@ -276,9 +282,10 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
       org.apache.openwhisk.utils
         .retry(
           {
+            assetHelper.deleteAssets()
             val bytesPerLine = 16
             val allowedSize = 1 megabytes
-            val name = "TestActionCausingExceededLogs-" + System.currentTimeMillis()
+            val name = "TestActionCausingExceededLogs"
             assetHelper.withCleaner(wsk.action, name, confirmDelete = true) {
               val actionName = TestUtils.getTestActionFilename("dosLogs.js")
               (action, _) =>
@@ -294,10 +301,10 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
               lines.last should include(Messages.truncateLogs(allowedSize))
             }
           },
-          10,
-          Some(1.second),
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
           Some(
-            s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should succeed but truncate logs, if log size exceeds its limit not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should succeed but truncate logs, if log size exceeds its limit not successful, retrying.."))
   }
 
   it should s"successfully invoke an action with a payload close to the limit (${ActivationEntityLimit.MAX_ACTIVATION_ENTITY_LIMIT.toMB} MB)" in withAssetCleaner(
@@ -305,7 +312,8 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "TestActionCausingJustInBoundaryResult-" + System.currentTimeMillis()
+          assetHelper.deleteAssets()
+          val name = "TestActionCausingJustInBoundaryResult"
           assetHelper.withCleaner(wsk.action, name) {
             val actionName = TestUtils.getTestActionFilename("echo.js")
             (action, _) =>
@@ -326,10 +334,10 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
           // The payload is echoed and thus the backchannel supports the limit as well.
           activation.response.result shouldBe Some(args.toJson)
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should successfully invoke an action with a payload close to the limit (${ActivationEntityLimit.MAX_ACTIVATION_ENTITY_LIMIT.toMB} MB) not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should successfully invoke an action with a payload close to the limit (${ActivationEntityLimit.MAX_ACTIVATION_ENTITY_LIMIT.toMB} MB) not successful, retrying.."))
   }
 
   Seq(true, false).foreach { blocking =>
@@ -338,7 +346,8 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
       org.apache.openwhisk.utils
         .retry(
           {
-            val name = "TestActionCausingExcessiveResult-" + System.currentTimeMillis()
+            assetHelper.deleteAssets()
+            val name = "TestActionCausingExcessiveResult"
             assetHelper.withCleaner(wsk.action, name) {
               val actionName = TestUtils.getTestActionFilename("sizedResult.js")
               (action, _) =>
@@ -372,10 +381,10 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
               withActivation(wsk.activation, rr, totalWait = 120 seconds) { checkResponse(_) }
             }
           },
-          10,
-          Some(1.second),
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
           Some(
-            s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should succeed but truncate result, if result exceeds its limit (blocking: $blocking) not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should succeed but truncate result, if result exceeds its limit (blocking: $blocking) not successful, retrying.."))
     }
   }
 
@@ -383,7 +392,8 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "TestActionWithLogs-" + System.currentTimeMillis()
+          assetHelper.deleteAssets()
+          val name = "TestActionWithLogs"
           assetHelper.withCleaner(wsk.action, name, confirmDelete = true) {
             val actionName = TestUtils.getTestActionFilename("dosLogs.js")
             (action, _) =>
@@ -400,17 +410,17 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
             response.response.result shouldBe Some(JsObject("msg" -> 1.toJson))
           }
         },
-        10,
-        Some(1.second),
-        Some(
-          s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should succeed with one log line not successful, retrying.."))
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should succeed with one log line not successful, retrying.."))
   }
 
   it should "fail on creating an action with exec which is too big" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "TestActionCausingExecTooBig-" + System.currentTimeMillis()
+          assetHelper.deleteAssets()
+          val name = "TestActionCausingExecTooBig"
 
           val actionCode = new File(s"$testActionsDir${File.separator}$name.js")
           actionCode.createNewFile()
@@ -424,10 +434,10 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
 
           actionCode.delete
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should fail on creating an action with exec which is too big not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should fail on creating an action with exec which is too big not successful, retrying.."))
   }
 
   /**
@@ -438,7 +448,8 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
       org.apache.openwhisk.utils
         .retry(
           {
-            val name = "TestFileLimitGood-" + System.currentTimeMillis()
+            assetHelper.deleteAssets()
+            val name = "TestFileLimitGood"
             assetHelper.withCleaner(wsk.action, name) { (action, _) =>
               action.create(name, Some(openFileAction))
             }
@@ -451,10 +462,10 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
               }
             }
           },
-          10,
-          Some(1.second),
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
           Some(
-            s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should successfully invoke an action when it is within nofile limit not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should successfully invoke an action when it is within nofile limit not successful, retrying.."))
   }
 
   /**
@@ -464,7 +475,8 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "TestFileLimitBad-" + System.currentTimeMillis()
+          assetHelper.deleteAssets()
+          val name = "TestFileLimitBad"
           assetHelper.withCleaner(wsk.action, name) { (action, _) =>
             action.create(name, Some(openFileAction))
           }
@@ -493,10 +505,10 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
                 .count(_.contains("ERROR: opened files = ")) shouldBe 1
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should fail to invoke an action when it exceeds nofile limit not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should fail to invoke an action when it exceeds nofile limit not successful, retrying.."))
   }
 
   it should "be able to run memory intensive actions multiple times by running the GC in the action" in withAssetCleaner(
@@ -504,7 +516,8 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "TestNodeJsMemoryActionAbleToRunOften-" + System.currentTimeMillis()
+          assetHelper.deleteAssets()
+          val name = "TestNodeJsMemoryActionAbleToRunOften"
           assetHelper.withCleaner(wsk.action, name, confirmDelete = true) {
             val allowedMemory = 512 megabytes
             val actionName = TestUtils.getTestActionFilename("memoryWithGC.js")
@@ -521,17 +534,18 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
             }
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should be able to run memory intensive actions multiple times by running the GC in the action not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should be able to run memory intensive actions multiple times by running the GC in the action not successful, retrying.."))
   }
 
   it should "be able to run a memory intensive actions" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "TestNodeJsInvokeHighMemory-" + System.currentTimeMillis()
+          assetHelper.deleteAssets()
+          val name = "TestNodeJsInvokeHighMemory"
           val allowedMemory = MemoryLimit.MAX_MEMORY
           assetHelper.withCleaner(wsk.action, name, confirmDelete = true) {
             val actionName = TestUtils.getTestActionFilename("memoryWithGC.js")
@@ -545,14 +559,14 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
             response.response.status shouldBe "success"
           }
         },
-        10,
-        Some(1.second),
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
         Some(
-          s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should be able to run a memory intensive actions not successful, retrying.."))
+          s"${this.getClass.getName} > $behaviorname should be able to run a memory intensive actions not successful, retrying.."))
   }
 
   it should "be aborted when exceeding its memory limits" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
-    val name = "TestNodeJsMemoryExceeding-" + System.currentTimeMillis()
+    val name = "TestNodeJsMemoryExceeding"
     assetHelper.withCleaner(wsk.action, name, confirmDelete = true) {
       val allowedMemory = MemoryLimit.MIN_MEMORY
       val actionName = TestUtils.getTestActionFilename("memoryWithGC.js")
@@ -565,7 +579,6 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
     withActivation(wsk.activation, run) {
       _.response.result.get.fields("error") shouldBe Messages.memoryExhausted.toJson
     }
-
   }
 
   /**
@@ -576,7 +589,8 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
       org.apache.openwhisk.utils
         .retry(
           {
-            val name = s"NodeJsTestLoggingActionCausingTimeout-${System.currentTimeMillis()}"
+            assetHelper.deleteAssets()
+            val name = s"NodeJsTestLoggingActionCausingTimeout"
             assetHelper.withCleaner(wsk.action, name, confirmDelete = true) { (action, _) =>
               action.create(
                 name,
@@ -603,9 +617,9 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
                 }
             }
           },
-          10,
-          Some(1.second),
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
           Some(
-            s"org.apache.openwhisk.core.limits.ActionLimitsTests.Action limits.should interrupt the heavy logging action within its time limits not successful, retrying.."))
+            s"${this.getClass.getName} > $behaviorname should interrupt the heavy logging action within its time limits not successful, retrying.."))
   }
 }

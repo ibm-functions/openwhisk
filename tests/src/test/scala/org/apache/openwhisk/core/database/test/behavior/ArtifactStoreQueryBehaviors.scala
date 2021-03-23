@@ -31,6 +31,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
 
           val ns = newNS()
@@ -65,6 +66,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
 
           val ns = newNS()
@@ -94,6 +96,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
 
           val ns = newNS()
@@ -120,6 +123,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
 
           val ns = newNS()
@@ -146,6 +150,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
 
           val ns = newNS()
@@ -185,6 +190,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
 
           val ns = newNS()
@@ -213,6 +219,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
 
           val ns = newNS()
@@ -241,6 +248,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
 
           val ns = newNS()
@@ -271,6 +279,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
           a[IllegalArgumentException] should be thrownBy query[WhiskActivation](
             activationStore,
@@ -298,6 +307,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
 
           val ns = newNS()
@@ -324,6 +334,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
 
           val ns = newNS()
@@ -360,6 +371,7 @@ trait ArtifactStoreQueryBehaviors extends ArtifactStoreBehaviorBase {
     org.apache.openwhisk.utils
       .retry(
         {
+          afterEach()
           implicit val tid: TransactionId = transid()
           a[IllegalArgumentException] should be thrownBy count[WhiskActivation](
             activationStore,

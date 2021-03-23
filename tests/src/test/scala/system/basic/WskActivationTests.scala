@@ -42,7 +42,8 @@ class WskActivationTests extends TestHelpers with WskTestHelpers with WskActorSy
     org.apache.openwhisk.utils
       .retry(
         {
-          val name = "hello-" + System.currentTimeMillis()
+          assetHelper.deleteAssets()
+          val name = "hello-fetch-result"
           val expectedResult = JsObject(
             "result" -> JsObject("payload" -> "hello, undefined!".toJson),
             "success" -> true.toJson,
