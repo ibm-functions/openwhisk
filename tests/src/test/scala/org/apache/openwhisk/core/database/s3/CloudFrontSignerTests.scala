@@ -26,6 +26,7 @@ import org.scalatest.junit.JUnitRunner
 import org.scalatest.{FlatSpec, Matchers, OptionValues}
 import pureconfig._
 import pureconfig.generic.auto._
+import scala.concurrent.duration._
 
 @RunWith(classOf[JUnitRunner])
 class CloudFrontSignerTests extends FlatSpec with Matchers with OptionValues {
@@ -61,19 +62,26 @@ class CloudFrontSignerTests extends FlatSpec with Matchers with OptionValues {
   behavior of "CloudFront config"
 
   it should "generate a signed url" in {
-    val config = ConfigFactory.parseString(configString).withFallback(ConfigFactory.load())
-    val s3Config = loadConfigOrThrow[S3Config](config, ConfigKeys.s3)
-    val signer = CloudFrontSigner(s3Config.cloudFrontConfig.get)
-    val expiration = Instant.now().plusSeconds(s3Config.cloudFrontConfig.get.timeout.toSeconds)
-    val uri = signer.getSignedURL("bar")
-    val query = uri.query()
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val config = ConfigFactory.parseString(configString).withFallback(ConfigFactory.load())
+          val s3Config = loadConfigOrThrow[S3Config](config, ConfigKeys.s3)
+          val signer = CloudFrontSigner(s3Config.cloudFrontConfig.get)
+          val expiration = Instant.now().plusSeconds(s3Config.cloudFrontConfig.get.timeout.toSeconds)
+          val uri = signer.getSignedURL("bar")
+          val query = uri.query()
 
-    //A signed url is of format
-    //https://<domain-name>/<object key>?Expires=xxx&Signature=xxx&Key-Pair-Id=xxx
-    uri.scheme shouldBe "https"
-    uri.path.tail shouldBe Path("bar")
-    query.get("Expires") shouldBe Some(expiration.getEpochSecond.toString)
-    query.get("Signature") shouldBe defined
-    query.get("Key-Pair-Id").value shouldBe keyPairId
+          //A signed url is of format
+          //https://<domain-name>/<object key>?Expires=xxx&Signature=xxx&Key-Pair-Id=xxx
+          uri.scheme shouldBe "https"
+          uri.path.tail shouldBe Path("bar")
+          query.get("Expires") shouldBe Some(expiration.getEpochSecond.toString)
+          query.get("Signature") shouldBe defined
+          query.get("Key-Pair-Id").value shouldBe keyPairId
+        },
+        5,
+        Some(1.second),
+        Some(s"${this.getClass.getName} > CloudFront config should generate a signed url not successful, retrying.."))
   }
 }
