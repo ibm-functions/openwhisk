@@ -52,8 +52,12 @@ import org.apache.openwhisk.http.Messages
 @RunWith(classOf[JUnitRunner])
 class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
 
+  private val retriesOnTestFailures = 5
+  private val waitBeforeRetry = 1.second
+
   /** Package Actions API tests */
-  behavior of "Package Actions API"
+  val behaviorname = "Package Actions API"
+  behavior of s"$behaviorname"
 
   val creds = WhiskAuthHelpers.newIdentity()
   val namespace = EntityPath(creds.subject.asString)
@@ -62,578 +66,986 @@ class PackageActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
 
   //// GET /actions/package/
   it should "list all actions in package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val actions = (1 to 2).map { _ =>
-      WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    }
-    put(entityStore, provider)
-    actions foreach { put(entityStore, _) }
-    org.apache.openwhisk.utils.retry {
-      Get(s"$collectionPath/${provider.name}/") ~> Route.seal(routes(creds)) ~> check {
-        status should be(OK)
-        val response = responseAs[List[JsObject]]
-        actions.length should be(response.length)
-        actions forall { a =>
-          response contains a.summaryAsJson
-        } should be(true)
-      }
-    }
+    val testname = "list all actions in package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val actions = (1 to 2).map { _ =>
+            WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          }
+          put(entityStore, provider)
+          actions foreach { put(entityStore, _) }
+          org.apache.openwhisk.utils.retry {
+            Get(s"$collectionPath/${provider.name}/") ~> Route.seal(routes(creds)) ~> check {
+              status should be(OK)
+              val response = responseAs[List[JsObject]]
+              actions.length should be(response.length)
+              actions forall { a =>
+                response contains a.summaryAsJson
+              } should be(true)
+            }
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "list all actions in package binding" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val reference = WhiskPackage(namespace, aname(), provider.bind)
-    val actions = (1 to 2).map { _ =>
-      WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    }
-    put(entityStore, provider)
-    put(entityStore, reference)
-    actions foreach { put(entityStore, _) }
-    org.apache.openwhisk.utils.retry {
-      Get(s"$collectionPath/${reference.name}/") ~> Route.seal(routes(creds)) ~> check {
-        status should be(OK)
-        val response = responseAs[List[JsObject]]
-        actions.length should be(response.length)
-        actions forall { a =>
-          response contains a.summaryAsJson
-        } should be(true)
-      }
-    }
+    val testname = "list all actions in package binding"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val reference = WhiskPackage(namespace, aname(), provider.bind)
+          val actions = (1 to 2).map { _ =>
+            WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          }
+          put(entityStore, provider)
+          put(entityStore, reference)
+          actions foreach { put(entityStore, _) }
+          org.apache.openwhisk.utils.retry {
+            Get(s"$collectionPath/${reference.name}/") ~> Route.seal(routes(creds)) ~> check {
+              status should be(OK)
+              val response = responseAs[List[JsObject]]
+              actions.length should be(response.length)
+              actions forall { a =>
+                response contains a.summaryAsJson
+              } should be(true)
+            }
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "include action in package when listing all actions" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None)
-    val action1 = WhiskAction(namespace, aname(), jsDefault("??"), Parameters(), ActionLimits())
-    val action2 = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    put(entityStore, provider)
-    put(entityStore, action1)
-    put(entityStore, action2)
-    org.apache.openwhisk.utils.retry {
-      Get(s"$collectionPath") ~> Route.seal(routes(creds)) ~> check {
-        status should be(OK)
-        val response = responseAs[List[JsObject]]
-        response.length should be(2)
-        response contains action1.summaryAsJson should be(true)
-        response contains action2.summaryAsJson should be(true)
-      }
-    }
+    val testname = "include action in package when listing all actions"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None)
+          val action1 = WhiskAction(namespace, aname(), jsDefault("??"), Parameters(), ActionLimits())
+          val action2 = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          put(entityStore, provider)
+          put(entityStore, action1)
+          put(entityStore, action2)
+          org.apache.openwhisk.utils.retry {
+            Get(s"$collectionPath") ~> Route.seal(routes(creds)) ~> check {
+              status should be(OK)
+              val response = responseAs[List[JsObject]]
+              response.length should be(2)
+              response contains action1.summaryAsJson should be(true)
+              response contains action2.summaryAsJson should be(true)
+            }
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject ambiguous list actions in package without trailing slash" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None)
-    put(entityStore, provider)
-    org.apache.openwhisk.utils.retry {
-      Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
-        status should be(Conflict)
-      }
-    }
+    val testname = "reject ambiguous list actions in package without trailing slash"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None)
+          put(entityStore, provider)
+          org.apache.openwhisk.utils.retry {
+            Get(s"$collectionPath/${provider.name}") ~> Route.seal(routes(creds)) ~> check {
+              status should be(Conflict)
+            }
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject invalid verb on get package actions" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None)
-    put(entityStore, provider)
-    Delete(s"$collectionPath/${provider.name}/") ~> Route.seal(routes(creds)) ~> check {
-      status should be(NotFound)
-    }
+    val testname = "reject invalid verb on get package actions"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None)
+          put(entityStore, provider)
+          Delete(s"$collectionPath/${provider.name}/") ~> Route.seal(routes(creds)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   //// PUT /actions/package/name
   it should "put action in package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    val content = WhiskActionPut(Some(action.exec))
-    put(entityStore, provider)
-    Put(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      deleteAction(action.docid)
-      status should be(OK)
-      val response = responseAs[WhiskAction]
-      response should be(
-        WhiskAction(
-          action.namespace,
-          action.name,
-          action.exec,
-          action.parameters,
-          action.limits,
-          action.version,
-          action.publish,
-          action.annotations ++ systemAnnotations(NODEJS10),
-          updated = response.updated))
-    }
+    val testname = "put action in package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          val content = WhiskActionPut(Some(action.exec))
+          put(entityStore, provider)
+          Put(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            deleteAction(action.docid)
+            status should be(OK)
+            val response = responseAs[WhiskAction]
+            response should be(
+              WhiskAction(
+                action.namespace,
+                action.name,
+                action.exec,
+                action.parameters,
+                action.limits,
+                action.version,
+                action.publish,
+                action.annotations ++ systemAnnotations(NODEJS10),
+                updated = response.updated))
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject put action in package that does not exist" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    val content = WhiskActionPut(Some(action.exec))
-    Put(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(NotFound)
-    }
+    val testname = "reject put action in package that does not exist"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          val content = WhiskActionPut(Some(action.exec))
+          Put(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject put action in package binding where package doesn't exist" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None, publish = true)
-    val binding = WhiskPackage(namespace, aname(), provider.bind)
-    val content = WhiskActionPut(Some(jsDefault("??")))
-    put(entityStore, binding)
-    Put(s"$collectionPath/${binding.name}/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-    }
+    val testname = "reject put action in package binding where package doesn't exist"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None, publish = true)
+          val binding = WhiskPackage(namespace, aname(), provider.bind)
+          val content = WhiskActionPut(Some(jsDefault("??")))
+          put(entityStore, binding)
+          Put(s"$collectionPath/${binding.name}/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject put action in package binding" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None, publish = true)
-    val binding = WhiskPackage(namespace, aname(), provider.bind)
-    val content = WhiskActionPut(Some(jsDefault("??")))
-    put(entityStore, provider)
-    put(entityStore, binding)
-    Put(s"$collectionPath/${binding.name}/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-    }
+    val testname = "reject put action in package binding"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None, publish = true)
+          val binding = WhiskPackage(namespace, aname(), provider.bind)
+          val content = WhiskActionPut(Some(jsDefault("??")))
+          put(entityStore, provider)
+          put(entityStore, binding)
+          Put(s"$collectionPath/${binding.name}/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject put action in package owned by different subject" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(EntityPath(Subject().asString), aname(), publish = true)
-    val content = WhiskActionPut(Some(jsDefault("??")))
-    put(entityStore, provider)
-    Put(s"/${provider.namespace}/${collection.path}/${provider.name}/${aname()}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(Forbidden)
-    }
+    val testname = "reject put action in package owned by different subject"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(EntityPath(Subject().asString), aname(), publish = true)
+          val content = WhiskActionPut(Some(jsDefault("??")))
+          put(entityStore, provider)
+          Put(s"/${provider.namespace}/${collection.path}/${provider.name}/${aname()}", content) ~> Route.seal(
+            routes(creds)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   //// DEL /actions/package/name
   it should "delete action in package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    put(entityStore, provider)
-    put(entityStore, action)
+    val testname = "delete action in package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          put(entityStore, provider)
+          put(entityStore, action)
 
-    // it should "reject delete action in package owned by different subject" in {
-    val auser = WhiskAuthHelpers.newIdentity()
-    Delete(s"/${provider.namespace}/${collection.path}/${provider.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+          // it should "reject delete action in package owned by different subject" in {
+          val auser = WhiskAuthHelpers.newIdentity()
+          Delete(s"/${provider.namespace}/${collection.path}/${provider.name}/${action.name}") ~> Route.seal(
+            routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
 
-    Delete(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(OK)
-      val response = responseAs[WhiskAction]
-      response should be(action)
-    }
+          Delete(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(OK)
+            val response = responseAs[WhiskAction]
+            response should be(action)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject delete action in package that does not exist" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    put(entityStore, action)
-    Delete(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(NotFound)
-    }
+    val testname = "reject delete action in package that does not exist"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          put(entityStore, action)
+          Delete(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject delete non-existent action in package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    put(entityStore, provider)
-    Delete(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(NotFound)
-    }
+    val testname = "reject delete non-existent action in package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          put(entityStore, provider)
+          Delete(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject delete action in package binding where package doesn't exist" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None, publish = true)
-    val binding = WhiskPackage(namespace, aname(), provider.bind)
-    val content = WhiskActionPut(Some(jsDefault("??")))
-    put(entityStore, binding)
-    Delete(s"$collectionPath/${binding.name}/${aname()}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-    }
+    val testname = "reject delete action in package binding where package doesn't exist"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None, publish = true)
+          val binding = WhiskPackage(namespace, aname(), provider.bind)
+          val content = WhiskActionPut(Some(jsDefault("??")))
+          put(entityStore, binding)
+          Delete(s"$collectionPath/${binding.name}/${aname()}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject delete action in package binding" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None, publish = true)
-    val binding = WhiskPackage(namespace, aname(), provider.bind)
-    val content = WhiskActionPut(Some(jsDefault("??")))
-    put(entityStore, provider)
-    put(entityStore, binding)
-    Delete(s"$collectionPath/${binding.name}/${aname()}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(BadRequest)
-    }
+    val testname = "reject delete action in package binding"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None, publish = true)
+          val binding = WhiskPackage(namespace, aname(), provider.bind)
+          val content = WhiskActionPut(Some(jsDefault("??")))
+          put(entityStore, provider)
+          put(entityStore, binding)
+          Delete(s"$collectionPath/${binding.name}/${aname()}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(BadRequest)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject delete action in package owned by different subject" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(EntityPath(Subject().asString), aname(), publish = true)
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    put(entityStore, provider)
-    put(entityStore, action)
-    Delete(s"/${provider.namespace}/${collection.path}/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(Forbidden)
-    }
+    val testname = "reject delete action in package owned by different subject"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(EntityPath(Subject().asString), aname(), publish = true)
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          put(entityStore, provider)
+          put(entityStore, action)
+          Delete(s"/${provider.namespace}/${collection.path}/${provider.name}/${action.name}") ~> Route.seal(
+            routes(creds)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   //// GET /actions/package/name
   it should "get action in package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = true)
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
-    put(entityStore, provider)
-    put(entityStore, action)
-    org.apache.openwhisk.utils.retry {
-      Get(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
-        status should be(OK)
-        val response = responseAs[WhiskAction]
-        response should be(action inherit provider.parameters)
-      }
-    }
+    val testname = "get action in package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = true)
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
+          put(entityStore, provider)
+          put(entityStore, action)
+          org.apache.openwhisk.utils.retry {
+            Get(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
+              status should be(OK)
+              val response = responseAs[WhiskAction]
+              response should be(action inherit provider.parameters)
+            }
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "get action in package binding with public package" in {
-    implicit val tid = transid()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), None, publish = true)
-    val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    put(entityStore, provider)
-    put(entityStore, binding)
-    put(entityStore, action)
-    org.apache.openwhisk.utils.retry {
-      Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
-        status should be(OK)
-        val response = responseAs[WhiskAction]
-        response should be(action inherit (provider.parameters ++ binding.parameters))
-      }
-    }
+    val testname = "get action in package binding with public package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), None, publish = true)
+          val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          put(entityStore, provider)
+          put(entityStore, binding)
+          put(entityStore, action)
+          org.apache.openwhisk.utils.retry {
+            Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
+              status should be(OK)
+              val response = responseAs[WhiskAction]
+              response should be(action inherit (provider.parameters ++ binding.parameters))
+            }
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "get action in package binding with public package with overriding parameters" in {
-    implicit val tid = transid()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = true)
-    val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A") ++ Parameters("b", "b"))
-    put(entityStore, provider)
-    put(entityStore, binding)
-    put(entityStore, action)
-    org.apache.openwhisk.utils.retry {
-      Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
-        status should be(OK)
-        val response = responseAs[WhiskAction]
-        response should be(action inherit (provider.parameters ++ binding.parameters))
-      }
-    }
+    val testname = "get action in package binding with public package with overriding parameters"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = true)
+          val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
+          val action =
+            WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A") ++ Parameters("b", "b"))
+          put(entityStore, provider)
+          put(entityStore, binding)
+          put(entityStore, action)
+          org.apache.openwhisk.utils.retry {
+            Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
+              status should be(OK)
+              val response = responseAs[WhiskAction]
+              response should be(action inherit (provider.parameters ++ binding.parameters))
+            }
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   // NOTE: does not work because entitlement model does not allow for an explicit
   // check on either one or both of the binding and package
   ignore should "get action in package binding with explicit entitlement grant" in {
-    implicit val tid = transid()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = false)
-    val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
-    put(entityStore, provider)
-    put(entityStore, binding)
-    put(entityStore, action)
-    val pkgaccess = Resource(provider.namespace, PACKAGES, Some(provider.name.asString))
-    Await.result(entitlementProvider.grant(auser, READ, pkgaccess), 1 second)
-    Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(OK)
-      val response = responseAs[WhiskAction]
-      response should be(action inherit (provider.parameters ++ binding.parameters))
-    }
+    val testname = "get action in package binding with explicit entitlement grant"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = false)
+          val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
+          put(entityStore, provider)
+          put(entityStore, binding)
+          put(entityStore, action)
+          val pkgaccess = Resource(provider.namespace, PACKAGES, Some(provider.name.asString))
+          Await.result(entitlementProvider.grant(auser, READ, pkgaccess), 1 second)
+          Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(OK)
+            val response = responseAs[WhiskAction]
+            response should be(action inherit (provider.parameters ++ binding.parameters))
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject get action in package that does not exist" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    put(entityStore, action)
-    Get(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(NotFound)
-    }
+    val testname = "reject get action in package that does not exist"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          put(entityStore, action)
+          Get(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject get non-existent action in package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    put(entityStore, provider)
-    Get(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(NotFound)
-    }
+    val testname = "reject get non-existent action in package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          put(entityStore, provider)
+          Get(s"$collectionPath/${provider.name}/${action.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject get action in package binding that does not exist" in {
-    implicit val tid = transid()
-    val name = aname()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = true)
-    val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
-    put(entityStore, provider)
-    put(entityStore, action)
-    Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(NotFound)
-    }
+    val testname = "reject get action in package binding that does not exist"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val name = aname()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = true)
+          val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
+          put(entityStore, provider)
+          put(entityStore, action)
+          Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject get action in package binding with package that does not exist" in {
-    implicit val tid = transid()
-    val name = aname()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = true)
-    val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
-    put(entityStore, binding)
-    put(entityStore, action)
-    Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden) // do not leak that package does not exist
-    }
+    val testname = "reject get action in package binding with package that does not exist"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val name = aname()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = true)
+          val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
+          put(entityStore, binding)
+          put(entityStore, action)
+          Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(Forbidden) // do not leak that package does not exist
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject get non-existing action in package binding" in {
-    implicit val tid = transid()
-    val name = aname()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = true)
-    val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
-    put(entityStore, provider)
-    put(entityStore, binding)
-    Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(NotFound)
-    }
+    val testname = "reject get non-existing action in package binding"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val name = aname()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = true)
+          val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
+          put(entityStore, provider)
+          put(entityStore, binding)
+          Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject get action in package binding with private package" in {
-    implicit val tid = transid()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = false)
-    val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
-    put(entityStore, provider)
-    put(entityStore, binding)
-    put(entityStore, action)
-    Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+    val testname = "reject get action in package binding with private package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), None, Parameters("p", "P"), publish = false)
+          val binding = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind, Parameters("b", "B"))
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"), Parameters("a", "A"))
+          put(entityStore, provider)
+          put(entityStore, binding)
+          put(entityStore, action)
+          Get(s"$collectionPath/${binding.name}/${action.name}") ~> Route.seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   //// POST /actions/name
   it should "allow owner to invoke an action in package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    val content = JsObject("xxx" -> "yyy".toJson)
-    put(entityStore, provider)
-    put(entityStore, action)
-    Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(Accepted)
-      val response = responseAs[JsObject]
-      response.fields("activationId") should not be None
-    }
+    val testname = "allow owner to invoke an action in package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          val content = JsObject("xxx" -> "yyy".toJson)
+          put(entityStore, provider)
+          put(entityStore, action)
+          Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(Accepted)
+            val response = responseAs[JsObject]
+            response.fields("activationId") should not be None
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "allow non-owner to invoke an action in public package" in {
-    implicit val tid = transid()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), publish = true)
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    val content = JsObject("xxx" -> "yyy".toJson)
-    put(entityStore, provider)
-    put(entityStore, action)
-    Post(s"/$namespace/${collection.path}/${provider.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
-      status should be(Accepted)
-      val response = responseAs[JsObject]
-      response.fields("activationId") should not be None
-    }
+    val testname = "allow non-owner to invoke an action in public package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), publish = true)
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          val content = JsObject("xxx" -> "yyy".toJson)
+          put(entityStore, provider)
+          put(entityStore, action)
+          Post(s"/$namespace/${collection.path}/${provider.name}/${action.name}", content) ~> Route
+            .seal(routes(auser)) ~> check {
+            status should be(Accepted)
+            val response = responseAs[JsObject]
+            response.fields("activationId") should not be None
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "invoke action in package binding with public package" in {
-    implicit val tid = transid()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), publish = true)
-    val reference = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind)
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    val content = JsObject("x" -> "x".toJson, "z" -> "Z".toJson)
-    put(entityStore, provider)
-    put(entityStore, reference)
-    put(entityStore, action)
-    Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
-      status should be(Accepted)
-      val response = responseAs[JsObject]
-      response.fields("activationId") should not be None
-    }
+    val testname = "invoke action in package binding with public package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), publish = true)
+          val reference = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind)
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          val content = JsObject("x" -> "x".toJson, "z" -> "Z".toJson)
+          put(entityStore, provider)
+          put(entityStore, reference)
+          put(entityStore, action)
+          Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
+            status should be(Accepted)
+            val response = responseAs[JsObject]
+            response.fields("activationId") should not be None
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   // NOTE: does not work because entitlement model does not allow for an explicit
   // check on either one or both of the binding and package
   ignore should "invoke action in package binding with explicit entitlement grant even if package is not public" in {
-    implicit val tid = transid()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), publish = false)
-    val reference = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind)
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    val content = JsObject("x" -> "x".toJson, "z" -> "Z".toJson)
-    put(entityStore, provider)
-    put(entityStore, reference)
-    put(entityStore, action)
-    val pkgaccess = Resource(provider.namespace, PACKAGES, Some(provider.name.asString))
-    Await.result(entitlementProvider.grant(auser, ACTIVATE, pkgaccess), 1 second)
-    Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
-      status should be(Accepted)
-      val response = responseAs[JsObject]
-      response.fields("activationId") should not be None
-    }
+    val testname = "invoke action in package binding with explicit entitlement grant even if package is not public"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), publish = false)
+          val reference = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind)
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          val content = JsObject("x" -> "x".toJson, "z" -> "Z".toJson)
+          put(entityStore, provider)
+          put(entityStore, reference)
+          put(entityStore, action)
+          val pkgaccess = Resource(provider.namespace, PACKAGES, Some(provider.name.asString))
+          Await.result(entitlementProvider.grant(auser, ACTIVATE, pkgaccess), 1 second)
+          Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
+            status should be(Accepted)
+            val response = responseAs[JsObject]
+            response.fields("activationId") should not be None
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject non-owner invoking an action in private package" in {
-    implicit val tid = transid()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), publish = false)
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    val content = JsObject("xxx" -> "yyy".toJson)
-    put(entityStore, provider)
-    put(entityStore, action)
-    Post(s"/$namespace/${collection.path}/${provider.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+    val testname = "reject non-owner invoking an action in private package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), publish = false)
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          val content = JsObject("xxx" -> "yyy".toJson)
+          put(entityStore, provider)
+          put(entityStore, action)
+          Post(s"/$namespace/${collection.path}/${provider.name}/${action.name}", content) ~> Route
+            .seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject invoking an action in package that does not exist" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), publish = false)
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    val content = JsObject("xxx" -> "yyy".toJson)
-    put(entityStore, action)
-    Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(NotFound)
-    }
+    val testname = "reject invoking an action in package that does not exist"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), publish = false)
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          val content = JsObject("xxx" -> "yyy".toJson)
+          put(entityStore, action)
+          Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject invoking a non-existent action in package" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname(), publish = false)
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    val content = JsObject("xxx" -> "yyy".toJson)
-    put(entityStore, action)
-    Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(NotFound)
-    }
+    val testname = "reject invoking a non-existent action in package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname(), publish = false)
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          val content = JsObject("xxx" -> "yyy".toJson)
+          put(entityStore, action)
+          Post(s"$collectionPath/${provider.name}/${action.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(NotFound)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "reject invoke action in package binding with private package" in {
-    implicit val tid = transid()
-    val auser = WhiskAuthHelpers.newIdentity()
-    val provider = WhiskPackage(namespace, aname(), publish = false)
-    val reference = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind)
-    val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
-    val content = JsObject("x" -> "x".toJson, "z" -> "Z".toJson)
-    put(entityStore, provider)
-    put(entityStore, reference)
-    put(entityStore, action)
-    Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-    }
+    val testname = "reject invoke action in package binding with private package"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val auser = WhiskAuthHelpers.newIdentity()
+          val provider = WhiskPackage(namespace, aname(), publish = false)
+          val reference = WhiskPackage(EntityPath(auser.subject.asString), aname(), provider.bind)
+          val action = WhiskAction(provider.fullPath, aname(), jsDefault("??"))
+          val content = JsObject("x" -> "x".toJson, "z" -> "Z".toJson)
+          put(entityStore, provider)
+          put(entityStore, reference)
+          put(entityStore, action)
+          Post(s"$collectionPath/${reference.name}/${action.name}", content) ~> Route.seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "report proper error when provider record is corrupted on delete" in {
-    implicit val tid = transid()
-    val provider = BadEntity(namespace, aname())
-    val entity = BadEntity(provider.namespace.addPath(provider.name), aname())
-    put(entityStore, provider)
-    put(entityStore, entity)
-    Delete(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
-      responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
-    }
+    val testname = "report proper error when provider record is corrupted on delete"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = BadEntity(namespace, aname())
+          val entity = BadEntity(provider.namespace.addPath(provider.name), aname())
+          put(entityStore, provider)
+          put(entityStore, entity)
+          Delete(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
+            responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "report proper error when record is corrupted on delete" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val entity = BadEntity(provider.fullPath, aname())
-    put(entityStore, provider, false)
-    val entityToDelete = put(entityStore, entity, false)
+    val testname = "report proper error when record is corrupted on delete"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val entity = BadEntity(provider.fullPath, aname())
+          put(entityStore, provider, false)
+          val entityToDelete = put(entityStore, entity, false)
 
-    Delete(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
-      deletePackage(provider.docid)
-      delete(entityStore, entityToDelete)
-      status should be(InternalServerError)
-      responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
-    }
+          Delete(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
+            deletePackage(provider.docid)
+            delete(entityStore, entityToDelete)
+            status should be(InternalServerError)
+            responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "report proper error when provider record is corrupted on get" in {
-    implicit val tid = transid()
-    val provider = BadEntity(namespace, aname())
-    val entity = BadEntity(provider.namespace.addPath(provider.name), aname())
-    put(entityStore, provider)
-    put(entityStore, entity)
+    val testname = "report proper error when provider record is corrupted on get"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = BadEntity(namespace, aname())
+          val entity = BadEntity(provider.namespace.addPath(provider.name), aname())
+          put(entityStore, provider)
+          put(entityStore, entity)
 
-    Get(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(InternalServerError)
-      responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
-    }
+          Get(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(InternalServerError)
+            responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
+          }
 
-    val auser = WhiskAuthHelpers.newIdentity()
-    Get(s"/${provider.namespace}/${collection.path}/${provider.name}/${entity.name}") ~> Route.seal(routes(auser)) ~> check {
-      status should be(Forbidden)
-      responseAs[ErrorResponse].error shouldBe Messages.notAuthorizedtoAccessResource(s"$namespace/${provider.name}")
-    }
+          val auser = WhiskAuthHelpers.newIdentity()
+          Get(s"/${provider.namespace}/${collection.path}/${provider.name}/${entity.name}") ~> Route
+            .seal(routes(auser)) ~> check {
+            status should be(Forbidden)
+            responseAs[ErrorResponse].error shouldBe Messages.notAuthorizedtoAccessResource(
+              s"$namespace/${provider.name}")
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "report proper error when record is corrupted on get" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val entity = BadEntity(provider.fullPath, aname())
-    put(entityStore, provider)
-    put(entityStore, entity)
+    val testname = "report proper error when record is corrupted on get"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val entity = BadEntity(provider.fullPath, aname())
+          put(entityStore, provider)
+          put(entityStore, entity)
 
-    Get(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
-      status should be(InternalServerError)
-      responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
-    }
+          Get(s"$collectionPath/${provider.name}/${entity.name}") ~> Route.seal(routes(creds)) ~> check {
+            status should be(InternalServerError)
+            responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "report proper error when provider record is corrupted on put" in {
-    implicit val tid = transid()
-    val provider = BadEntity(namespace, aname())
-    val entity = BadEntity(provider.namespace.addPath(provider.name), aname())
-    put(entityStore, provider)
-    put(entityStore, entity)
+    val testname = "report proper error when provider record is corrupted on put"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = BadEntity(namespace, aname())
+          val entity = BadEntity(provider.namespace.addPath(provider.name), aname())
+          put(entityStore, provider)
+          put(entityStore, entity)
 
-    val content = WhiskActionPut()
-    Put(s"$collectionPath/${provider.name}/${entity.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(InternalServerError)
-      responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
-    }
+          val content = WhiskActionPut()
+          Put(s"$collectionPath/${provider.name}/${entity.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(InternalServerError)
+            responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 
   it should "report proper error when record is corrupted on put" in {
-    implicit val tid = transid()
-    val provider = WhiskPackage(namespace, aname())
-    val entity = BadEntity(provider.fullPath, aname())
-    put(entityStore, provider)
-    put(entityStore, entity)
+    val testname = "report proper error when record is corrupted on put"
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          afterEach()
+          implicit val tid = transid()
+          val provider = WhiskPackage(namespace, aname())
+          val entity = BadEntity(provider.fullPath, aname())
+          put(entityStore, provider)
+          put(entityStore, entity)
 
-    val content = WhiskActionPut()
-    Put(s"$collectionPath/${provider.name}/${entity.name}", content) ~> Route.seal(routes(creds)) ~> check {
-      status should be(InternalServerError)
-      responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
-    }
+          val content = WhiskActionPut()
+          Put(s"$collectionPath/${provider.name}/${entity.name}", content) ~> Route.seal(routes(creds)) ~> check {
+            status should be(InternalServerError)
+            responseAs[ErrorResponse].error shouldBe Messages.corruptedEntity
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} > $behaviorname should $testname not successful, retrying.."))
+
   }
 }
