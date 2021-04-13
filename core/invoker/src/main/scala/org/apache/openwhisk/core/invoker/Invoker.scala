@@ -136,7 +136,11 @@ object Invoker {
         if (config.zookeeperHosts.startsWith(":") || config.zookeeperHosts.endsWith(":")) {
           abort(s"Must provide valid zookeeper host and port to use dynamicId assignment (${config.zookeeperHosts})")
         }
-        new InstanceIdAssigner(config.zookeeperHosts).getId(unique)
+        val newId = new InstanceIdAssigner(config.zookeeperHosts).getId(unique)
+        // eg invoker2/10.208.32.124/invoker-cjtth
+        logger.warn(this, s"invoker: invoker$newId/$unique/${cmdLineArgs.displayedName.getOrElse("")}")
+        logger.warn(this, (Seq("invoker" + newId) ++ unique ++ cmdLineArgs.displayedName.getOrElse("")).mkString("/"))
+        newId
 
       case _ => abort(s"Either --id or --uniqueName must be configured with correct values")
     }

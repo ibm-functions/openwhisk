@@ -154,7 +154,7 @@ class InvokerPool(childFactory: (ActorRefFactory, InvokerInstanceId) => ActorRef
 
   def logStatus(): Unit = {
     monitor.foreach(_ ! CurrentInvokerPoolState(status))
-    val pretty = status.map(i => s"${i.id.toInt} -> ${i.status}")
+    val pretty = status.map(i => s"${i.id.toString} -> ${i.status}")
     logging.info(this, s"invoker status changed to ${pretty.mkString(", ")}")
     val all = status.length
     val healthy = status.filter(_.status == InvokerState.Healthy).length
