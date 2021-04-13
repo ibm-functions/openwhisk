@@ -138,7 +138,7 @@ object Invoker {
         }
         val newId = new InstanceIdAssigner(config.zookeeperHosts).getId(unique)
         // eg invoker2/10.208.32.124/invoker-cjtth
-        logger.warn(this, (Seq("invoker" + newId) ++ unique ++ cmdLineArgs.displayedName.getOrElse("")).mkString("/"))
+        logger.warn(this, s"invoker: invoker$newId/$unique/${cmdLineArgs.displayedName.getOrElse("")}")
         newId
 
       case _ => abort(s"Either --id or --uniqueName must be configured with correct values")
