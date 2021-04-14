@@ -151,11 +151,11 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
               logging.info(this, s"[POST] trigger activation id: ${triggerActivationId}")
               val triggerActivation = WhiskActivation(
                 namespace = user.namespace.name.toPath, // all activations should end up in the one space regardless trigger.namespace
-                name = entityName.name,
-                subject = user.subject,
-                activationId = triggerActivationId,
-                start = Instant.now(Clock.systemUTC()),
-                end = Instant.EPOCH,
+                entityName.name,
+                user.subject,
+                triggerActivationId,
+                Instant.now(Clock.systemUTC()),
+                Instant.EPOCH,
                 response = ActivationResponse.success(payload orElse Some(JsObject.empty)),
                 version = trigger.version,
                 duration = None,
