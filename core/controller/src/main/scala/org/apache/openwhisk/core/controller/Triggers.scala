@@ -154,7 +154,7 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
                 name = entityName.name,
                 subject = user.subject,
                 activationId = triggerActivationId,
-                transId = transId,
+                transId = transid,
                 start = Instant.now(Clock.systemUTC()),
                 end = Instant.EPOCH,
                 response = ActivationResponse.success(payload orElse Some(JsObject.empty)),
