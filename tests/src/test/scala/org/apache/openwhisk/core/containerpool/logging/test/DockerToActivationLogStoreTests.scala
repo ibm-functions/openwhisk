@@ -52,12 +52,12 @@ class DockerToActivationLogStoreTests extends FlatSpec with Matchers with WskAct
   val action = ExecutableWhiskAction(user.namespace.name.toPath, EntityName("actionName"), exec)
   val successfulActivation =
     WhiskActivation(
-      namespace = user.namespace.name.toPath,
-      name = action.name,
-      subject = user.subject,
-      activationId = ActivationId.generate(),
-      start = Instant.EPOCH,
-      end = Instant.EPOCH)
+      user.namespace.name.toPath,
+      action.name,
+      user.subject,
+      ActivationId.generate(),
+      Instant.EPOCH,
+      Instant.EPOCH)
   val developerErrorActivation = successfulActivation.copy(response = ActivationResponse.developerError("failed"))
 
   def toByteString(logs: List[LogLine]) = logs.map(_.toJson.compactPrint).map(ByteString.apply)
@@ -180,7 +180,7 @@ class DockerToActivationLogStoreTests extends FlatSpec with Matchers with WskAct
                       val id: ContainerId = ContainerId("test"),
                       val addr: ContainerAddress = ContainerAddress("test", 1234))(implicit val ec: ExecutionContext,
                                                                                    val logging: Logging)
-      extends Container {
+    extends Container {
     override def suspend()(implicit transid: TransactionId): Future[Unit] = ???
     override def resume()(implicit transid: TransactionId): Future[Unit] = ???
 
