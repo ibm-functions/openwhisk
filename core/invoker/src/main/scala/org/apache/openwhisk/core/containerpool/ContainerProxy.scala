@@ -833,7 +833,6 @@ object ContainerProxy {
 
     WhiskActivation(
       activationId = job.msg.activationId,
-      transId = job.msg.transid.id,
       namespace = job.msg.user.namespace.name.toPath,
       subject = job.msg.user.subject,
       cause = job.msg.cause,
@@ -848,7 +847,7 @@ object ContainerProxy {
           Parameters(WhiskActivation.pathAnnotation, JsString(job.action.fullyQualifiedName(false).asString)) ++
           Parameters(WhiskActivation.kindAnnotation, JsString(job.action.exec.kind)) ++
           Parameters(WhiskActivation.timeoutAnnotation, JsBoolean(isTimeout)) ++
-          causedBy ++ initTime ++ binding
+          causedBy ++ initTime ++ binding ++ Parameters(WhiskActivation.transIdAnnotation, JsString(transid.id))
       })
   }
 

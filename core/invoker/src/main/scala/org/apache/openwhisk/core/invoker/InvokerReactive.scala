@@ -324,7 +324,6 @@ class InvokerReactive(
 
     WhiskActivation(
       activationId = msg.activationId,
-      transId = msg.transid.id,
       namespace = msg.user.namespace.name.toPath,
       subject = msg.user.subject,
       cause = msg.cause,
@@ -336,7 +335,9 @@ class InvokerReactive(
       response = response,
       annotations = {
         Parameters(WhiskActivation.pathAnnotation, JsString(msg.action.asString)) ++
-          Parameters(WhiskActivation.kindAnnotation, JsString(Exec.UNKNOWN)) ++ causedBy
+          Parameters(WhiskActivation.kindAnnotation, JsString(Exec.UNKNOWN)) ++ causedBy ++ Parameters(
+          WhiskActivation.transIdAnnotation,
+          JsString(msg.transid.id))
       })
   }
 

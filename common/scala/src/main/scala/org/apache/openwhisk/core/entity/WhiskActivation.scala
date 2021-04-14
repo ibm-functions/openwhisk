@@ -53,7 +53,6 @@ case class WhiskActivation(namespace: EntityPath,
                            override val name: EntityName,
                            subject: Subject,
                            activationId: ActivationId,
-                           transId: String = TransactionId.unknown.id,
                            start: Instant,
                            end: Instant,
                            cause: Option[ActivationId] = None,
@@ -145,6 +144,7 @@ object WhiskActivation
   val waitTimeAnnotation = "waitTime"
   val conductorAnnotation = "conductor"
   val timeoutAnnotation = "timeout"
+  val transIdAnnotation = "transId"
 
   val memory = "memory"
   val duration = "duration"

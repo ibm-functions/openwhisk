@@ -553,7 +553,6 @@ protected[actions] trait PrimitiveActions {
       name = session.action.name,
       user.subject,
       activationId = session.activationId,
-      transId = transid.id,
       start = session.start,
       end = end,
       cause = session.cause,
@@ -566,7 +565,7 @@ protected[actions] trait PrimitiveActions {
         Parameters(WhiskActivation.kindAnnotation, JsString(Exec.SEQUENCE)) ++
         Parameters(WhiskActivation.conductorAnnotation, JsTrue) ++
         causedBy ++ binding ++
-        sequenceLimits,
+        sequenceLimits ++ Parameters(WhiskActivation.transIdAnnotation, JsString(transid.id)),
       duration = Some(session.duration))
 
     if (UserEvents.enabled) {

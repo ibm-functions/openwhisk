@@ -218,7 +218,6 @@ protected[actions] trait SequenceActions {
       name = action.name,
       user.subject,
       activationId = activationId,
-      transId = transid.id,
       start = start,
       end = end,
       cause = if (topmost) None else cause, // propagate the cause for inner sequences, but undefined for topmost
@@ -230,7 +229,7 @@ protected[actions] trait SequenceActions {
         Parameters(WhiskActivation.pathAnnotation, JsString(action.fullyQualifiedName(false).asString)) ++
         Parameters(WhiskActivation.kindAnnotation, JsString(Exec.SEQUENCE)) ++
         causedBy ++ binding ++
-        sequenceLimits,
+        sequenceLimits ++ Parameters(WhiskActivation.transIdAnnotation, JsString(transid.id)),
       duration = Some(accounting.duration))
   }
 

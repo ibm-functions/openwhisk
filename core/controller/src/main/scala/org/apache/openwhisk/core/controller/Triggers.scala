@@ -154,14 +154,14 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
                 name = entityName.name,
                 subject = user.subject,
                 activationId = triggerActivationId,
-                transId = transid.id,
                 start = Instant.now(Clock.systemUTC()),
                 end = Instant.EPOCH,
                 response = ActivationResponse.success(payload orElse Some(JsObject.empty)),
                 version = trigger.version,
                 duration = None,
                 annotations = {
-                  Parameters(WhiskActivation.kindAnnotation, JsString("trigger"))
+                  Parameters(WhiskActivation.kindAnnotation, JsString("trigger")) ++
+                    Parameters(WhiskActivation.transIdAnnotation, JsString(transid.id))
                 })
               val args: JsObject = trigger.parameters.merge(payload).getOrElse(JsObject.empty)
 
