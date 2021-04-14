@@ -324,6 +324,7 @@ class InvokerReactive(
 
     WhiskActivation(
       activationId = msg.activationId,
+      transId = msg.transid,
       namespace = msg.user.namespace.name.toPath,
       subject = msg.user.subject,
       cause = msg.cause,

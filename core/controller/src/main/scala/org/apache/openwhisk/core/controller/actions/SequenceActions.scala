@@ -193,7 +193,7 @@ protected[actions] trait SequenceActions {
                                      topmost: Boolean,
                                      cause: Option[ActivationId],
                                      start: Instant,
-                                     end: Instant): WhiskActivation = {
+                                     end: Instant)(implicit transid: TransactionId): WhiskActivation = {
 
     // compute max memory
     val sequenceLimits = accounting.maxMemory map { maxMemoryAcrossActionsInSequence =>
@@ -218,6 +218,7 @@ protected[actions] trait SequenceActions {
       name = action.name,
       user.subject,
       activationId = activationId,
+      transId = transid,
       start = start,
       end = end,
       cause = if (topmost) None else cause, // propagate the cause for inner sequences, but undefined for topmost

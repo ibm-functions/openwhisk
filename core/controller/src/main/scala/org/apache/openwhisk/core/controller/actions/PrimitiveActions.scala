@@ -553,6 +553,7 @@ protected[actions] trait PrimitiveActions {
       name = session.action.name,
       user.subject,
       activationId = session.activationId,
+      transId = transid,
       start = session.start,
       end = end,
       cause = session.cause,
