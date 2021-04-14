@@ -328,11 +328,11 @@ class ConductorsApiTests extends ControllerTestCommon with WhiskActionsApi {
         else ActivationResponse.success(Some(result))
       val start = Instant.now
       WhiskActivation(
-        namespace = action.namespace,
-        name = action.name,
-        subject = msg.user.subject,
-        activationId = msg.activationId,
-        start = start,
+        action.namespace,
+        action.name,
+        msg.user.subject,
+        msg.activationId,
+        start,
         end = start.plusMillis(duration),
         response = response)
     }
@@ -374,3 +374,4 @@ class ConductorsApiTests extends ControllerTestCommon with WhiskActionsApi {
       } getOrElse Future.failed(new IllegalArgumentException("No invocation parameters in conductor test"))
   }
 }
+
