@@ -374,4 +374,3 @@ class ConductorsApiTests extends ControllerTestCommon with WhiskActionsApi {
       } getOrElse Future.failed(new IllegalArgumentException("No invocation parameters in conductor test"))
   }
 }
-
