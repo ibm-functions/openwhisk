@@ -218,7 +218,7 @@ protected[actions] trait SequenceActions {
       name = action.name,
       user.subject,
       activationId = activationId,
-      transId = transid,
+      transId = transid.id,
       start = start,
       end = end,
       cause = if (topmost) None else cause, // propagate the cause for inner sequences, but undefined for topmost

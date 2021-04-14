@@ -833,7 +833,7 @@ object ContainerProxy {
 
     WhiskActivation(
       activationId = job.msg.activationId,
-      transId = job.msg.transid,
+      transId = job.msg.transid.id,
       namespace = job.msg.user.namespace.name.toPath,
       subject = job.msg.user.subject,
       cause = job.msg.cause,
