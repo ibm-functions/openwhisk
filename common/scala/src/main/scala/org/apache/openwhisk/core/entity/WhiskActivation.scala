@@ -180,7 +180,7 @@ object WhiskActivation
    */
   lazy val filtersView = WhiskQueries.view(WhiskQueries.dbConfig.activationsFilterDdoc, collectionName)
 
-  override implicit val serdes = jsonFormat13(WhiskActivation.apply)
+  override implicit val serdes = jsonFormat14(WhiskActivation.apply)
 
   // Caching activations doesn't make much sense in the common case as usually,
   // an activation is only asked for once.
