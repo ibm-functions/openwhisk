@@ -134,12 +134,12 @@ trait ArtifactStoreBehaviorBase
 
   protected def newActivation(ns: String, actionName: String, start: Long): WhiskActivation = {
     WhiskActivation(
-      namespace = EntityPath(ns),
-      name = EntityName(actionName),
-      subject = Subject(),
-      activationId = ActivationId.generate(),
-      start = Instant.ofEpochMilli(start),
-      end = Instant.ofEpochMilli(start + 1000))
+      EntityPath(ns),
+      EntityName(actionName),
+      Subject(),
+      ActivationId.generate(),
+      Instant.ofEpochMilli(start),
+      Instant.ofEpochMilli(start + 1000))
   }
 
   protected def aname() = EntityName(s"${prefix}_name_${randomString()}")
