@@ -35,17 +35,17 @@ import org.apache.openwhisk.core.database.UserContext
 import scala.concurrent.duration._
 
 /**
-  * Tests Activations API.
-  *
-  * Unit tests of the controller service as a standalone component.
-  * These tests exercise a fresh instance of the service object in memory -- these
-  * tests do NOT communication with a whisk deployment.
-  *
-  *
-  * @Idioglossia
-  * "using Specification DSL to write unit tests, as in should, must, not, be"
-  * "using Specs2RouteTest DSL to chain HTTP requests for unit testing, as in ~>"
-  */
+ * Tests Activations API.
+ *
+ * Unit tests of the controller service as a standalone component.
+ * These tests exercise a fresh instance of the service object in memory -- these
+ * tests do NOT communication with a whisk deployment.
+ *
+ *
+ * @Idioglossia
+ * "using Specification DSL to write unit tests, as in should, must, not, be"
+ * "using Specs2RouteTest DSL to chain HTTP requests for unit testing, as in ~>"
+ */
 @RunWith(classOf[JUnitRunner])
 class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi {
 
@@ -895,7 +895,7 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
                               override val activationId: ActivationId,
                               override val start: Instant,
                               override val end: Instant)
-            extends WhiskActivation(namespace, name, subject, activationId, start, end) {
+              extends WhiskActivation(namespace, name, subject, activationId, start, end) {
             override def toJson = {
               val json = super.toJson
               JsObject(json.fields - "subject")
