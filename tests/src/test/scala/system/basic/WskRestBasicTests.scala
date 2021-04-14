@@ -1612,18 +1612,34 @@ class WskRestBasicTests extends TestHelpers with WskTestHelpers with WskActorSys
 
           val ns = wsk.namespace.whois()
           val run = wsk.trigger.fire(triggerName)
-          withActivation(wsk.activation, run) { activation =>
-            var result = wsk.activation.get(Some(activation.activationId))
-            result.getField("namespace") shouldBe ns
-            result.getField("name") shouldBe triggerName
-            result.getField("version") shouldBe "0.0.1"
-            result.getFieldJsValue("publish") shouldBe JsFalse
-            result.getField("subject") shouldBe ns
-            result.getField("activationId") shouldBe activation.activationId
-            result.getFieldJsValue("start").toString should not be JsObject.empty.toString
-            result.getFieldJsValue("end").toString shouldBe JsObject.empty.toString
-            result.getFieldJsValue("duration").toString shouldBe JsObject.empty.toString
-            result.getFieldListJsObject("annotations").length shouldBe 0
+          withActivation(wsk.activation, run) {
+            activation =>
+              println(s"activation: $activation")
+              var result = wsk.activation.get(Some(activation.activationId))
+              result.getField("namespace") shouldBe ns
+              result.getField("name") shouldBe triggerName
+              result.getField("version") shouldBe "0.0.1"
+              result.getFieldJsValue("publish") shouldBe JsFalse
+              result.getField("subject") shouldBe ns
+              result.getField("activationId") shouldBe activation.activationId
+              result.getFieldJsValue("start").toString should not be JsObject.empty.toString
+              result.getFieldJsValue("end").toString shouldBe JsObject.empty.toString
+              result.getFieldJsValue("duration").toString shouldBe JsObject.empty.toString
+              result.getFieldListJsObject("annotations").length shouldBe 2
+              result
+                .getFieldJsValue("annotations")
+                .convertTo[Seq[JsObject]]
+                .find(_.fields("key").convertTo[String] == "kind")
+                .map(_.fields("value"))
+                .map(kind => { kind.convertTo[String] shouldBe "trigger" })
+                .getOrElse(fail())
+              result
+                .getFieldJsValue("annotations")
+                .convertTo[Seq[JsObject]]
+                .find(_.fields("key").convertTo[String] == "transId")
+                .map(_.fields("value"))
+                .map(transId => { transId.convertTo[String].length shouldBe 32 })
+                .getOrElse(fail())
           }
         },
         retriesOnTestFailures,
