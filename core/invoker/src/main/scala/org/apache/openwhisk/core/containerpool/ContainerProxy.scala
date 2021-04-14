@@ -847,7 +847,7 @@ object ContainerProxy {
           Parameters(WhiskActivation.pathAnnotation, JsString(job.action.fullyQualifiedName(false).asString)) ++
           Parameters(WhiskActivation.kindAnnotation, JsString(job.action.exec.kind)) ++
           Parameters(WhiskActivation.timeoutAnnotation, JsBoolean(isTimeout)) ++
-          causedBy ++ initTime ++ binding ++ Parameters(WhiskActivation.transIdAnnotation, JsString(transid.id))
+          causedBy ++ initTime ++ binding ++ Parameters(WhiskActivation.transIdAnnotation, JsString(job.msg.transid.id))
       })
   }
 
