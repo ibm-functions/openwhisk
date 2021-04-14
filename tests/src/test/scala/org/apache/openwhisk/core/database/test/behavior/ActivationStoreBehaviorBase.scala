@@ -82,12 +82,12 @@ trait ActivationStoreBehaviorBase
 
   protected def newActivation(ns: String, actionName: String, start: Long): WhiskActivation = {
     WhiskActivation(
-      EntityPath(ns),
-      EntityName(actionName),
-      Subject(),
-      ActivationId.generate(),
-      Instant.ofEpochMilli(start),
-      Instant.ofEpochMilli(start + 1000))
+      namespace = EntityPath(ns),
+      name = EntityName(actionName),
+      subject = Subject(),
+      activationId = ActivationId.generate(),
+      start = Instant.ofEpochMilli(start),
+      end = Instant.ofEpochMilli(start + 1000))
   }
 
   /**

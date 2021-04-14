@@ -328,11 +328,11 @@ class ConductorsApiTests extends ControllerTestCommon with WhiskActionsApi {
         else ActivationResponse.success(Some(result))
       val start = Instant.now
       WhiskActivation(
-        action.namespace,
-        action.name,
-        msg.user.subject,
-        msg.activationId,
-        start,
+        namespace = action.namespace,
+        name = action.name,
+        subject = msg.user.subject,
+        activationId = msg.activationId,
+        start = start,
         end = start.plusMillis(duration),
         response = response)
     }

@@ -52,12 +52,12 @@ class DockerToActivationLogStoreTests extends FlatSpec with Matchers with WskAct
   val action = ExecutableWhiskAction(user.namespace.name.toPath, EntityName("actionName"), exec)
   val successfulActivation =
     WhiskActivation(
-      user.namespace.name.toPath,
-      action.name,
-      user.subject,
-      ActivationId.generate(),
-      Instant.EPOCH,
-      Instant.EPOCH)
+      namespace = user.namespace.name.toPath,
+      name = action.name,
+      subject = user.subject,
+      activationId = ActivationId.generate(),
+      start = Instant.EPOCH,
+      end = Instant.EPOCH)
   val developerErrorActivation = successfulActivation.copy(response = ActivationResponse.developerError("failed"))
 
   def toByteString(logs: List[LogLine]) = logs.map(_.toJson.compactPrint).map(ByteString.apply)

@@ -895,7 +895,13 @@ class ActivationsApiTests extends ControllerTestCommon with WhiskActivationsApi 
                               override val activationId: ActivationId,
                               override val start: Instant,
                               override val end: Instant)
-              extends WhiskActivation(namespace, name, subject, activationId, start, end) {
+              extends WhiskActivation(
+                namespace = namespace,
+                name = name,
+                subject = subject,
+                activationId = activationId,
+                start = start,
+                end = end) {
             override def toJson = {
               val json = super.toJson
               JsObject(json.fields - "subject")
