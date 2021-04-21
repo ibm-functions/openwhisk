@@ -315,13 +315,14 @@ class InvokerActor(invokerInstance: InvokerInstanceId, controllerInstance: Contr
 
   /** An Offline invoker represents an existing but broken invoker. This means, that it does not send pings anymore. */
   when(Offline) {
-    case Event(_: PingMessage, _) => goto(Unhealthy)
+    case Event(p: PingMessage, _) if !p.isBlacklisted => goto(Unhealthy)
   }
 
   // To be used for all states that should send test actions to reverify the invoker
   val healthPingingState: StateFunction = {
-    case Event(_: PingMessage, _) => stay
-    case Event(StateTimeout, _)   => goto(Offline)
+    case Event(p: PingMessage, _) if !p.isBlacklisted => stay
+    case Event(p: PingMessage, _) if p.isBlacklisted  => goto(Offline)
+    case Event(StateTimeout, _)                       => goto(Offline)
     case Event(Tick, _) =>
       invokeTestAction()
       stay
@@ -338,8 +339,9 @@ class InvokerActor(invokerInstance: InvokerInstanceId, controllerInstance: Contr
    * for 20 seconds.
    */
   when(Healthy, stateTimeout = healthyTimeout) {
-    case Event(_: PingMessage, _) => stay
-    case Event(StateTimeout, _)   => goto(Offline)
+    case Event(p: PingMessage, _) if !p.isBlacklisted => stay
+    case Event(p: PingMessage, _) if p.isBlacklisted  => goto(Offline)
+    case Event(StateTimeout, _)                       => goto(Offline)
   }
 
   /** Handle the completion of an Activation in every state. */

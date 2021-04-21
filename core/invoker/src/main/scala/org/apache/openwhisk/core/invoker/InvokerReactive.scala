@@ -343,12 +343,10 @@ class InvokerReactive(
 
   private val healthProducer = msgProvider.getProducer(config)
   Scheduler.scheduleWaitAtMost(1.seconds)(() => {
-    if (!namespaceBlacklist.isBlacklisted(instance.displayedName.getOrElse(""))) {
-      healthProducer.send("health", PingMessage(instance)).andThen {
+    healthProducer
+      .send("health", PingMessage(instance, namespaceBlacklist.isBlacklisted(instance.displayedName.getOrElse(""))))
+      .andThen {
         case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
       }
-    } else {
-      Future.successful(())
-    }
   })
 }
