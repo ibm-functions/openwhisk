@@ -20,6 +20,7 @@ package org.apache.openwhisk.core.controller.test
 import org.junit.runner.RunWith
 import org.scalatest.junit.JUnitRunner
 
+import akka.http.scaladsl.model.headers.RawHeader
 import akka.http.scaladsl.model.StatusCodes.NotFound
 import akka.http.scaladsl.model.StatusCodes.OK
 import akka.http.scaladsl.server.Route
@@ -47,7 +48,7 @@ class RespondWithHeadersTests extends ControllerTestCommon with RespondWithHeade
 
   val routes = {
     pathPrefix("api" / "v1") {
-      sendCorsHeaders {
+      send10206Headers {
         path("one") {
           complete(OK)
         } ~ path("two") {
@@ -63,22 +64,42 @@ class RespondWithHeadersTests extends ControllerTestCommon with RespondWithHeade
 
   it should "respond to options" in {
     Options("/api/v1") ~> Route.seal(routes) ~> check {
-      headers should contain allOf (allowOrigin, allowHeaders)
+      headers should contain allOf (
+                                RawHeader("X-Content-Type-Options", "nosniff"),
+                                RawHeader("X-XSS-Protection", "1; mode=block"),
+                                RawHeader("Cache-Control", "no-store, max-age=0"),
+                                RawHeader("Pragma", "no-cache"),
+                                allowOrigin, allowHeaders)
     }
   }
 
   it should "respond to options on every route under /api/v1" in {
     Options("/api/v1/one") ~> Route.seal(routes) ~> check {
-      headers should contain allOf (allowOrigin, allowHeaders)
+      headers should contain allOf (
+                                RawHeader("X-Content-Type-Options", "nosniff"),
+                                RawHeader("X-XSS-Protection", "1; mode=block"),
+                                RawHeader("Cache-Control", "no-store, max-age=0"),
+                                RawHeader("Pragma", "no-cache"),
+                                allowOrigin, allowHeaders)
     }
     Options("/api/v1/two") ~> Route.seal(routes) ~> check {
-      headers should contain allOf (allowOrigin, allowHeaders)
+      headers should contain allOf (
+                                RawHeader("X-Content-Type-Options", "nosniff"),
+                                RawHeader("X-XSS-Protection", "1; mode=block"),
+                                RawHeader("Cache-Control", "no-store, max-age=0"),
+                                RawHeader("Pragma", "no-cache"),
+                                allowOrigin, allowHeaders)
     }
   }
 
   it should "respond to options even on bogus routes under /api/v1" in {
     Options("/api/v1/bogus") ~> Route.seal(routes) ~> check {
-      headers should contain allOf (allowOrigin, allowHeaders)
+      headers should contain allOf (
+                                RawHeader("X-Content-Type-Options", "nosniff"),
+                                RawHeader("X-XSS-Protection", "1; mode=block"),
+                                RawHeader("Cache-Control", "no-store, max-age=0"),
+                                RawHeader("Pragma", "no-cache"),
+                                allowOrigin, allowHeaders)
     }
   }
 
