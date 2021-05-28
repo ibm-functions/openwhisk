@@ -158,7 +158,7 @@ protected[controller] trait RespondWithHeaders extends Directives with CorsSetti
                             RawHeader("X-XSS-Protection", "1; mode=block"),
                             RawHeader("Cache-Control", "no-store, max-age=0"),
                             RawHeader("Pragma", "no-cache"),
-                            allowOrigin, allowHeaders, allowMethods)
+                            allowHeaders, allowMethods)
 }
 
 case class WhiskInformation(buildNo: String, date: String)
