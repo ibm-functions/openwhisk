@@ -96,6 +96,7 @@ class HeadersTests extends FlatSpec with Matchers with ScalaFutures with WskActo
    */
   def containsHeaders(headers: Seq[HttpHeader], allowedMethods: Option[Set[String]] = None) = {
     headers should contain (allowHeaders)
+    headers should not contain (allowOrigin)
 
     // TODO: commented out for now as allowed methods are not supported currently
     //        val headersMap = headers map { header =>
