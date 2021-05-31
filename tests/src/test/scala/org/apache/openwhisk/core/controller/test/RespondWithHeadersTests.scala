@@ -48,7 +48,7 @@ class RespondWithHeadersTests extends ControllerTestCommon with RespondWithHeade
 
   val routes = {
     pathPrefix("api" / "v1") {
-      send10206Headers {
+      sendResponseHeaders {
         path("one") {
           complete(OK)
         } ~ path("two") {

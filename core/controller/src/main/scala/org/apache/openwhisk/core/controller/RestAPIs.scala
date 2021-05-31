@@ -153,7 +153,7 @@ protected[controller] object RestApiCommons {
  */
 protected[controller] trait RespondWithHeaders extends Directives with CorsSettings.RestAPIs {
   import akka.http.scaladsl.model.headers.RawHeader
-  val send10206Headers = respondWithHeaders(
+  val sendResponseHeaders = respondWithHeaders(
                             RawHeader("X-Content-Type-Options", "nosniff"),
                             RawHeader("X-XSS-Protection", "1; mode=block"),
                             RawHeader("Cache-Control", "no-store, max-age=0"),
@@ -203,7 +203,7 @@ class RestAPIVersion(config: WhiskConfig, apiPath: String, apiVersion: String)(
 
   def routes(implicit transid: TransactionId): Route = {
     prefix {
-      send10206Headers {
+      sendResponseHeaders {
         info ~
           authenticationDirectiveProvider.authenticate(transid, authStore, logging) { user =>
             namespaces.routes(user) ~
@@ -225,7 +225,7 @@ class RestAPIVersion(config: WhiskConfig, apiPath: String, apiVersion: String)(
           web.routes()
         } ~
           options {
-            send10206Headers {
+            sendResponseHeaders {
               complete(OK)
             }
           }
