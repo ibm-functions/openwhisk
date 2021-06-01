@@ -154,11 +154,12 @@ protected[controller] object RestApiCommons {
 protected[controller] trait RespondWithHeaders extends Directives with CorsSettings.RestAPIs {
   import akka.http.scaladsl.model.headers.RawHeader
   val sendResponseHeaders = respondWithHeaders(
-                            RawHeader("X-Content-Type-Options", "nosniff"),
-                            RawHeader("X-XSS-Protection", "1; mode=block"),
-                            RawHeader("Cache-Control", "no-store, max-age=0"),
-                            RawHeader("Pragma", "no-cache"),
-                            allowHeaders, allowMethods)
+    RawHeader("X-Content-Type-Options", "nosniff"),
+    RawHeader("X-XSS-Protection", "1; mode=block"),
+    RawHeader("Cache-Control", "no-store, max-age=0"),
+    RawHeader("Pragma", "no-cache"),
+    allowHeaders,
+    allowMethods)
 }
 
 case class WhiskInformation(buildNo: String, date: String)
