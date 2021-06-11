@@ -84,16 +84,18 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
         val authkey = BasicAuthenticationAuthKey(UUID(pw.username), Secret(pw.password))
         logging.info(this, s"authenticate: ${authkey.uuid}")
         val future = Identity.get(authStore, authkey) map { result =>
-          val account = result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account
-          val identity = if (getOrCreateBlacklist.isBlacklisted(account)) {
-            Identity(
-              subject = result.subject,
-              namespace = result.namespace,
-              authkey = result.authkey,
-              rights = result.rights,
-              limits =
-                UserLimits(invocationsPerMinute = Some(0), concurrentInvocations = Some(0), firesPerMinute = Some(0)))
-          } else result
+          val blacklist = getOrCreateBlacklist
+          val identity =
+            if (!blacklist.isEmpty && blacklist.isBlacklisted(
+                  result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account)) {
+              Identity(
+                subject = result.subject,
+                namespace = result.namespace,
+                authkey = result.authkey,
+                rights = result.rights,
+                limits =
+                  UserLimits(invocationsPerMinute = Some(0), concurrentInvocations = Some(0), firesPerMinute = Some(0)))
+            } else result
 
           // store info for activity tracker
           val name = identity.subject.asString

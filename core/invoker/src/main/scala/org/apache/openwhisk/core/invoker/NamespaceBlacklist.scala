@@ -54,6 +54,13 @@ class NamespaceBlacklist(authStore: AuthStore) {
    */
   def isBlacklisted(name: String): Boolean = blacklist.contains(name)
 
+  /**
+   * Check if blacklist is empty.
+   *
+   * @return whether or not the blacklist is empty
+   */
+  def isEmpty(): Boolean = blacklist.isEmpty
+
   /** Refreshes the current blacklist from the database. */
   /** Limit query parameter set to 0 for limitless record query. */
   def refreshBlacklist()(implicit ec: ExecutionContext, tid: TransactionId): Future[Set[String]] = {
