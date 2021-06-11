@@ -30,7 +30,8 @@ import spray.json.DefaultJsonProtocol._
 protected[core] case class BasicAuthenticationAuthKey(uuid: UUID,
                                                       key: Secret,
                                                       keyEncrypted: String = "",
-                                                      namespaceCrnEncoded: String = "")
+                                                      namespaceCrnEncoded: String = "",
+                                                      account: String = "")
     extends GenericAuthKey(
       JsObject(
         "api_key" -> s"$uuid:$key".toJson,

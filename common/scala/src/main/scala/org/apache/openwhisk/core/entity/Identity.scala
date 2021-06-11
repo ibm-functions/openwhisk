@@ -298,7 +298,7 @@ object Identity extends MultipleReadersSingleWriterCache[Option[Identity], DocIn
         Identity(
           subject,
           Namespace(EntityName(namespace), UUID(uuid)),
-          BasicAuthenticationAuthKey(UUID(uuid), Secret(key), keyenc, crnEncoded),
+          BasicAuthenticationAuthKey(UUID(uuid), Secret(key), keyenc, crnEncoded, account),
           Privilege.ALL,
           limits)
       case _ =>

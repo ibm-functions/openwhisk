@@ -21,18 +21,54 @@ import akka.actor.ActorSystem
 import akka.http.scaladsl.model.headers._
 import akka.http.scaladsl.server.Directives._
 import akka.http.scaladsl.server.directives.{AuthenticationDirective, AuthenticationResult}
-import org.apache.openwhisk.common.{Logging, TransactionId}
+import akka.stream.ActorMaterializer
+import org.apache.openwhisk.common.{Logging, Scheduler, TransactionId}
+import org.apache.openwhisk.core.ConfigKeys
 import org.apache.openwhisk.core.database.NoDocumentException
 import org.apache.openwhisk.core.entity._
 import org.apache.openwhisk.core.entity.types.AuthStore
+import org.apache.openwhisk.core.invoker.{NamespaceBlacklist, NamespaceBlacklistConfig}
+import pureconfig.loadConfigOrThrow
+//import pureconfig._
+import pureconfig.generic.auto._
 
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import spray.json.JsString
 
 object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
 
+  var namespaceBlacklist: Option[NamespaceBlacklist] = None
+  def getOrCreateBlacklist()(implicit transid: TransactionId,
+                             system: ActorSystem,
+                             ec: ExecutionContext,
+                             logging: Logging): NamespaceBlacklist = {
+    val blacklist =
+      if (namespaceBlacklist.isDefined) namespaceBlacklist.get
+      else {
+        //implicit val ec = authStore.executionContext
+        //implicit val logging = authStore.logging
+        logging.info(this, "creating blacklist..")
+        val authStore = WhiskAuthStore.datastore()(system, logging, ActorMaterializer())
+        val namespaceBlacklist = new NamespaceBlacklist(authStore)
+        Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) {
+          () =>
+            logging.info(this, "running background job to update blacklist")
+            namespaceBlacklist.refreshBlacklist()(authStore.executionContext, transid).andThen {
+              case Success(set) => {
+                logging.info(this, s"updated blacklist to ${set.size} entries($set)")
+              }
+              case Failure(t) => logging.error(this, s"error on updating the blacklist: ${t.getMessage}")
+            }
+        }
+        namespaceBlacklist
+      }
+    namespaceBlacklist = Some(blacklist)
+    blacklist
+  }
+
   def validateCredentials(credentials: Option[BasicHttpCredentials])(implicit transid: TransactionId,
+                                                                     system: ActorSystem,
                                                                      ec: ExecutionContext,
                                                                      logging: Logging,
                                                                      authStore: AuthStore): Future[Option[Identity]] = {
@@ -42,19 +78,30 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
         val authkey = BasicAuthenticationAuthKey(UUID(pw.username), Secret(pw.password))
         logging.info(this, s"authenticate: ${authkey.uuid}")
         val future = Identity.get(authStore, authkey) map { result =>
+          val account = result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account
+          val identity = if (getOrCreateBlacklist.isBlacklisted(account)) {
+            Identity(
+              subject = result.subject,
+              namespace = result.namespace,
+              authkey = result.authkey,
+              rights = result.rights,
+              limits =
+                UserLimits(invocationsPerMinute = Some(0), concurrentInvocations = Some(0), firesPerMinute = Some(0)))
+          } else result
+
           // store info for activity tracker
-          val name = result.subject.asString
-          transid.setTag(TransactionId.tagNamespaceId, result.namespace.name.asString)
+          val name = identity.subject.asString
+          transid.setTag(TransactionId.tagNamespaceId, identity.namespace.name.asString)
           transid.setTag(TransactionId.tagInitiatorId, name)
           transid.setTag(TransactionId.tagInitiatorName, name)
           transid.setTag(TransactionId.tagGrantType, "password")
           val JsString(crnEncoded) =
-            result.authkey.toEnvironment.fields.getOrElse("namespace_crn_encoded", JsString.empty)
+            identity.authkey.toEnvironment.fields.getOrElse("namespace_crn_encoded", JsString.empty)
           transid.setTag(TransactionId.tagTargetIdEncoded, crnEncoded)
 
-          if (authkey == result.authkey) {
+          if (authkey == identity.authkey) {
             logging.debug(this, s"authentication valid")
-            Some(result)
+            Some(identity)
           } else {
             logging.debug(this, s"authentication not valid")
             None
@@ -87,10 +134,25 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
 
   def identityByNamespace(
     namespace: EntityName)(implicit transid: TransactionId, system: ActorSystem, authStore: AuthStore) = {
-    Identity.get(authStore, namespace)
+    //Identity.get(authStore, namespace)
+    implicit val ec = authStore.executionContext
+    implicit val logging = authStore.logging
+    Identity.get(authStore, namespace) map { result =>
+      val account = result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account
+      val identity = if (getOrCreateBlacklist.isBlacklisted(account)) {
+        Identity(
+          subject = result.subject,
+          namespace = result.namespace,
+          authkey = result.authkey,
+          rights = result.rights,
+          limits = UserLimits(invocationsPerMinute = Some(0), concurrentInvocations = Some(0), firesPerMinute = Some(0)))
+      } else result
+      identity
+    }
   }
 
   def authenticate(implicit transid: TransactionId,
+                   system: ActorSystem,
                    authStore: AuthStore,
                    logging: Logging): AuthenticationDirective[Identity] = {
     extractExecutionContext.flatMap { implicit ec =>
