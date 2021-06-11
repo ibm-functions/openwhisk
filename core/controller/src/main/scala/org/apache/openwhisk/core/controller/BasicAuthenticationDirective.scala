@@ -48,7 +48,12 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
       if (namespaceBlacklist.isDefined) namespaceBlacklist.get
       else {
         val whiskConfig = new WhiskConfig(Map.empty)
-        logging.info(this, s"whiskconfig: $whiskConfig")
+        logging.info(this, s"controller name: ${whiskConfig.controllerName}")
+        logging.info(this, s"sys.env: ${sys.env}")
+        logging.info(this, s"sys.props: ${sys.props}")
+        logging.info(this, s"System.getenv(): ${System.getenv()}")
+        logging.info(this, s"System.getProperties(): ${System.getProperties()}")
+
         //implicit val ec = authStore.executionContext
         //implicit val logging = authStore.logging
         logging.info(this, "creating blacklist..")
