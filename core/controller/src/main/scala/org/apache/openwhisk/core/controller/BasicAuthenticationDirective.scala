@@ -24,6 +24,7 @@ import akka.http.scaladsl.server.directives.{AuthenticationDirective, Authentica
 import akka.stream.ActorMaterializer
 import org.apache.openwhisk.common.{Logging, Scheduler, TransactionId}
 import org.apache.openwhisk.core.ConfigKeys
+import org.apache.openwhisk.core.WhiskConfig
 import org.apache.openwhisk.core.database.NoDocumentException
 import org.apache.openwhisk.core.entity._
 import org.apache.openwhisk.core.entity.types.AuthStore
@@ -46,20 +47,25 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
     val blacklist =
       if (namespaceBlacklist.isDefined) namespaceBlacklist.get
       else {
+        val whiskConfig = new WhiskConfig(Map.empty)
+        logging.info(this, s"whiskconfig: $whiskConfig")
         //implicit val ec = authStore.executionContext
         //implicit val logging = authStore.logging
         logging.info(this, "creating blacklist..")
         val authStore = WhiskAuthStore.datastore()(system, logging, ActorMaterializer())
         val namespaceBlacklist = new NamespaceBlacklist(authStore)
-        Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) {
-          () =>
-            logging.info(this, "running background job to update blacklist")
-            namespaceBlacklist.refreshBlacklist()(authStore.executionContext, transid).andThen {
-              case Success(set) => {
-                logging.info(this, s"updated blacklist to ${set.size} entries($set)")
+        if (!whiskConfig.controllerName.equals("crudcontroller")) {
+          logging.info(this, "creating background job to update blacklist..")
+          Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) {
+            () =>
+              logging.info(this, "running background job to update blacklist")
+              namespaceBlacklist.refreshBlacklist()(authStore.executionContext, transid).andThen {
+                case Success(set) => {
+                  logging.info(this, s"updated blacklist to ${set.size} entries($set)")
+                }
+                case Failure(t) => logging.error(this, s"error on updating the blacklist: ${t.getMessage}")
               }
-              case Failure(t) => logging.error(this, s"error on updating the blacklist: ${t.getMessage}")
-            }
+          }
         }
         namespaceBlacklist
       }
