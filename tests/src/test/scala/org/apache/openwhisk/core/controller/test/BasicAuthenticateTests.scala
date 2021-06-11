@@ -77,7 +77,7 @@ class BasicAuthenticateTests extends ControllerTestCommon {
                 val pass = BasicHttpCredentials(ns.authkey.uuid.asString, ns.authkey.key.asString)
                 val user = Await.result(
                   BasicAuthenticationDirective
-                    .validateCredentials(Some(pass))(transid, executionContext, logging, authStore),
+                    .validateCredentials(Some(pass))(transid, actorSystem, executionContext, logging, authStore),
                   dbOpTimeout)
                 user.get shouldBe Identity(subject, ns.namespace, ns.authkey, rights = Privilege.ALL)
 
@@ -88,7 +88,7 @@ class BasicAuthenticateTests extends ControllerTestCommon {
                 // repeat query, now should be served from cache
                 val cachedUser = Await.result(
                   BasicAuthenticationDirective
-                    .validateCredentials(Some(pass))(transid, executionContext, logging, authStore),
+                    .validateCredentials(Some(pass))(transid, actorSystem, executionContext, logging, authStore),
                   dbOpTimeout)
                 cachedUser.get shouldBe Identity(subject, ns.namespace, ns.authkey, rights = Privilege.ALL)
 
@@ -104,7 +104,7 @@ class BasicAuthenticateTests extends ControllerTestCommon {
             val pass = BasicHttpCredentials(ns.authkey.uuid.asString, k)
             val user = Await.result(
               BasicAuthenticationDirective
-                .validateCredentials(Some(pass))(transid, executionContext, logging, authStore),
+                .validateCredentials(Some(pass))(transid, actorSystem, executionContext, logging, authStore),
               dbOpTimeout)
             user shouldBe empty
           }
@@ -123,7 +123,8 @@ class BasicAuthenticateTests extends ControllerTestCommon {
           val creds = WhiskAuthHelpers.newIdentity()
           val pass = creds.authkey.getCredentials.asInstanceOf[Option[BasicHttpCredentials]]
           val user = Await.result(
-            BasicAuthenticationDirective.validateCredentials(pass)(transid, executionContext, logging, authStore),
+            BasicAuthenticationDirective
+              .validateCredentials(pass)(transid, actorSystem, executionContext, logging, authStore),
             dbOpTimeout)
           user should be(None)
           stream.toString should not include pass.get.password
@@ -142,7 +143,8 @@ class BasicAuthenticateTests extends ControllerTestCommon {
           val creds = WhiskAuthHelpers.newIdentity()
           val pass = creds.authkey.getCredentials.asInstanceOf[Option[BasicHttpCredentials]]
           val user = Await.result(
-            BasicAuthenticationDirective.validateCredentials(pass)(transid, executionContext, logging, authStore),
+            BasicAuthenticationDirective
+              .validateCredentials(pass)(transid, actorSystem, executionContext, logging, authStore),
             dbOpTimeout)
           user should be(None)
         },
@@ -158,7 +160,8 @@ class BasicAuthenticateTests extends ControllerTestCommon {
         {
           implicit val tid = transid()
           val user = Await.result(
-            BasicAuthenticationDirective.validateCredentials(None)(transid, executionContext, logging, authStore),
+            BasicAuthenticationDirective
+              .validateCredentials(None)(transid, actorSystem, executionContext, logging, authStore),
             dbOpTimeout)
           user should be(None)
         },
@@ -176,7 +179,7 @@ class BasicAuthenticateTests extends ControllerTestCommon {
           val pass = BasicHttpCredentials("x", Secret().asString)
           val user = Await.result(
             BasicAuthenticationDirective
-              .validateCredentials(Some(pass))(transid, executionContext, logging, authStore),
+              .validateCredentials(Some(pass))(transid, actorSystem, executionContext, logging, authStore),
             dbOpTimeout)
           user should be(None)
         },
@@ -194,7 +197,7 @@ class BasicAuthenticateTests extends ControllerTestCommon {
           val pass = BasicHttpCredentials(UUID().asString, "x")
           val user = Await.result(
             BasicAuthenticationDirective
-              .validateCredentials(Some(pass))(transid, executionContext, logging, authStore),
+              .validateCredentials(Some(pass))(transid, actorSystem, executionContext, logging, authStore),
             dbOpTimeout)
           user should be(None)
         },
@@ -212,7 +215,7 @@ class BasicAuthenticateTests extends ControllerTestCommon {
           val pass = BasicHttpCredentials("x", "y")
           val user = Await.result(
             BasicAuthenticationDirective
-              .validateCredentials(Some(pass))(transid, executionContext, logging, authStore),
+              .validateCredentials(Some(pass))(transid, actorSystem, executionContext, logging, authStore),
             dbOpTimeout)
           user should be(None)
         },
