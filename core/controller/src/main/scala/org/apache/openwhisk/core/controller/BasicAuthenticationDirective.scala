@@ -24,13 +24,11 @@ import akka.http.scaladsl.server.directives.{AuthenticationDirective, Authentica
 import akka.stream.ActorMaterializer
 import org.apache.openwhisk.common.{Logging, Scheduler, TransactionId}
 import org.apache.openwhisk.core.ConfigKeys
-//import org.apache.openwhisk.core.WhiskConfig
 import org.apache.openwhisk.core.database.NoDocumentException
 import org.apache.openwhisk.core.entity._
 import org.apache.openwhisk.core.entity.types.AuthStore
 import org.apache.openwhisk.core.invoker.{NamespaceBlacklist, NamespaceBlacklistConfig}
 import pureconfig.loadConfigOrThrow
-//import pureconfig._
 import pureconfig.generic.auto._
 
 import scala.concurrent.{ExecutionContext, Future}
@@ -48,27 +46,19 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
       if (namespaceBlacklist.isDefined) namespaceBlacklist.get
       else {
         logging.info(this, s"controller name: ${sys.env.get("CONTROLLER_NAME").getOrElse("")}")
-        //sys.env.get("CONTROLLER_NAME").getOrElse("")
-        //val whiskConfig = new WhiskConfig(Map.empty)
-        //logging.info(this, s"controller name: ${whiskConfig.controllerName}")
-        logging.info(this, s"sys.env: ${sys.env}")
-        //logging.info(this, s"sys.props: ${sys.props}")
-        //logging.info(this, s"System.getenv(): ${System.getenv()}")
-        //logging.info(this, s"System.getProperties(): ${System.getProperties()}")
-
-        //implicit val ec = authStore.executionContext
-        //implicit val logging = authStore.logging
-        logging.info(this, "creating blacklist..")
+        logging.info(this, "create blacklist..")
         val authStore = WhiskAuthStore.datastore()(system, logging, ActorMaterializer())
         val namespaceBlacklist = new NamespaceBlacklist(authStore)
         if (!sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")) {
-          logging.info(this, "creating background job to update blacklist..")
+          logging.info(this, "create background job to update blacklist..")
           Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) {
             () =>
-              logging.info(this, "running background job to update blacklist")
+              logging.debug(this, "running background job to update blacklist")
               namespaceBlacklist.refreshBlacklist()(authStore.executionContext, transid).andThen {
                 case Success(set) => {
-                  logging.info(this, s"updated blacklist to ${set.size} entries($set)")
+                  logging.info(
+                    this,
+                    s"updated blacklist to ${set.size} items (accounts: ${set.filter(i => i matches "[0-9a-z]{32}")})")
                 }
                 case Failure(t) => logging.error(this, s"error on updating the blacklist: ${t.getMessage}")
               }
@@ -94,7 +84,7 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
           val blacklist = getOrCreateBlacklist
           val identity =
             if (!blacklist.isEmpty && blacklist.isBlacklisted(
-                  result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account)) {
+                  Try(result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account).getOrElse(""))) {
               Identity(
                 subject = result.subject,
                 namespace = result.namespace,
@@ -153,8 +143,9 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
     implicit val ec = authStore.executionContext
     implicit val logging = authStore.logging
     Identity.get(authStore, namespace) map { result =>
-      val account = result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account
-      val identity = if (getOrCreateBlacklist.isBlacklisted(account)) {
+      val blacklist = getOrCreateBlacklist
+      if (!blacklist.isEmpty && blacklist.isBlacklisted(
+            Try(result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account).getOrElse(""))) {
         Identity(
           subject = result.subject,
           namespace = result.namespace,
@@ -162,7 +153,6 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
           rights = result.rights,
           limits = UserLimits(invocationsPerMinute = Some(0), concurrentInvocations = Some(0), firesPerMinute = Some(0)))
       } else result
-      identity
     }
   }
 
