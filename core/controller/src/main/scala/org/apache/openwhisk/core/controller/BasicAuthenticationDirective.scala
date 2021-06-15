@@ -157,11 +157,12 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
   }
 
   def authenticate(implicit transid: TransactionId,
-                   system: ActorSystem,
                    authStore: AuthStore,
                    logging: Logging): AuthenticationDirective[Identity] = {
-    extractExecutionContext.flatMap { implicit ec =>
-      basicAuth(validateCredentials)
+    extractActorSystem.flatMap { implicit system =>
+      extractExecutionContext.flatMap { implicit ec =>
+        basicAuth(validateCredentials)
+      }
     }
   }
 }
