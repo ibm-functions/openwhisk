@@ -316,6 +316,7 @@ class InvokerActor(invokerInstance: InvokerInstanceId, controllerInstance: Contr
   /** An Offline invoker represents an existing but broken invoker. This means, that it does not send pings anymore. */
   when(Offline) {
     case Event(p: PingMessage, _) if !p.isBlacklisted => goto(Unhealthy)
+    case Event(p: PingMessage, _) if p.isBlacklisted => stay // avoid unhandled event {"isBlacklisted":true,..} in state Offline
   }
 
   // To be used for all states that should send test actions to reverify the invoker
