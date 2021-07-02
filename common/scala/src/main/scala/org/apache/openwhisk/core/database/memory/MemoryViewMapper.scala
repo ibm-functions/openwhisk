@@ -95,8 +95,13 @@ private object ActivationViewMapper extends MemoryViewMapper {
       case "activations" if ddoc.startsWith("whisks-filters") =>
         filterActivation(d, equal(c, NS_WITH_PATH, nsValue), startKey, endKey)
       //whisks ddoc uses namespace as first key
-      case "activations" if ddoc.startsWith("whisks") => filterActivation(d, equal(d, NS, nsValue), startKey, endKey)
-      case _                                          => throw UnsupportedView(s"$ddoc/$view")
+      case "activations" if ddoc.startsWith("whisks") =>
+        filterActivation(d, equal(d, NS, nsValue), startKey, endKey) || filterActivation(
+          d,
+          equal(c, NS_WITH_PATH, nsValue),
+          startKey,
+          endKey)
+      case _ => throw UnsupportedView(s"$ddoc/$view")
     }
   }
 
