@@ -168,7 +168,9 @@ abstract class ApiGwEndToEndTests
       rr = wsk.api
         .create(swagger = Some(swaggerfile.getAbsolutePath()), cliCfgFile = Some(cliWskPropsFile.getCanonicalPath()))
       verifyAPISwaggerCreated(rr)
-      val swaggerapiurl = getSwaggerApiUrl(rr)
+      var swaggerapiurl = getSwaggerApiUrl(rr)
+      println(s"Returned api url: '${swaggerapiurl}'")
+      swaggerapiurl = swaggerapiurl.replace("http://", "https://").replace(":80", "")
       println(s"Returned api url: '${swaggerapiurl}'")
 
       // Call the API URL and validate the results
