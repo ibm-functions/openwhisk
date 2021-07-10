@@ -1187,10 +1187,20 @@ trait RunRestCmd extends Matchers with ScalaFutures with SwaggerValidator {
       List(Authorization(creds)),
       entity =
         body.map(b => HttpEntity.Strict(ContentTypes.`application/json`, ByteString(b))).getOrElse(HttpEntity.Empty))
+    if (path.endsWith("createApi")) {
+      logger.info(this, s"Request: $request")
+      logger.info(this, s"Requestbody: $body")
+    }
     val response = Http().singleRequest(request, connectionContext).flatMap { _.toStrict(toStrictTimeout) }.futureValue
 
     logger.debug(this, s"Request: $request")
     logger.debug(this, s"Response: $response")
+    if (path.endsWith("createApi")) {
+      logger.info(this, s"Response: $response")
+    }
+
+    //System.out.println(s"request: $request")
+    //System.out.println(s"response: $response")
 
     val validationErrors = validateRequestAndResponse(request, response)
     if (validationErrors.nonEmpty) {
