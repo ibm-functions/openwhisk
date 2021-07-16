@@ -53,15 +53,15 @@ class ExtendedCouchDbRestClient(protocol: String,
 
   // http://docs.couchdb.org/en/1.6.1/api/database/common.html#put--db
   def createDb(): Future[Either[StatusCode, JsObject]] =
-    requestJson[JsObject](mkRequest(HttpMethods.PUT, uri(getDbName(db)), headers = baseHeaders))
+    requestJson[JsObject](mkRequest(HttpMethods.PUT, uri(db), headers = baseHeaders))
 
   // http://docs.couchdb.org/en/1.6.1/api/database/common.html#delete--db
   def deleteDb(): Future[Either[StatusCode, JsObject]] =
-    requestJson[JsObject](mkRequest(HttpMethods.DELETE, uri(getDbName(db)), headers = baseHeaders))
+    requestJson[JsObject](mkRequest(HttpMethods.DELETE, uri(db), headers = baseHeaders))
 
   // http://docs.couchdb.org/en/1.6.1/api/database/common.html#head--db
   def doesDbExist(): Future[Boolean] = {
-    requestJson[JsObject](mkRequest(HttpMethods.HEAD, uri(getDbName(db)), headers = baseHeaders))
+    requestJson[JsObject](mkRequest(HttpMethods.HEAD, uri(db), headers = baseHeaders))
       .map {
         case Right(_)                   => true
         case Left(StatusCodes.NotFound) => false
@@ -87,7 +87,7 @@ class ExtendedCouchDbRestClient(protocol: String,
       })
       .toMap
 
-    val url = uri(getDbName(db), "_all_docs").withQuery(Uri.Query(argMap))
+    val url = uri(db, "_all_docs").withQuery(Uri.Query(argMap))
     requestJson[JsObject](mkRequest(HttpMethods.GET, url, headers = baseHeaders))
   }
 }

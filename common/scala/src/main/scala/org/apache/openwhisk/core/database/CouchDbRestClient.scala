@@ -54,7 +54,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
   private def getCurrentDay = System.currentTimeMillis / (24 * 60 * 60 * 1000)
 
-  protected def getDbName(db: String) = if (db.endsWith("activations-")) db + getCurrentDay else db
+  private def getDbName(db: String) = if (db.endsWith("activations-")) db + getCurrentDay else db
 
   // Properly encodes the potential slashes in each segment.
   protected def uri(segments: Any*): Uri = {
