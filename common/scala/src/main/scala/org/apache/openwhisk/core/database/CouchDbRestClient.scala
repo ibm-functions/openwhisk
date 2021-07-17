@@ -34,15 +34,15 @@ import org.apache.openwhisk.http.PoolingRestClient._
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
-  * A client implementing the CouchDb API.
-  *
-  * This client only handles communication to the respective endpoints and works in a Json-in -> Json-out fashion. It's
-  * up to the client to interpret the results accordingly.
-  */
+ * A client implementing the CouchDb API.
+ *
+ * This client only handles communication to the respective endpoints and works in a Json-in -> Json-out fashion. It's
+ * up to the client to interpret the results accordingly.
+ */
 class CouchDbRestClient(protocol: String, host: String, port: Int, username: String, password: String, db: String)(
   implicit system: ActorSystem,
   logging: Logging)
-  extends PoolingRestClient(protocol, host, port, 16 * 1024) {
+    extends PoolingRestClient(protocol, host, port, 16 * 1024) {
 
   protected implicit override val context: ExecutionContext = system.dispatchers.lookup("dispatchers.couch-dispatcher")
 
