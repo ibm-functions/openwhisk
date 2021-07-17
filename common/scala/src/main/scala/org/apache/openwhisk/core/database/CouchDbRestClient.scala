@@ -52,9 +52,9 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
   private def revHeader(forRev: String) = List(`If-Match`(EntityTagRange(EntityTag(forRev))))
 
-  private def getCurrentDay = System.currentTimeMillis / (24 * 60 * 60 * 1000)
+  private def getCurrentDay: Long = System.currentTimeMillis / (24 * 60 * 60 * 1000)
 
-  private def getDbName(db: String) = if (db.endsWith("activations-")) db + getCurrentDay else db
+  private def getDbName(db: String): String = if (db.endsWith("activations-")) db + getCurrentDay else db
 
   // Properly encodes the potential slashes in each segment.
   protected def uri(segments: Any*): Uri = {
