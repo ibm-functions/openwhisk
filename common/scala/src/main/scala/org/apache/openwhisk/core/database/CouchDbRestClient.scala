@@ -85,8 +85,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#delete--db-docid
   def deleteDoc(id: String, rev: String): Future[Either[StatusCode, JsObject]] =
-    requestJson[JsObject](
-      mkRequest(HttpMethods.DELETE, uri(db, id), headers = baseHeaders ++ revHeader(rev)))
+    requestJson[JsObject](mkRequest(HttpMethods.DELETE, uri(db, id), headers = baseHeaders ++ revHeader(rev)))
 
   // http://docs.couchdb.org/en/1.6.1/api/ddoc/views.html
   def executeView(designDoc: String, viewName: String)(startKey: List[Any] = Nil,
@@ -156,11 +155,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                     source: Source[ByteString, _]): Future[Either[StatusCode, JsObject]] = {
     val entity = HttpEntity.Chunked(contentType, source.map(bs => HttpEntity.ChunkStreamPart(bs)))
     val request =
-      mkRequest(
-        HttpMethods.PUT,
-        uri(db, id, attName),
-        Future.successful(entity),
-        baseHeaders ++ revHeader(rev))
+      mkRequest(HttpMethods.PUT, uri(db, id, attName), Future.successful(entity), baseHeaders ++ revHeader(rev))
     requestJson[JsObject](request)
   }
 
@@ -170,8 +165,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                        rev: String,
                        attName: String,
                        sink: Sink[ByteString, Future[T]]): Future[Either[StatusCode, (ContentType, T)]] = {
-    val httpRequest =
-      mkRequest(HttpMethods.GET, uri(db, id, attName), headers = baseHeaders ++ revHeader(rev))
+    val httpRequest = mkRequest(HttpMethods.GET, uri(db, id, attName), headers = baseHeaders ++ revHeader(rev))
 
     request(httpRequest).flatMap { response =>
       if (response.status.isSuccess) {
