@@ -535,7 +535,7 @@ class ReplicatorTests
             createdDatabasesVar.foreach(removeReplicationDoc)
             retry({
               // make sure replication doc was deleted
-              removeReplicationDoc(wrongPrefixName) shouldBe(None)
+              removeReplicationDoc(wrongPrefixName) shouldBe (None)
             }, 10, Some(1.second))
             removeDatabase(correctPrefixName)
             removeDatabase(wrongPrefixName)
