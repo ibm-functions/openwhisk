@@ -533,7 +533,10 @@ class ReplicatorTests
             // cleanup backup database
             createdDatabasesVar.foreach(removeDatabase(_))
             createdDatabasesVar.foreach(removeReplicationDoc)
-            removeReplicationDoc(wrongPrefixName)
+            retry({
+              // make sure replication doc was deleted
+              removeReplicationDoc(wrongPrefixName) shouldBe(None)
+            }, 10, Some(1.second))
             removeDatabase(correctPrefixName)
             removeDatabase(wrongPrefixName)
           }
