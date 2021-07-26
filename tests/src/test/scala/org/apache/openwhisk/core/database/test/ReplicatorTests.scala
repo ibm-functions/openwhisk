@@ -483,6 +483,10 @@ class ReplicatorTests
             createdDatabasesVar.foreach(removeReplicationDoc)
             removeDatabase(expiredName)
             removeDatabase(notExpiredName)
+            retry({
+              // make sure replication doc was deleted
+              removeReplicationDoc(notExpiredName) shouldBe (None)
+            }, 10, Some(1.second))
           }
         },
         retriesOnTestFailures,
