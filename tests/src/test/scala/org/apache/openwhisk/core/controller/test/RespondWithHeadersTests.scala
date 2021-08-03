@@ -68,6 +68,7 @@ class RespondWithHeadersTests extends ControllerTestCommon with RespondWithHeade
       RawHeader("X-XSS-Protection", "1; mode=block"),
       RawHeader("Cache-Control", "no-store, max-age=0"),
       RawHeader("Pragma", "no-cache"),
+      RawHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"),
       allowHeaders)
       headers should not contain (allowOrigin)
     }
@@ -79,6 +80,7 @@ class RespondWithHeadersTests extends ControllerTestCommon with RespondWithHeade
       RawHeader("X-XSS-Protection", "1; mode=block"),
       RawHeader("Cache-Control", "no-store, max-age=0"),
       RawHeader("Pragma", "no-cache"),
+      RawHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"),
       allowHeaders)
       headers should not contain (allowOrigin)
     }
@@ -87,6 +89,7 @@ class RespondWithHeadersTests extends ControllerTestCommon with RespondWithHeade
       RawHeader("X-XSS-Protection", "1; mode=block"),
       RawHeader("Cache-Control", "no-store, max-age=0"),
       RawHeader("Pragma", "no-cache"),
+      RawHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"),
       allowHeaders)
       headers should not contain (allowOrigin)
     }
@@ -98,6 +101,7 @@ class RespondWithHeadersTests extends ControllerTestCommon with RespondWithHeade
       RawHeader("X-XSS-Protection", "1; mode=block"),
       RawHeader("Cache-Control", "no-store, max-age=0"),
       RawHeader("Pragma", "no-cache"),
+      RawHeader("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'"),
       allowHeaders)
       headers should not contain (allowOrigin)
     }
