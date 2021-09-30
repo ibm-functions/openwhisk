@@ -197,7 +197,7 @@ object Controller {
       "description" -> "OpenWhisk".toJson,
       "support" -> JsObject(
         "github" -> "https://github.com/apache/openwhisk/issues".toJson,
-        "slack" -> "http://slack.openwhisk.org".toJson),
+        "slack" -> "https://slack.openwhisk.org".toJson),
       "api_paths" -> apis.toJson,
       "limits" -> JsObject(
         "actions_per_minute" -> config.actionInvokePerMinuteLimit.toInt.toJson,
