@@ -459,10 +459,11 @@ trait ActivityUtils {
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, if (isUpdate) severity_warning else severity_normal)))
           case "DELETE" =>
+            val operation = "delete"
             Some(
               ApiMatcherResult(
-                actionType = actionTypePrefix + ".delete",
-                logMessage = messagePrefix + "delete " + entityType + " " + targetName,
+                actionType = actionTypePrefix + "." + operation,
+                logMessage = messagePrefix + operation + " " + entityType + " " + targetName,
                 targetIdentifier = targetIdentifier,
                 targetName = targetName,
                 targetType = targetType,
@@ -561,10 +562,11 @@ trait ActivityUtils {
                 targetType = targetType,
                 severity = adjustSeverityByReasonCode(reasonCode, if (isUpdate) severity_warning else severity_normal)))
           case "DELETE" =>
+            val operation = "delete"
             Some(
               ApiMatcherResult(
-                actionType = thisService + ".rule.delete",
-                logMessage = messagePrefix + "delete rule " + ruleName,
+                actionType = thisService + ".rule." + operation,
+                logMessage = messagePrefix + operation + " rule " + ruleName,
                 targetIdentifier = ruleIdentifier,
                 targetName = ruleName,
                 targetType = targetType,
