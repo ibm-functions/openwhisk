@@ -33,7 +33,7 @@ import org.apache.openwhisk.core.entity.{BulkEntityResult, DocInfo, DocumentRead
 import org.apache.openwhisk.http.Messages
 
 import scala.concurrent.Future
-import scala.util.{Failure,Try}
+import scala.util.{Failure, Try}
 
 /**
  * Basic client to put and delete artifacts in a data store.
