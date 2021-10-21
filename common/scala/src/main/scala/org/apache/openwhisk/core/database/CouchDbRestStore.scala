@@ -41,10 +41,9 @@ import scala.util.{Failure,Try}
  * @param dbProtocol the protocol to access the database with (http/https)
  * @param dbHost the host to access database from
  * @param dbPort the port on the host
- * @param dbUserName the user name to access database as
+ * @param dbUsername the user name to access database as
  * @param dbPassword the secret for the user name required to access the database
  * @param dbName the name of the database to operate on
- * @param serializerEvidence confirms the document abstraction is serializable to a Document with an id
  */
 class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: String,
                                                                   dbHost: String,
@@ -459,12 +458,33 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: St
         val attachment = readAttachmentFromCouch(doc, attachmentUri, sink)
         attachment.transformWith {
           case Failure(_: NoDocumentException) =>
-            // fallback to empty attachment for mem scheme if attachment for couch scheme does not exist to allow
-            // updates/deletes of actions with orphaned attachments
-            logging.error(
+            logging.warn(
               this,
-              s"[ATT_GET] '$dbName', retrieving attachment '$name' of document '$doc'; not found, fallback to empty attachment")
-            memorySource(Uri("mem://")).runWith(sink)
+              s"[ATT_GET] '$dbName', retrieving attachment '$name' of document '$doc' not found, check for stub info")
+            val request: CouchDbRestClient => Future[Either[StatusCode, JsObject]] = { client =>
+              client.getDoc(doc.id.id, doc.rev.rev)
+            }
+            request(client).map { e =>
+              e match {
+                case Right(response) =>
+                  if (!response.fields.contains("_attachments")) {
+                    logging.warn(
+                      this,
+                      s"[ATT_GET] '$dbName', stub info for attachment '$name' not found in document '$doc', fallback to empty attachment")
+                    memorySource(Uri("mem://")).runWith(sink)
+                  } else {
+                    logging.warn(
+                      this,
+                      s"[ATT_GET] '$dbName', stub info for attachment '$name' found in document '$doc', stay with 'Not Found' exeception")
+                    attachment
+                  }
+                case Left(statusCode) =>
+                  logging.warn(
+                    this,
+                    s"[ATT_GET] '$dbName', retrieving document '$doc' failed with status '$statusCode', stay with 'Not Found' exeception")
+                  attachment
+              }
+            }.flatten
           case _ => attachment
         }
       case s if attachmentStore.isDefined && attachmentStore.get.scheme == s =>
