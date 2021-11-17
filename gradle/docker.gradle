@@ -62,7 +62,7 @@ if(project.hasProperty('dockerBuildArgs')) {
 task distDocker {
     doLast {
         def start = new Date()
-        def cmd = dockerBinary + ['--no-cache'] + dockerBuildArg + ['-t', dockerImageName, project.buildscript.sourceFile.getParentFile().getAbsolutePath()]
+        def cmd = dockerBinary + dockerBuildArg + ['--no-cache'] + ['-t', dockerImageName, project.buildscript.sourceFile.getParentFile().getAbsolutePath()]
         retry(cmd, dockerRetries, dockerTimeout)
         println("Building '${dockerImageName}' took ${TimeCategory.minus(new Date(), start)}")
     }
