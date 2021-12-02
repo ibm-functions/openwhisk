@@ -21,7 +21,7 @@ import java.util.Properties
 
 import akka.actor.ActorSystem
 import org.apache.kafka.clients.admin.{AdminClient, AdminClientConfig, NewTopic}
-import org.apache.kafka.common.errors.{RetriableException, TopicExistsException}
+import org.apache.kafka.common.errors.{InvalidReplicationFactorException, RetriableException, TopicExistsException}
 import pureconfig._
 import pureconfig.generic.auto._
 import org.apache.openwhisk.common.{CausedBy, Logging}
@@ -67,29 +67,44 @@ object KafkaMessagingProvider extends MessagingProvider {
         val partitions = 1
         val nt = new NewTopic(topic, partitions, kafkaConfig.replicationFactor).configs(topicConfig.asJava)
 
-        def createTopic(retries: Int = 5): Try[Unit] = {
-          Try(client.listTopics().names().get())
-            .map(topics =>
-              if (topics.contains(topic)) {
-                Success(logging.info(this, s"$topic already exists and the user can see it, skipping creation."))
-              } else {
-                Try(client.createTopics(List(nt).asJava).values().get(topic).get())
-                  .map(_ => logging.info(this, s"created topic $topic"))
-                  .recoverWith {
-                    case CausedBy(_: TopicExistsException) =>
-                      Success(logging.info(this, s"topic $topic already existed"))
-                    case CausedBy(t: RetriableException) if retries > 0 =>
-                      logging.warn(this, s"topic $topic could not be created because of $t, retries left: $retries")
-                      Thread.sleep(1.second.toMillis)
-                      createTopic(retries - 1)
-                    case t =>
-                      logging.error(this, s"ensureTopic for $topic failed due to $t")
-                      Failure(t)
-                  }
-            })
+        def createTopic(retries: Int = 10): Try[Unit] = {
+          val res = Try(client.createTopics(List(nt).asJava).values().get(topic).get())
+            .map(_ => logging.info(this, s"created topic $topic"))
+            .recoverWith {
+              case CausedBy(_: TopicExistsException) =>
+                // Topic is already there, means, we are done.
+                // There might be a gap, as we do not check that all the parameters of the
+                // existing topic match the requested (for example replication factor).
+                // As dynamic change of things like replication factor is actually not supported,
+                // this situation should not happen.
+                Success(logging.info(this, s"topic $topic already existed"))
+              case CausedBy(t: RetriableException) if retries > 0 =>
+                // Usually these are connection timeouts, so we wait some time and do it again.
+                logging.warn(this, s"topic $topic could not be created because of $t, retries (10s) left: $retries")
+                Thread.sleep(10.second.toMillis)
+                createTopic(retries - 1)
+              case CausedBy(t: InvalidReplicationFactorException) if retries > 0 =>
+                // The InvalidReplicationFactorException can happen in a Kafka cluster environment
+                // usually at startup. Kafka is operational once one broker is availabe. Additional
+                // brokers will join depending on their startup. When we
+                // try to create a topic while the cluster has less brokers than replications for the new
+                // topic are required we will see this exception. We will then wait some time and try to
+                // create the topic again. We use a higher wait time as kafka startup using persistent
+                // volumes takes some time.
+                logging.warn(this, s"topic $topic could not be created because of $t, retries (30s) left: $retries")
+                Thread.sleep(30.second.toMillis)
+                createTopic(retries - 1)
+              case t =>
+                // Finally we fail with this exception.
+                logging.error(this, s"createTopic() for $topic failed due to $t")
+                Failure(t)
+            }
+          logging.info(this, s"createTopic() res= $res")
+          res
         }
 
         val result = createTopic()
+        logging.info(this, s"Result of createTopic()=$result.")
         client.close()
         result
       })
