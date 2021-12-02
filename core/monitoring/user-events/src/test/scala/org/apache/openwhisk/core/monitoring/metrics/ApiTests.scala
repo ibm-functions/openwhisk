@@ -17,6 +17,8 @@
 
 package org.apache.openwhisk.core.monitoring.metrics
 
+import akka.actor.ActorSystem
+import akka.stream.ActorMaterializer
 import akka.http.scaladsl.model.headers.HttpEncodings._
 import akka.http.scaladsl.model.headers.{`Accept-Encoding`, `Content-Encoding`, HttpEncoding, HttpEncodings}
 import akka.http.scaladsl.model.{HttpCharsets, HttpEntity, HttpResponse}
@@ -39,12 +41,15 @@ class ApiTests
     with BeforeAndAfterAll {
   implicit val timeoutConfig = PatienceConfig(1.minute)
 
+  implicit val actorSystem: ActorSystem = ActorSystem("ApiTests")
+  override implicit val materializer = ActorMaterializer() // in trait RouteTest of type akka.stream.Materializer
+
   private var api: PrometheusEventsApi = _
   private var consumer: EventConsumer = _
 
   override protected def beforeAll(): Unit = {
     super.beforeAll()
-    consumer = createConsumer(56754, system.settings.config)
+    consumer = createConsumer(56754, system.settings.config)(actorSystem, materializer)
     api = new PrometheusEventsApi(consumer, createExporter())
   }
 

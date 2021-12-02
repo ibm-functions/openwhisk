@@ -28,6 +28,7 @@ import org.scalatest.Matchers
 import common.StreamLogging
 import akka.http.scaladsl.testkit.ScalatestRouteTest
 import akka.http.scaladsl.testkit.RouteTestTimeout
+import akka.stream.ActorMaterializer
 import spray.json._
 import org.apache.openwhisk.common.TransactionId
 import org.apache.openwhisk.core.{FeatureFlags, WhiskConfig}
@@ -60,6 +61,7 @@ protected trait ControllerTestCommon
   implicit val routeTestTimeout = RouteTestTimeout(90 seconds)
 
   override implicit val actorSystem = system // defined in ScalatestRouteTest
+  override implicit val materializer = ActorMaterializer()
   override val executionContext = actorSystem.dispatcher
 
   override val whiskConfig = new WhiskConfig(RestApiCommons.requiredProperties ++ WhiskConfig.kafkaHosts)
@@ -106,8 +108,8 @@ protected trait ControllerTestCommon
     base ++ Parameters(WhiskAction.execFieldName, kind)
   }
 
-  val entityStore = WhiskEntityStore.datastore()
-  val authStore = WhiskAuthStore.datastore()
+  val entityStore = WhiskEntityStore.datastore()(actorSystem, logging, materializer)
+  val authStore = WhiskAuthStore.datastore()(actorSystem, logging, materializer)
   val logStore = SpiLoader.get[LogStoreProvider].instance(actorSystem)
   val activationStore = SpiLoader.get[ActivationStoreProvider].instance(actorSystem, materializer, logging)
 
