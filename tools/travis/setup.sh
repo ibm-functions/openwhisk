@@ -48,3 +48,7 @@ pip install --user humanize requests
 # Downloads the gradle wrapper, dependencies and tries to compile the code.
 # Retried 5 times in case there are network hiccups.
 TERM=dumb retry ./gradlew :tests:compileTestScala
+
+cat ./settings.gradle
+sed -i "s/gradle.ext.akka_http\ =\ \[version\ \:\ '10.2.7'\]/gradle.ext.akka_http\ =\ \[version\ \:\ '10.2.4'\]/" ./settings.gradle
+cat ./settings.gradle
