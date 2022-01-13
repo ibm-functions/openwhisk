@@ -41,7 +41,9 @@ import spray.json._
 
 import scala.concurrent.duration._
 import scala.concurrent.{ExecutionContext, Future}
-import scala.util.{Failure, Success}
+import scala.language.postfixOps
+import scala.sys.process._
+import scala.util.{Failure, Success, Try}
 
 object InvokerReactive extends InvokerProvider {
 
@@ -154,9 +156,23 @@ class InvokerReactive(
   private val authStore = WhiskAuthStore.datastore()
 
   private val namespaceBlacklist = new NamespaceBlacklist(authStore)
+  private val rootfs = "/"
+  private val logsfs = "/logs"
+  private var rootfspcent = -1
+  private var logsfspcent = -1
 
   Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) { () =>
     logging.debug(this, "running background job to update blacklist")
+
+    //val rootfspcentraw = (s"df $rootfs" #| s"grep $rootfs" #| "awk '{ print $5}'" !!)
+    val rootfsraw = Try((s"df $rootfs" #| s"grep $rootfs" !!).trim).getOrElse("??")
+    val rootfspcentraw = Try(rootfsraw.replaceAll(" +", " ").split(" ")(4)).getOrElse("??")
+    rootfspcent = Try(rootfspcentraw.substring(0, rootfspcentraw.indexOf("%")).toInt).getOrElse(-1)
+    val logsfsraw = Try((s"df $logsfs" #| s"grep $logsfs" !!).trim).getOrElse("??")
+    val logsfspcentraw = Try(logsfsraw.replaceAll(" +", " ").split(" ")(4)).getOrElse("??")
+    logsfspcent = Try(logsfspcentraw.substring(0, logsfspcentraw.indexOf("%")).toInt).getOrElse(-1)
+    logging.warn(this, s"$rootfsraw($rootfspcentraw($rootfspcent)), $logsfsraw($logsfspcentraw($logsfspcent))")
+
     namespaceBlacklist.refreshBlacklist()(ec, TransactionId.invoker).andThen {
       case Success(set) => {
         logging.warn(this, s"updated blacklist to ${set.size} entries")
@@ -344,7 +360,12 @@ class InvokerReactive(
   private val healthProducer = msgProvider.getProducer(config)
   Scheduler.scheduleWaitAtMost(1.seconds)(() => {
     healthProducer
-      .send("health", PingMessage(instance, namespaceBlacklist.isBlacklisted(instance.displayedName.getOrElse(""))))
+      .send(
+        "health",
+        PingMessage(
+          instance,
+          namespaceBlacklist
+            .isBlacklisted(instance.displayedName.getOrElse("")) || rootfspcent >= 85 || logsfspcent >= 85))
       .andThen {
         case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
       }
