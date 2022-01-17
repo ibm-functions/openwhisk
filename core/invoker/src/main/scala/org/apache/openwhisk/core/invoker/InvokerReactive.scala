@@ -165,13 +165,15 @@ class InvokerReactive(
     logging.debug(this, "running background job to update blacklist")
 
     //val rootfspcentraw = (s"df $rootfs" #| s"grep $rootfs" #| "awk '{ print $5}'" !!)
-    val rootfsraw = Try((s"df $rootfs" #| s"grep $rootfs" !!).trim).getOrElse("??")
-    val rootfspcentraw = Try(rootfsraw.replaceAll(" +", " ").split(" ")(4)).getOrElse("??")
+    val rootfsraw = Try((s"df $rootfs" #| s"grep $rootfs" !!).trim.replaceAll(" +", " ")).getOrElse("??")
+    val rootfspcentraw = Try(rootfsraw.split(" ")(4)).getOrElse("??")
     rootfspcent = Try(rootfspcentraw.substring(0, rootfspcentraw.indexOf("%")).toInt).getOrElse(-1)
-    val logsfsraw = Try((s"df $logsfs" #| s"grep $logsfs" !!).trim).getOrElse("??")
-    val logsfspcentraw = Try(logsfsraw.replaceAll(" +", " ").split(" ")(4)).getOrElse("??")
+    val logsfsraw = Try((s"df $logsfs" #| s"grep $logsfs" !!).trim.replaceAll(" +", " ")).getOrElse("??")
+    val logsfspcentraw = Try(logsfsraw.split(" ")(4)).getOrElse("??")
     logsfspcent = Try(logsfspcentraw.substring(0, logsfspcentraw.indexOf("%")).toInt).getOrElse(-1)
-    logging.warn(this, s"$rootfsraw($rootfspcentraw($rootfspcent)), $logsfsraw($logsfspcentraw($logsfspcent))")
+    logging.warn(
+      this,
+      s"invoker fs space: '$rootfsraw ($rootfspcentraw($rootfspcent))', '$logsfsraw ($logsfspcentraw($logsfspcent))'")
 
     namespaceBlacklist.refreshBlacklist()(ec, TransactionId.invoker).andThen {
       case Success(set) => {
