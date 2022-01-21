@@ -86,12 +86,28 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
 
     CacheInvalidationMessage.parse(raw) match {
       case Success(msg: CacheInvalidationMessage) => {
+        logging.warn(
+          this,
+          s"@StR msg: $msg, " +
+            s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
+            s"actsize: ${WhiskAction.cacheSize}, " +
+            s"pkgsize: ${WhiskPackage.cacheSize}, " +
+            s"rulesize: ${WhiskRule.cacheSize}, " +
+            s"trgsize: ${WhiskTrigger.cacheSize}")
         if (msg.instanceId != instanceId) {
           WhiskActionMetaData.removeId(msg.key)
           WhiskAction.removeId(msg.key)
           WhiskPackage.removeId(msg.key)
           WhiskRule.removeId(msg.key)
           WhiskTrigger.removeId(msg.key)
+          logging.warn(
+            this,
+            s"@StR " +
+              s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
+              s"actsize: ${WhiskAction.cacheSize}, " +
+              s"pkgsize: ${WhiskPackage.cacheSize}, " +
+              s"rulesize: ${WhiskRule.cacheSize}, " +
+              s"trgsize: ${WhiskTrigger.cacheSize}")
         }
       }
       case Failure(t) => logging.error(this, s"failed processing message: $raw with $t")
