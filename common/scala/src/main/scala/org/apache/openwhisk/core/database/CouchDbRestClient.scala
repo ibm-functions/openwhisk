@@ -147,6 +147,33 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
   }
 
+  // https://docs.couchdb.org/en/1.6.1/api/database/changes.html
+  def changes()(since: Option[String] = None,
+                limit: Option[Int] = None,
+                includeDocs: Boolean = false,
+                descending: Boolean = false): Future[Either[StatusCode, JsObject]] = {
+
+    def bool2OptStr(bool: Boolean): Option[String] = if (bool) Some("true") else None
+
+    val args = Seq[(String, Option[String])](
+      "since" -> since,
+      "limit" -> limit.filter(_ > 0).map(_.toString),
+      "include_docs" -> bool2OptStr(includeDocs),
+      "descending" -> bool2OptStr(descending))
+
+    // Throw out all undefined arguments.
+    val argMap: Map[String, String] = args
+      .collect({
+        case (l, Some(r)) => (l, r)
+      })
+      .toMap
+
+    val changesUri = uri(db, "_changes").withQuery(Uri.Query(argMap))
+
+    logging.info(this, s"@StR doing get request $changesUri")
+    requestJson[JsObject](mkRequest(HttpMethods.GET, changesUri, headers = baseHeaders))
+  }
+
   // Streams an attachment to the database
   // http://docs.couchdb.org/en/1.6.1/api/document/attachments.html#put--db-docid-attname
   def putAttachment(id: String,
