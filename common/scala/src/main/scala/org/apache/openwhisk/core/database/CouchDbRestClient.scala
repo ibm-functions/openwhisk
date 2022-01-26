@@ -170,7 +170,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
     val changesUri = uri(db, "_changes").withQuery(Uri.Query(argMap))
 
-    logging.info(this, s"@StR doing get request $changesUri")
+    logging.info(this, s"@StR doing get request on host $host with uri $changesUri")
     requestJson[JsObject](mkRequest(HttpMethods.GET, changesUri, headers = baseHeaders))
   }
 

@@ -71,7 +71,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   private val dbClient: CouchDbRestClient =
     new CouchDbRestClient(
       dbConfig.protocol,
-      dbConfig.host,
+      dbConfig.host + "x",
       dbConfig.port,
       dbConfig.username,
       dbConfig.password,
@@ -80,118 +80,73 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   private val lcuskey = "last_seq" // last change update sequence key
   private var lcus = ""
 
-  dbClient
-    .changes()(limit = Some(1), descending = true)
-    .map {
-      case Right(response) =>
-        lcus = Try(response.fields(lcuskey).asInstanceOf[JsString].convertTo[String]).getOrElse("")
-        assert(!lcus.isEmpty, s"no or invalid last change update sequence in response: '$response'")
-        logging.info(this, s"@StR initial last change update sequence: $lcus")
+  def ensureLastChangeUpdateSequence() = {
 
-        Scheduler.scheduleWaitAtMost(60.seconds) { () =>
-          dbClient
-            .changes()(since = Some(lcus), descending = false)
-            .map {
-              case Right(response) =>
-                val nlcus = response.fields(lcuskey).asInstanceOf[JsString].convertTo[String]
-                logging.info(this, s"@StR lcus: $lcus, nlcus: $nlcus")
-                val seqs = response.fields("results").convertTo[List[JsObject]]
-                val seqsdel = seqs.filter(_.fields.contains("deleted"))
-                logging.info(this, s"@StR found ${seqs.length} changes (${seqsdel} deletions)")
-                if (seqs.length > 0) {
-                  logging.info(
-                    this,
-                    s"@StR cache before invalidation: " +
-                      s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
-                      s"actsize: ${WhiskAction.cacheSize}, " +
-                      s"pkgsize: ${WhiskPackage.cacheSize}, " +
-                      s"rulesize: ${WhiskRule.cacheSize}, " +
-                      s"trgsize: ${WhiskTrigger.cacheSize}")
-
-                  seqs.foreach { seq =>
-                    // [RemoteCacheInvalidation] @StR msg: {"instanceId":"controller1001","key":{"mainId":"srost@de.ibm.com_myspace/strxxx"}},
-                    val ck = CacheKey(seq.fields("id").asInstanceOf[JsString].convertTo[String])
-                    logging.info(this, s"@StR going to remove key from cache: $ck")
-                    WhiskActionMetaData.removeId(ck)
-                    WhiskAction.removeId(ck)
-                    WhiskPackage.removeId(ck)
-                    WhiskRule.removeId(ck)
-                    WhiskTrigger.removeId(ck)
-                  }
-
-                  logging.info(
-                    this,
-                    s"@StR cache after invalidation: " +
-                      s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
-                      s"actsize: ${WhiskAction.cacheSize}, " +
-                      s"pkgsize: ${WhiskPackage.cacheSize}, " +
-                      s"rulesize: ${WhiskRule.cacheSize}, " +
-                      s"trgsize: ${WhiskTrigger.cacheSize}")
-                }
-
-                lcus = nlcus
-                logging.info(this, s"@StR new last change update sequence: $lcus")
-
-              case Left(code) =>
-                logging.error(this, s"Unexpected http response code: $code, keep old lcus: $lcus")
-            }
-        }
-
-      case Left(code) =>
-        assert(false, s"Unexpected http response code: $code from ${dbConfig.databaseFor[WhiskEntity]}/_changes call")
-    }
-
-  /*Scheduler.scheduleWaitAtMost(60.seconds) { () =>
     dbClient
-      .changes()(since = Some(lcus), descending = false)
+      .changes()(limit = Some(1), descending = true)
       .map {
         case Right(response) =>
-          val nlcus = response.fields(lcuskey).asInstanceOf[JsString].convertTo[String]
-          logging.info(this, s"@StR lcus: $lcus, nlcus: $nlcus")
-          val seqs = response.fields("results").convertTo[List[JsObject]]
-          val seqsdel = seqs.filter(_.fields.contains("deleted"))
-          logging.info(this, s"@StR found ${seqs.length} changes (${seqsdel} deletions)")
-          if (seqs.length > 0) {
-            logging.info(
-              this,
-              s"@StR cache before invalidation: " +
-                s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
-                s"actsize: ${WhiskAction.cacheSize}, " +
-                s"pkgsize: ${WhiskPackage.cacheSize}, " +
-                s"rulesize: ${WhiskRule.cacheSize}, " +
-                s"trgsize: ${WhiskTrigger.cacheSize}")
+          lcus = Try(response.fields(lcuskey).asInstanceOf[JsString].convertTo[String]).getOrElse("")
+          assert(!lcus.isEmpty, s"no or invalid last change update sequence in response: '$response'")
+          logging.info(this, s"@StR initial last change update sequence: $lcus")
 
-            seqs.foreach { seq =>
-              // [RemoteCacheInvalidation] @StR msg: {"instanceId":"controller1001","key":{"mainId":"srost@de.ibm.com_myspace/strxxx"}},
-              val ck = CacheKey(seq.fields("id").asInstanceOf[JsString].convertTo[String])
-              logging.info(this, s"@StR going to remove key from cache: $ck")
-              WhiskActionMetaData.removeId(ck)
-              WhiskAction.removeId(ck)
-              WhiskPackage.removeId(ck)
-              WhiskRule.removeId(ck)
-              WhiskTrigger.removeId(ck)
-            }
+          Scheduler.scheduleWaitAtLeast(interval = 15.seconds, initialDelay = 60.seconds, name = "CacheInvalidation") {
+            () =>
+              dbClient
+                .changes()(since = Some(lcus), descending = false)
+                .map {
+                  case Right(response) =>
+                    val nlcus = response.fields(lcuskey).asInstanceOf[JsString].convertTo[String]
+                    logging.info(this, s"@StR lcus: $lcus, nlcus: $nlcus")
+                    val seqs = response.fields("results").convertTo[List[JsObject]]
+                    val seqsdel = seqs.filter(_.fields.contains("deleted"))
+                    logging.info(this, s"@StR found ${seqs.length} changes (${seqsdel.length} deletions)")
+                    if (seqs.length > 0) {
+                      logging.info(
+                        this,
+                        s"@StR cache before invalidation: " +
+                          s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
+                          s"actsize: ${WhiskAction.cacheSize}, " +
+                          s"pkgsize: ${WhiskPackage.cacheSize}, " +
+                          s"rulesize: ${WhiskRule.cacheSize}, " +
+                          s"trgsize: ${WhiskTrigger.cacheSize}")
 
-            logging.info(
-              this,
-              s"@StR cache after invalidation: " +
-                s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
-                s"actsize: ${WhiskAction.cacheSize}, " +
-                s"pkgsize: ${WhiskPackage.cacheSize}, " +
-                s"rulesize: ${WhiskRule.cacheSize}, " +
-                s"trgsize: ${WhiskTrigger.cacheSize}")
+                      seqs.foreach { seq =>
+                        // [RemoteCacheInvalidation] @StR msg: {"instanceId":"controller1001","key":{"mainId":"srost@de.ibm.com_myspace/strxxx"}},
+                        val ck = CacheKey(seq.fields("id").asInstanceOf[JsString].convertTo[String])
+                        logging.info(this, s"@StR going to remove key from cache: $ck")
+                        WhiskActionMetaData.removeId(ck)
+                        WhiskAction.removeId(ck)
+                        WhiskPackage.removeId(ck)
+                        WhiskRule.removeId(ck)
+                        WhiskTrigger.removeId(ck)
+                      }
+
+                      logging.info(
+                        this,
+                        s"@StR cache after invalidation: " +
+                          s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
+                          s"actsize: ${WhiskAction.cacheSize}, " +
+                          s"pkgsize: ${WhiskPackage.cacheSize}, " +
+                          s"rulesize: ${WhiskRule.cacheSize}, " +
+                          s"trgsize: ${WhiskTrigger.cacheSize}")
+                    }
+
+                    lcus = nlcus
+                    logging.info(this, s"@StR new last change update sequence: $lcus")
+
+                  case Left(code) =>
+                    logging.error(this, s"Unexpected http response code: $code, keep old lcus: $lcus")
+                }
           }
-
-          lcus = nlcus
-          logging.info(this, s"@StR new last change update sequence: $lcus")
+          Success(lcus)
 
         case Left(code) =>
-          logging.error(this, s"Unexpected http response code: $code, keep old lcus: $lcus")
+          Failure(
+            new Throwable(
+              s"Unexpected http response code: $code from ${dbConfig.databaseFor[WhiskEntity]}/_changes call"))
       }
-  }*/
-
-  //val entityStore = WhiskEntityStore.datastore()(as, logging, ActorMaterializer())
-  //entityStore.query()
+  }
 
   def notifyOtherInstancesAboutInvalidation(key: CacheKey): Future[Unit] = {
     cacheInvalidationProducer.send(cacheInvalidationTopic, CacheInvalidationMessage(key, instanceId)).map(_ => Unit)
