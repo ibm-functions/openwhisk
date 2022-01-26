@@ -112,14 +112,18 @@ class Controller(val instance: ControllerInstanceId,
   })
 
   implicit val executionContext = actorSystem.dispatcher
-  cacheChangeNotification.value.remoteCacheInvalidaton.ensureLastChangeUpdateSequence().map {
-    case Success(lcus) => logging.info(this, s"@StR initial last change update sequence: $lcus")
-    case Failure(t) =>
-      logging.error(this, t.getMessage)
-      actorSystem.terminate()
-      Await.result(actorSystem.whenTerminated, 30.seconds)
-      sys.exit(1)
-  }
+  cacheChangeNotification.value.remoteCacheInvalidaton.ensureInitialLastChangeUpdateSequence
+    .map {
+      case _ =>
+        cacheChangeNotification.value.remoteCacheInvalidaton.scheduleCacheInvalidation
+    }
+    .recoverWith {
+      case t =>
+        logging.error(this, t.getMessage)
+        actorSystem.terminate()
+        Await.result(actorSystem.whenTerminated, 30.seconds)
+        sys.exit(1)
+    }
 
   // initialize backend services
   private implicit val loadBalancer =

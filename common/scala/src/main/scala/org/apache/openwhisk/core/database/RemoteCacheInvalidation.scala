@@ -19,8 +19,10 @@ package org.apache.openwhisk.core.database
 
 import java.nio.charset.StandardCharsets
 
+//import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
+import scala.concurrent.Await
 import scala.util.Failure
 import scala.util.Success
 import scala.util.Try
@@ -79,96 +81,196 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
 
   private val lcuskey = "last_seq" // last change update sequence key
   private var lcus = "" // last change update sequence
-  private var lcusnum = -1 // num last change update sequences
 
-  def ensureLastChangeUpdateSequence() = {
+  /**
+   * Retry an operation 'step()' awaiting its result up to 'timeout'.
+   * Attempt the operation up to 'count' times. The future from the
+   * step is not aborted --- TODO fix this.
+   */
+  /*def retry[T](step: () => Future[T],
+               timeout: Duration,
+               count: Int = 100,
+               graceBeforeRetry: FiniteDuration = 50.milliseconds): Try[T] = {
+    val future = step()
+    if (count > 0) try {
+      val result = Await.result(future, timeout)
+      Success(result)
+    } catch {
+      case n: NoDocumentException =>
+        println("no document exception, retrying")
+        Thread.sleep(graceBeforeRetry.toMillis)
+        retry(step, timeout, count - 1, graceBeforeRetry)
+      case RetryOp() =>
+        println("condition not met, retrying")
+        Thread.sleep(graceBeforeRetry.toMillis)
+        retry(step, timeout, count - 1, graceBeforeRetry)
+      case t: TimeoutException =>
+        println("timed out, retrying")
+        Thread.sleep(graceBeforeRetry.toMillis)
+        retry(step, timeout, count - 1, graceBeforeRetry)
+      case t: Throwable =>
+        println(s"unexpected failure $t")
+        Failure(t)
+    } else Failure(new NoDocumentException("timed out"))
+  }*/
+
+  case class PaginationException(message: String) extends Exception(message)
+  case class PagingOp() extends Throwable
+
+  def paging2[T](step: () => Future[T]): Try[T] = {
+    val future = step()
+    try {
+      val result = Await.result(future, 5.seconds)
+      Success(result)
+    } catch {
+      case PagingOp() =>
+        println("condition not met, retrying")
+        paging2(step)
+      case t: Throwable =>
+        println(s"unexpected failure $t")
+        Failure(t)
+    }
+  }
+
+  def paging3[T](fn: => Future[String]): Future[String] = {
+    logging.info(this, s"@StR inside paging function..")
+    Try(fn).recover {
+      case PagingOp() =>
+        logging.error(this, s"@StR caught PagingOp() in paging function")
+        paging(fn)
+      case t: Throwable =>
+        logging.error(this, s"@StR caught t: ${t.getMessage}")
+        throw t
+    }.get
+  }
+
+  def paging[T](fn: => Future[String]): Future[String] = {
+    logging.info(this, s"@StR inside paging function..")
+    try fn
+    catch {
+      case PagingOp() =>
+        logging.error(this, s"@StR caught PagingOp() in paging function")
+        paging(fn)
+      case t: Throwable =>
+        logging.error(this, s"@StR caught t: ${t.getMessage}")
+        throw t
+    }
+  }
+
+  private def removeFromLocalCacheBySeqs(seqs: List[JsObject]) = {
+    logging.info(
+      this,
+      s"@StR found ${seqs.length} changes (${seqs.filter(_.fields.contains("deleted")).length} deletions)")
+    if (seqs.length > 0) {
+      logging.info(
+        this,
+        s"@StR cache before invalidation: " +
+          s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
+          s"actsize: ${WhiskAction.cacheSize}, " +
+          s"pkgsize: ${WhiskPackage.cacheSize}, " +
+          s"rulesize: ${WhiskRule.cacheSize}, " +
+          s"trgsize: ${WhiskTrigger.cacheSize}")
+
+      seqs.foreach { seq =>
+        // [RemoteCacheInvalidation] @StR msg: {"instanceId":"controller1001","key":{"mainId":"srost@de.ibm.com_myspace/strxxx"}},
+        val ck = CacheKey(seq.fields("id").asInstanceOf[JsString].convertTo[String])
+        logging.info(this, s"@StR going to remove key from cache: $ck")
+        WhiskActionMetaData.removeId(ck)
+        WhiskAction.removeId(ck)
+        WhiskPackage.removeId(ck)
+        WhiskRule.removeId(ck)
+        WhiskTrigger.removeId(ck)
+      }
+
+      logging.info(
+        this,
+        s"@StR cache after invalidation: " +
+          s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
+          s"actsize: ${WhiskAction.cacheSize}, " +
+          s"pkgsize: ${WhiskPackage.cacheSize}, " +
+          s"rulesize: ${WhiskRule.cacheSize}, " +
+          s"trgsize: ${WhiskTrigger.cacheSize}")
+    }
+  }
+
+  //@tailrec
+  private def getLastChangeUpdateSequences(limit: Int = 1): Future[Unit] = {
+    //paging3({
+    require(limit >= 0, "limit should be non negative")
+    dbClient
+      .changes()(since = Some(lcus), limit = Some(limit), descending = false)
+      .map {
+        case Right(resp) =>
+          val newlcus = resp.fields(lcuskey).asInstanceOf[JsString].convertTo[String]
+          logging.info(this, s"@StR lcus: $lcus, newlcus: $newlcus")
+          val seqs = resp.fields("results").convertTo[List[JsObject]]
+          removeFromLocalCacheBySeqs(seqs)
+
+          lcus = newlcus
+          logging.info(this, s"@StR new last change update sequence: $lcus")
+
+          if (seqs.length == limit) {
+            logging.warn(this, s"@StR fetched maximum limit of $limit changes from db")
+            getLastChangeUpdateSequences(limit)
+          }
+
+        /*seqs.length match {
+            case l if l == limit =>
+              logging.warn(this, s"@StR fetched maximum limit of $limit changes from db")
+              //throw PagingOp()
+              getLastChangeUpdateSequences(limit, newlcus)
+            //Future.successful(())
+            //lcus
+            case _ =>
+              val foo = Future.successful(())
+              foo
+            //lcus
+          }*/
+        case Left(code) =>
+          logging.error(this, s"Unexpected http response code: $code, keep old lcus '$lcus'")
+          Future.successful(())
+        //lcus
+      }
+      .recoverWith {
+        /*case PagingOp() =>
+            logging.error(this, s"@StR caught PagingOp() in recoverWith block")
+            throw PagingOp()*/
+        case t: Throwable =>
+          logging.error(
+            this,
+            s"@StR '${dbConfig.databaseFor[WhiskEntity]}' internal error for _changes call, failure: '${t.getMessage}', keep old lcus '$lcus'")
+          Future.successful(())
+      }
+      .mapTo[Unit]
+    //})
+  }
+
+  def scheduleCacheInvalidation() = {
+    Scheduler.scheduleWaitAtLeast(interval = 15.seconds, initialDelay = 60.seconds, name = "CacheInvalidation") { () =>
+      getLastChangeUpdateSequences(10)
+    }
+  }
+
+  def ensureInitialLastChangeUpdateSequence() = {
 
     dbClient
       .changes()(limit = Some(1), descending = true)
       .map {
         case Right(response) =>
-          lcus = Try(response.fields(lcuskey).asInstanceOf[JsString].convertTo[String]).getOrElse("")
-          assert(!lcus.isEmpty, s"no or invalid last change update sequence in response: '$response'")
+          lcus = response.fields(lcuskey).asInstanceOf[JsString].convertTo[String]
+          assert(!lcus.isEmpty, s"invalid initial last change update sequence in response: '$response'")
           logging.info(this, s"@StR initial last change update sequence: $lcus")
-
-          Scheduler.scheduleWaitAtLeast(interval = 15.seconds, initialDelay = 60.seconds, name = "CacheInvalidation")(
-            () => {
-              val limit = 10
-              do {
-                lcusnum = -1 // reset num of fetched seqs
-                dbClient
-                  .changes()(since = Some(lcus), limit = Some(limit), descending = false)
-                  .map {
-                    case Right(response) =>
-                      val newlcus = response.fields(lcuskey).asInstanceOf[JsString].convertTo[String]
-                      logging.info(this, s"@StR lcus: $lcus, newlcus: $newlcus")
-                      val seqs = response.fields("results").convertTo[List[JsObject]]
-                      val seqsdel = seqs.filter(_.fields.contains("deleted"))
-                      logging.info(this, s"@StR found ${seqs.length} changes (${seqsdel.length} deletions)")
-                      if (seqs.length > 0) {
-                        logging.info(
-                          this,
-                          s"@StR cache before invalidation: " +
-                            s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
-                            s"actsize: ${WhiskAction.cacheSize}, " +
-                            s"pkgsize: ${WhiskPackage.cacheSize}, " +
-                            s"rulesize: ${WhiskRule.cacheSize}, " +
-                            s"trgsize: ${WhiskTrigger.cacheSize}")
-
-                        seqs.foreach {
-                          seq =>
-                            // [RemoteCacheInvalidation] @StR msg: {"instanceId":"controller1001","key":{"mainId":"srost@de.ibm.com_myspace/strxxx"}},
-                            val ck = CacheKey(seq.fields("id").asInstanceOf[JsString].convertTo[String])
-                            logging.info(this, s"@StR going to remove key from cache: $ck")
-                            WhiskActionMetaData.removeId(ck)
-                            WhiskAction.removeId(ck)
-                            WhiskPackage.removeId(ck)
-                            WhiskRule.removeId(ck)
-                            WhiskTrigger.removeId(ck)
-                        }
-
-                        logging.info(
-                          this,
-                          s"@StR cache after invalidation: " +
-                            s"actmetasize: ${WhiskActionMetaData.cacheSize}, " +
-                            s"actsize: ${WhiskAction.cacheSize}, " +
-                            s"pkgsize: ${WhiskPackage.cacheSize}, " +
-                            s"rulesize: ${WhiskRule.cacheSize}, " +
-                            s"trgsize: ${WhiskTrigger.cacheSize}")
-                      }
-
-                      lcus = newlcus
-                      lcusnum = seqs.length
-                      logging.info(this, s"@StR new last change update sequence: $lcus")
-
-                    case Left(code) =>
-                      logging.error(this, s"Unexpected http response code: $code, keep old lcus '$lcus'")
-                  }
-                  .recoverWith {
-                    case t =>
-                      logging.error(
-                        this,
-                        s"@StR '${dbConfig.databaseFor[WhiskEntity]}' internal error for _changes call, failure: '${t.getMessage}', keep old lcus '$lcus'")
-                      Future(Success(lcus))
-                  }
-                if (lcusnum == limit) {
-                  logging.info(this, s"@StR pagination..")
-                }
-              } while (lcusnum == limit) // continue in case of pending changes
-              Future(Success(lcus))
-            })
-          Success(lcus)
-
+        //lcus
         case Left(code) =>
           val msg = s"@StR '${dbConfig.databaseFor[WhiskEntity]}' unexecpted response code: $code from _changes call"
           logging.error(this, msg)
-          Failure(new Throwable(msg))
+          throw new Throwable(msg)
       }
       .recoverWith {
         case t =>
           val msg = s"@StR '${dbConfig.databaseFor[WhiskEntity]}' internal error, failure: '${t.getMessage}'"
           logging.error(this, msg)
-          Future(Failure(new Throwable(msg)))
+          throw t
       }
   }
 
