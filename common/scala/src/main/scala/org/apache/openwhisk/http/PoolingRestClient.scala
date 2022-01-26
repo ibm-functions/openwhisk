@@ -30,7 +30,6 @@ import spray.json._
 import scala.concurrent.{ExecutionContext, Future, Promise}
 import scala.concurrent.duration._
 import scala.util.{Failure, Success, Try}
-import org.apache.openwhisk.common.Logging
 
 /**
  * Http client to talk to a known host.
