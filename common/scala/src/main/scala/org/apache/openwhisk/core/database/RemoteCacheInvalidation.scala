@@ -142,9 +142,15 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
           Success(lcus)
 
         case Left(code) =>
-          Failure(
-            new Throwable(
-              s"Unexpected http response code: $code from ${dbConfig.databaseFor[WhiskEntity]}/_changes call"))
+          val msg = s"@StR '${dbConfig.databaseFor[WhiskEntity]}' unexecpted response code: $code from _changes call"
+          logging.error(this, msg)
+          Failure(new Throwable(msg))
+      }
+      .recoverWith {
+        case t =>
+          val msg = s"@StR '${dbConfig.databaseFor[WhiskEntity]}' internal error, failure: '${t.getMessage}'"
+          logging.error(this, msg)
+          Future(Failure(new Throwable(msg)))
       }
   }
 
