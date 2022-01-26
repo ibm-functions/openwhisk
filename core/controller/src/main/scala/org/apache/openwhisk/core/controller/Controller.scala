@@ -46,6 +46,7 @@ import org.apache.openwhisk.spi.SpiLoader
 import scala.concurrent.ExecutionContext.Implicits
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.Await
+import scala.language.reflectiveCalls
 import scala.util.{Failure, Success}
 
 /**
@@ -110,7 +111,7 @@ class Controller(val instance: ControllerInstanceId,
     }
   })
 
-  implicit val ec = actorSystem.dispatcher
+  implicit val executionContext = actorSystem.dispatcher
   cacheChangeNotification.value.remoteCacheInvalidaton.ensureLastChangeUpdateSequence().map {
     case Success(lcus) => logging.info(this, s"@StR initial last change update sequence: $lcus")
     case Failure(t) =>
@@ -152,7 +153,7 @@ class Controller(val instance: ControllerInstanceId,
    * @return JSON with details of invoker health or count of healthy invokers respectively.
    */
   private val internalInvokerHealth = {
-    implicit val executionContext = actorSystem.dispatcher
+    //implicit val executionContext = actorSystem.dispatcher
     (pathPrefix("invokers") & get) {
       pathEndOrSingleSlash {
         complete {
