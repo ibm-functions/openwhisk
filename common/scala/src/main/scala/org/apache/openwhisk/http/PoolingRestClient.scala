@@ -128,30 +128,6 @@ class PoolingRestClient(
       }
     }
 
-  def requestJsonChanges[T: RootJsonReader](futureRequest: Future[HttpRequest]): Future[Either[StatusCode, T]] =
-    request(futureRequest).flatMap { response =>
-      println(s"@StR response from _changes request: $response(${response.status})")
-      if (response.status.isSuccess) {
-        Unmarshal(response.entity.withoutSizeLimit).to[T].map(Right.apply)
-      } else {
-        println(s"@StR failed response from _changes request: $response(${response.status})")
-        Unmarshal(response.entity).to[String].flatMap { body =>
-          println(s"@StR body from failed _changes request: $body")
-          val statusCode = response.status
-          println(s"@StR statusCode from failed _changes request: $statusCode")
-          val reason =
-            if (body.nonEmpty) s"${statusCode.reason} (details: $body)" else statusCode.reason
-          println(s"@StR reason from failed _changes request: $reason")
-          val customStatusCode = StatusCodes
-            .custom(intValue = statusCode.intValue, reason = reason, defaultMessage = statusCode.defaultMessage)
-          println(s"@StR customStatusCode from failed _changes request: $customStatusCode")
-          // This is important, as it drains the entity stream.
-          // Otherwise the connection stays open and the pool dries up.
-          response.discardEntityBytes().future.map(_ => Left(customStatusCode))
-        }
-      }
-    }
-
   def shutdown(): Future[Unit] = Future.successful(materializer.shutdown())
 }
 

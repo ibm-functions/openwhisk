@@ -170,8 +170,8 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
     val changesUri = uri(db, "_changes").withQuery(Uri.Query(argMap))
 
-    logging.info(this, s"@StR doing _changes request on host $host with uri $changesUri")
-    requestJsonChanges[JsObject](mkRequest(HttpMethods.GET, changesUri, headers = baseHeaders))
+    logging.debug(this, s"doing _changes request on host $host with uri $changesUri")
+    requestJson[JsObject](mkRequest(HttpMethods.GET, changesUri, headers = baseHeaders))
   }
 
   // Streams an attachment to the database
