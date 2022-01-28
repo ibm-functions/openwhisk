@@ -106,7 +106,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
     private var lastChangeUpdateSequence: Option[String] = None
 
     /**
-     * Get last change update sequence.
+     * Get last change update sequence from store.
      *
      * @return last change update sequence
      */
@@ -116,11 +116,21 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
     }
 
     /**
-     * Set last change update sequence.
+     * Get last change update sequence from db response.
+     *
+     * @return last change update sequence
      */
-    def set(resp: JsObject): Unit = {
+    def get(resp: JsObject): String = {
       val lcus = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
       assert(!lcus.isEmpty, s"invalid lcus: '$lcus'")
+      lcus
+    }
+
+    /**
+     * Set last change update sequence from db response to store.
+     */
+    def set(resp: JsObject): Unit = {
+      val lcus = get(resp)
       lastChangeUpdateSequence match {
         case None =>
           logging.info(this, s"initial lcus: $lcus")
@@ -131,7 +141,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
     }
 
     /**
-     * Get last change update sequences.
+     * Get last change update sequences from db response.
      *
      * @return list last change update sequences
      */
@@ -140,12 +150,21 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
     }
 
     /**
-     * Get count last change update sequences for deletions.
+     * Get last change update sequences for deletions count from db sequences.
      *
-     * @return count last change update sequences for deletions
+     * @return last change update sequences for deletions count
      */
     def getCountDelSeqs(seqs: List[JsObject]): Int = {
       seqs.count(_.fields.contains("deleted"))
+    }
+
+    /**
+     * Get last change update sequence doc id from db sequence.
+     *
+     * @return last change update sequence doc id
+     */
+    def getSeqDocId(seq: JsObject): String = {
+      seq.fields("id").asInstanceOf[JsString].convertTo[String]
     }
   }
 
@@ -154,17 +173,14 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   private def removeFromLocalCacheBySeqs(resp: JsObject): Int = {
     val seqs = lastChangeUpdateSequnce.getSeqs(resp)
     logging.info(this, s"found ${seqs.length} changes (${lastChangeUpdateSequnce.getCountDelSeqs(seqs)} deletions)")
-    if (seqs.nonEmpty) {
-      seqs.foreach { seq =>
-        val ck = CacheKey(seq.fields("id").asInstanceOf[JsString].convertTo[String])
-        WhiskActionMetaData.removeId(ck)
-        WhiskAction.removeId(ck)
-        WhiskPackage.removeId(ck)
-        WhiskRule.removeId(ck)
-        WhiskTrigger.removeId(ck)
-        logging.debug(this, s"removed key $ck from cache")
-      }
-      lastChangeUpdateSequnce.set(resp)
+    seqs.foreach { seq =>
+      val ck = CacheKey(lastChangeUpdateSequnce.getSeqDocId(seq))
+      WhiskActionMetaData.removeId(ck)
+      WhiskAction.removeId(ck)
+      WhiskPackage.removeId(ck)
+      WhiskRule.removeId(ck)
+      WhiskTrigger.removeId(ck)
+      logging.debug(this, s"removed key $ck from cache")
     }
     seqs.length
   }
@@ -176,13 +192,16 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
       .changes()(since = Some(lcus), limit = Some(limit), descending = false)
       .map {
         case Right(resp) =>
-          if (removeFromLocalCacheBySeqs(resp) == limit && pages > 0) {
-            logging.info(this, s"fetched max changes ($limit) ($pages pages left)")
-            getLastChangeUpdateSequences(lastChangeUpdateSequnce.get(), limit, pages - 1)
+          removeFromLocalCacheBySeqs(resp) match {
+            case ps if ps == limit && pages > 0 =>
+              logging.info(this, s"fetched max changes ($limit) ($pages pages left)")
+              getLastChangeUpdateSequences(lastChangeUpdateSequnce.get(resp), limit, pages - 1)
+            case ps if ps > 0 || pages == 0 =>
+              lastChangeUpdateSequnce.set(resp)
+            case _ =>
           }
         case Left(code) =>
           logging.error(this, s"unexpected response code: $code")
-          Future.successful(())
       }
       .recoverWith {
         case t: Throwable =>
