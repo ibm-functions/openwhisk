@@ -74,22 +74,22 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   final case class CacheInvalidationConfig(enabled: Boolean,
                                            initDelay: Int,
                                            pollInterval: Int,
-                                           pollLimit: Int,
-                                           recursionDepth: Int)
+                                           pageSize: Int,
+                                           maxPages: Int)
   private val cacheInvalidationConfigNamespace = "whisk.controller.cacheinvalidation"
   private val cacheInvalidationConfig = loadConfig[CacheInvalidationConfig](cacheInvalidationConfigNamespace).toOption
-  private val cacheInvalidationEnabled = cacheInvalidationConfig.map(_.enabled).getOrElse(false)
+  private val cacheInvalidationEnabled = cacheInvalidationConfig.exists(_.enabled)
   private val cacheInvalidationInitDelay = cacheInvalidationConfig.map(_.initDelay).getOrElse(-1)
   private val cacheInvalidationPollInterval = cacheInvalidationConfig.map(_.pollInterval).getOrElse(-1)
-  private val cacheInvalidationPollLimit = cacheInvalidationConfig.map(_.pollLimit).getOrElse(-1)
-  private val cacheInvalidationRecursionDepth = cacheInvalidationConfig.map(_.recursionDepth).getOrElse(10)
+  private val cacheInvalidationPageSize = cacheInvalidationConfig.map(_.pageSize).getOrElse(-1)
+  private val cacheInvalidationMaxPages = cacheInvalidationConfig.map(_.maxPages).getOrElse(-1)
   logging.info(
     this,
-    s"cacheInvalidationEnabled: ${cacheInvalidationEnabled}, " +
-      s"cacheInvalidationInitDelay: ${cacheInvalidationInitDelay}, " +
-      s"cacheInvalidationPollInterval: ${cacheInvalidationPollInterval}, " +
-      s"cacheInvalidationPollLimit: ${cacheInvalidationPollLimit}, " +
-      s"cacheInvalidationRecursionDepth: ${cacheInvalidationRecursionDepth}")
+    s"cacheInvalidationEnabled: $cacheInvalidationEnabled, " +
+      s"cacheInvalidationInitDelay: $cacheInvalidationInitDelay, " +
+      s"cacheInvalidationPollInterval: $cacheInvalidationPollInterval, " +
+      s"cacheInvalidationPageSize: $cacheInvalidationPageSize, " +
+      s"cacheInvalidationMaxPages: $cacheInvalidationMaxPages")
 
   private val dbConfig = loadConfigOrThrow[CouchDbConfig](ConfigKeys.couchdb)
   private val dbClient: CouchDbRestClient =
@@ -101,11 +101,60 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
       dbConfig.password,
       dbConfig.databaseFor[WhiskEntity])
 
-  private val lcuskey = "last_seq" // last change update sequence key
-  private var lcus = "" // last change update sequence
+  class LastChangeUpdateSequence()(implicit logging: Logging) {
 
-  private def removeFromLocalCacheBySeqs(seqs: List[JsObject]) = {
-    if (seqs.length > 0) {
+    private var lastChangeUpdateSequence: Option[String] = None
+
+    /**
+     * Get last change update sequence.
+     *
+     * @return last change update sequence
+     */
+    def get(): String = {
+      assert(lastChangeUpdateSequence.isDefined, s"invalid lcus: '$lastChangeUpdateSequnce'")
+      lastChangeUpdateSequence.get
+    }
+
+    /**
+     * Set last change update sequence.
+     */
+    def set(resp: JsObject): Unit = {
+      val lcus = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
+      assert(!lcus.isEmpty, s"invalid lcus: '$lcus'")
+      lastChangeUpdateSequence match {
+        case None =>
+          logging.info(this, s"initial lcus: $lcus")
+        case _ =>
+          logging.info(this, s"new lcus: $lcus (old lcus: ${lastChangeUpdateSequence.get}")
+      }
+      lastChangeUpdateSequence = Some(lcus)
+    }
+
+    /**
+     * Get last change update sequences.
+     *
+     * @return list last change update sequences
+     */
+    def getSeqs(resp: JsObject): List[JsObject] = {
+      resp.fields("results").convertTo[List[JsObject]]
+    }
+
+    /**
+     * Get count last change update sequences for deletions.
+     *
+     * @return count last change update sequences for deletions
+     */
+    def getCountDelSeqs(seqs: List[JsObject]): Int = {
+      seqs.count(_.fields.contains("deleted"))
+    }
+  }
+
+  private val lastChangeUpdateSequnce = new LastChangeUpdateSequence
+
+  private def removeFromLocalCacheBySeqs(resp: JsObject): Int = {
+    val seqs = lastChangeUpdateSequnce.getSeqs(resp)
+    logging.info(this, s"found ${seqs.length} changes (${lastChangeUpdateSequnce.getCountDelSeqs(seqs)} deletions)")
+    if (seqs.nonEmpty) {
       seqs.foreach { seq =>
         val ck = CacheKey(seq.fields("id").asInstanceOf[JsString].convertTo[String])
         WhiskActionMetaData.removeId(ck)
@@ -115,33 +164,24 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
         WhiskTrigger.removeId(ck)
         logging.debug(this, s"removed key $ck from cache")
       }
+      lastChangeUpdateSequnce.set(resp)
     }
+    seqs.length
   }
 
   //@tailrec
-  private def getLastChangeUpdateSequences(limit: Int, recursions: Int): Future[Unit] = {
+  private def getLastChangeUpdateSequences(lcus: String, limit: Int, pages: Int): Future[Unit] = {
     require(limit >= 0, "limit should be non negative")
     dbClient
       .changes()(since = Some(lcus), limit = Some(limit), descending = false)
       .map {
         case Right(resp) =>
-          val newlcus = resp.fields(lcuskey).asInstanceOf[JsString].convertTo[String]
-          val seqs = resp.fields("results").convertTo[List[JsObject]]
-          logging.info(
-            this,
-            s"found ${seqs.length} changes (${seqs.filter(_.fields.contains("deleted")).length} deletions)")
-          removeFromLocalCacheBySeqs(seqs)
-
-          lcus = newlcus
-          logging.info(this, s"new last change update sequence: $lcus")
-
-          if (seqs.length == limit && recursions >= 1) {
-            logging.warn(this, s"fetched maximum limit of $limit($recursions) changes from db")
-            getLastChangeUpdateSequences(limit, recursions - 1)
+          if (removeFromLocalCacheBySeqs(resp) == limit && pages > 0) {
+            logging.info(this, s"fetched max changes ($limit) ($pages pages left)")
+            getLastChangeUpdateSequences(lastChangeUpdateSequnce.get(), limit, pages - 1)
           }
-
         case Left(code) =>
-          logging.error(this, s"unexpected response code $code")
+          logging.error(this, s"unexpected response code: $code")
           Future.successful(())
       }
       .recoverWith {
@@ -152,36 +192,33 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
       .mapTo[Unit]
   }
 
-  def scheduleCacheInvalidation() = {
+  def scheduleCacheInvalidation(): Any = {
     if (cacheInvalidationEnabled) {
       Scheduler.scheduleWaitAtLeast(
         interval = FiniteDuration(cacheInvalidationPollInterval, TimeUnit.SECONDS),
         initialDelay = FiniteDuration(cacheInvalidationInitDelay, TimeUnit.SECONDS),
         name = "CacheInvalidation") { () =>
-        getLastChangeUpdateSequences(cacheInvalidationPollLimit, cacheInvalidationRecursionDepth)
+        getLastChangeUpdateSequences(
+          lastChangeUpdateSequnce.get(),
+          cacheInvalidationPageSize,
+          cacheInvalidationMaxPages - 1)
       }
     }
   }
 
-  def ensureInitialLastChangeUpdateSequence() = {
+  def ensureInitialLastChangeUpdateSequence(): Future[Unit] = {
     if (cacheInvalidationEnabled) {
       dbClient
         .changes()(limit = Some(1), descending = true)
         .map {
-          case Right(response) =>
-            lcus = response.fields(lcuskey).asInstanceOf[JsString].convertTo[String]
-            assert(!lcus.isEmpty, s"invalid initial last change update sequence in response: '$response'")
-            logging.info(this, s"initial last change update sequence: $lcus")
+          case Right(resp) =>
+            lastChangeUpdateSequnce.set(resp)
           case Left(code) =>
-            val msg = s"unexecpted response code: $code from _changes call"
-            logging.error(this, msg)
-            throw new Throwable(msg)
+            throw new Throwable(s"unexpected response code: $code")
         }
         .recoverWith {
-          case t =>
-            val msg = s"'${dbConfig.databaseFor[WhiskEntity]}' internal error: '${t.getMessage}'"
-            logging.error(this, msg)
-            throw t
+          case t: Throwable =>
+            throw new Throwable(s"'${dbConfig.databaseFor[WhiskEntity]}' internal error: '${t.getMessage}'")
         }
     } else {
       Future.successful(())
@@ -202,7 +239,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
       removeFromLocalCache)
   })
 
-  def invalidateWhiskActionMetaData(key: CacheKey) =
+  def invalidateWhiskActionMetaData(key: CacheKey): Unit =
     WhiskActionMetaData.removeId(key)
 
   private def removeFromLocalCache(bytes: Array[Byte]): Future[Unit] = Future {
