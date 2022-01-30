@@ -20,13 +20,10 @@ package org.apache.openwhisk.core.database
 import java.nio.charset.StandardCharsets
 import java.util.concurrent.TimeUnit
 
-//import scala.annotation.tailrec
 import scala.concurrent.Future
 import scala.concurrent.duration.DurationInt
 import scala.concurrent.duration.FiniteDuration
-import scala.util.Failure
-import scala.util.Success
-import scala.util.Try
+import scala.util.{Failure, Success, Try}
 import akka.actor.ActorSystem
 import akka.actor.Props
 import spray.json._
@@ -103,7 +100,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
         dbConfig.password,
         dbConfig.databaseFor[WhiskEntity])
 
-    private var lcus: Option[String] = None
+    private var lcus: String = ""
 
     /**
      * Get last change update sequence from store.
@@ -111,29 +108,21 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
      * @return last change update sequence
      */
     def get(): String = {
-      assert(!lcus.getOrElse("").isEmpty, s"invalid lcus: '$lcus'")
-      lcus.get
+      assert(!lcus.isEmpty, s"lcus must not be empty")
+      lcus
     }
 
     /**
-     * Set last change update sequence from db response.
+     * Set last change update sequence from db response to store.
      */
     def set(resp: JsObject): Unit = {
       val seq = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
-      assert(!seq.isEmpty, s"invalid lcus: '$lcus' in response $resp")
-      lcus match {
-        case None =>
-          logging.info(this, s"initial lcus: $seq")
-        case _ =>
-          logging.info(this, s"new lcus: $seq ($lcus")
-      }
-      lcus = Some(seq)
+      assert(!seq.isEmpty, s"lcus must not be empty in response $resp")
+      lcus = seq
     }
 
     /**
-     * Ensure initial last change update sequence.
-     *
-     * @return last change update sequence
+     * Store initial last change update sequence.
      */
     def ensureInitialSequence(): Future[Unit] = {
       assert(lcus.isEmpty, s"lcus: 'initial $lcus' is already set")
@@ -141,6 +130,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
         .changes()(limit = Some(1), descending = true)
         .map { resp =>
           set(resp)
+          logging.info(this, s"initial lcus: $lcus")
         }
     }
 
@@ -150,14 +140,15 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
      * @return ids of changed documents
      */
     def getChanges(limit: Int): Future[List[String]] = {
+      require(limit >= 0, "limit should be non negative")
       dbClient
         .changes()(since = Some(get()), limit = Some(limit), descending = false)
         .map { resp =>
           val seqs = resp.fields("results").convertTo[List[JsObject]]
           logging.info(this, s"found ${seqs.length} changes (${seqs.count(_.fields.contains("deleted"))} deletions)")
-          seqs.length match {
-            case 0 =>
-            case _ => set(resp)
+          if (seqs.length > 0) {
+            set(resp)
+            logging.info(this, s"new lcus: $lcus")
           }
           seqs.map(_.fields("id").convertTo[String])
         }
@@ -178,33 +169,8 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
     }
   }
 
-  //@tailrec
-  /*private def getChanges(limit: Int, pages: Int): Future[Unit] = {
-    require(limit >= 0, "limit should be non negative")
-    dbChanges
-      .getChanges(limit = limit)
-      .map { changes =>
-        removeFromLocalCacheByChanges(changes)
-        changes.length match {
-          case clen if clen == limit && pages > 0 =>
-            logging.info(this, s"fetched max changes ($limit) ($pages pages left)")
-            getChanges(limit, pages - 1)
-          case _ =>
-        }
-      }
-      .recoverWith {
-        case t: Throwable =>
-          // log but accept error, stay with old sequence until next poll
-          logging.error(this, s"internal error: '${t.getMessage}'")
-          Future.successful(())
-      }
-      .mapTo[Unit]
-  }*/
-
-  //@tailrec
   private def getChanges(limit: Int, pages: Int): Future[List[String]] = {
-    require(limit >= 0, "limit should be non negative")
-    dbChanges.getChanges(limit = limit).andThen {
+    dbChanges.getChanges(limit).andThen {
       case Success(changes) => {
         removeFromLocalCacheByChanges(changes)
         if (changes.length == limit && pages > 0) {
@@ -212,6 +178,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
           getChanges(limit, pages - 1)
         }
       }
+      // no need to swallow exception here as non-fatal exceptions are caught by the scheduler
       case Failure(t) => logging.error(this, s"error on get changes: ${t.getMessage}")
     }
   }
@@ -227,7 +194,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
     }
   }
 
-  def ensureInitialSequence() = {
+  def ensureInitialSequence(): Future[Unit] = {
     if (cacheInvalidationEnabled) {
       dbChanges.ensureInitialSequence()
     } else {
