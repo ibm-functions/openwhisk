@@ -112,7 +112,8 @@ class Controller(val instance: ControllerInstanceId,
   })
 
   implicit val executionContext = actorSystem.dispatcher
-  cacheChangeNotification.value.remoteCacheInvalidaton.ensureInitialLastChangeUpdateSequence
+  cacheChangeNotification.value.remoteCacheInvalidaton
+    .ensureInitialSequence()
     .map {
       case _ =>
         cacheChangeNotification.value.remoteCacheInvalidaton.scheduleCacheInvalidation

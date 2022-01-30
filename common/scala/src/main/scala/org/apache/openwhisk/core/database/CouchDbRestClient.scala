@@ -151,7 +151,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
   def changes()(since: Option[String] = None,
                 limit: Option[Int] = None,
                 includeDocs: Boolean = false,
-                descending: Boolean = false): Future[Either[StatusCode, JsObject]] = {
+                descending: Boolean = false): Future[JsObject] = {
 
     def bool2OptStr(bool: Boolean): Option[String] = if (bool) Some("true") else None
 
@@ -172,6 +172,12 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
     logging.debug(this, s"doing _changes request on host $host with uri $changesUri")
     requestJson[JsObject](mkRequest(HttpMethods.GET, changesUri, headers = baseHeaders))
+      .map {
+        case Right(resp) =>
+          resp
+        case Left(code) =>
+          throw new Exception("Unexpected http response code: " + code)
+      }
   }
 
   // Streams an attachment to the database
