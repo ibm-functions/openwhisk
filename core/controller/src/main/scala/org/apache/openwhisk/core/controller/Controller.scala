@@ -120,7 +120,7 @@ class Controller(val instance: ControllerInstanceId,
     }
     .recoverWith {
       case t =>
-        logging.error(this, t.getMessage)
+        logging.error(this, s"failure during remoteCacheInvalidaton.ensureInitialSequence: ${t.getMessage}")
         actorSystem.terminate()
         Await.result(actorSystem.whenTerminated, 30.seconds)
         sys.exit(1)
