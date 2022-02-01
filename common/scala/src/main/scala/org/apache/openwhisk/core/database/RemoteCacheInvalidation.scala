@@ -103,25 +103,6 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
     private var lcus: String = ""
 
     /**
-     * Get last change update sequence from store.
-     *
-     * @return last change update sequence
-     */
-    def get(): String = {
-      assert(!lcus.isEmpty, s"lcus must not be empty")
-      lcus
-    }
-
-    /**
-     * Set last change update sequence from db response to store.
-     */
-    def set(resp: JsObject): Unit = {
-      val seq = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
-      assert(!seq.isEmpty, s"lcus must not be empty in response $resp")
-      lcus = seq
-    }
-
-    /**
      * Store initial last change update sequence.
      */
     def ensureInitialSequence(): Future[Unit] = {
@@ -129,25 +110,25 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
       dbClient
         .changes()(limit = Some(1), descending = true)
         .map { resp =>
-          set(resp)
+          lcus = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
           logging.info(this, s"initial lcus: $lcus")
         }
     }
 
     /**
-     * Get changes made to documents in the database.
+     * Get changes made to documents in the database and store last change update sequence.
      *
      * @return ids of changed documents
      */
     def getChanges(limit: Int): Future[List[String]] = {
       require(limit >= 0, "limit should be non negative")
       dbClient
-        .changes()(since = Some(get()), limit = Some(limit), descending = false)
+        .changes()(since = Some(lcus), limit = Some(limit), descending = false)
         .map { resp =>
           val seqs = resp.fields("results").convertTo[List[JsObject]]
           logging.info(this, s"found ${seqs.length} changes (${seqs.count(_.fields.contains("deleted"))} deletions)")
           if (seqs.length > 0) {
-            set(resp)
+            lcus = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
             logging.info(this, s"new lcus: $lcus")
           }
           seqs.map(_.fields("id").convertTo[String])
