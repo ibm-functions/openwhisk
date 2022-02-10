@@ -36,6 +36,7 @@ class BlockingInvokeOneActionSimulation extends Simulation {
   val Array(uuid, key) = sys.env("API_KEY").split(":")
 
   val connections: Int = sys.env("CONNECTIONS").toInt
+  val secondsWarmup: FiniteDuration = sys.env.getOrElse("SECONDSWARMUP", "5").toInt.seconds
   val seconds: FiniteDuration = sys.env.getOrElse("SECONDS", "10").toInt.seconds
 
   // Specify thresholds
@@ -64,7 +65,7 @@ class BlockingInvokeOneActionSimulation extends Simulation {
             .readFileToString(Resource.body(actionfile).get.file, StandardCharsets.UTF_8)))
     }
     .rendezVous(connections)
-    .during(5.seconds) {
+    .during(secondsWarmup) {
       exec(openWhisk("Warm containers up").authenticate(uuid, key).action(actionName).invoke())
     }
     .rendezVous(connections)
