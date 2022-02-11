@@ -76,12 +76,32 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
       mkJsonRequest(HttpMethods.POST, uri(getDbName(db), "_bulk_docs"), JsObject("docs" -> docs.toJson), baseHeaders))
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#get--db-docid
-  def getDoc(id: String): Future[Either[StatusCode, JsObject]] =
-    requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDbName(db), id), headers = baseHeaders))
+  def getDoc(id: String): Future[Either[StatusCode, JsObject]] = {
+    val res = requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDbName(db), id), headers = baseHeaders))
+    res.flatMap { e =>
+      e match {
+        case Left(StatusCodes.NotFound) if db.endsWith("activations-") =>
+          val dbname = db + (getCurrentDay-1)
+          logging.debug(this, s"doing get request for $id on $dbname")
+          requestJson[JsObject](mkRequest(HttpMethods.GET, uri(dbname, id), headers = baseHeaders))
+        case _ => res
+      }
+    }
+  }
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#get--db-docid
-  def getDoc(id: String, rev: String): Future[Either[StatusCode, JsObject]] =
-    requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDbName(db), id), headers = baseHeaders ++ revHeader(rev)))
+  def getDoc(id: String, rev: String): Future[Either[StatusCode, JsObject]] = {
+    val res = requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDbName(db), id), headers = baseHeaders ++ revHeader(rev)))
+    res.flatMap { e =>
+      e match {
+        case Left(StatusCodes.NotFound) if db.endsWith("activations-") =>
+          val dbname = db + (getCurrentDay-1)
+          logging.debug(this, s"doing get request for $id and $rev on $dbname")
+          requestJson[JsObject](mkRequest(HttpMethods.GET, uri(dbname, id), headers = baseHeaders ++ revHeader(rev)))
+        case _ => res
+      }
+    }
+  }
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#delete--db-docid
   def deleteDoc(id: String, rev: String): Future[Either[StatusCode, JsObject]] =
