@@ -67,8 +67,20 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     requestJson[JsObject](mkJsonRequest(HttpMethods.PUT, uri(getDbName(db), id), doc, baseHeaders))
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#put--db-docid
-  def putDoc(id: String, rev: String, doc: JsObject): Future[Either[StatusCode, JsObject]] =
-    requestJson[JsObject](mkJsonRequest(HttpMethods.PUT, uri(getDbName(db), id), doc, baseHeaders ++ revHeader(rev)))
+  def putDoc(id: String, rev: String, doc: JsObject): Future[Either[StatusCode, JsObject]] = {
+    if (db.endsWith("activations-")) {
+      logging.info(this, s"@StR doing put request for $id and $rev on ${getDbName(db)}")
+    }
+    val res = requestJson[JsObject](mkJsonRequest(HttpMethods.PUT, uri(getDbName(db), id), doc, baseHeaders ++ revHeader(rev)))
+    res.flatMap { e =>
+      e match {
+        case Left(StatusCodes.NotFound) if db.endsWith("activations-") =>
+          logging.info(this, s"@StR doing put request for $id and $rev on ${db + (getCurrentDay-1)}")
+          requestJson[JsObject](mkJsonRequest(HttpMethods.PUT, uri(db + (getCurrentDay-1), id), doc, baseHeaders ++ revHeader(rev)))
+        case _ => res
+      }
+    }
+  }
 
   // http://docs.couchdb.org/en/2.1.0/api/database/bulk-api.html#inserting-documents-in-bulk
   def putDocs(docs: Seq[JsObject]): Future[Either[StatusCode, JsArray]] =
@@ -78,12 +90,14 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#get--db-docid
   def getDoc(id: String): Future[Either[StatusCode, JsObject]] = {
     val res = requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDbName(db), id), headers = baseHeaders))
+    if (db.endsWith("activations-")) {
+      logging.info(this, s"@StR doing get request for $id on ${getDbName(db)}")
+    }
     res.flatMap { e =>
       e match {
         case Left(StatusCodes.NotFound) if db.endsWith("activations-") =>
-          val dbname = db + (getCurrentDay-1)
-          logging.debug(this, s"doing get request for $id on $dbname")
-          requestJson[JsObject](mkRequest(HttpMethods.GET, uri(dbname, id), headers = baseHeaders))
+          logging.info(this, s"@StR doing get request for $id on ${db + (getCurrentDay-1)}")
+          requestJson[JsObject](mkRequest(HttpMethods.GET, uri(db + (getCurrentDay-1), id), headers = baseHeaders))
         case _ => res
       }
     }
@@ -91,13 +105,15 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#get--db-docid
   def getDoc(id: String, rev: String): Future[Either[StatusCode, JsObject]] = {
+    if (db.endsWith("activations-")) {
+      logging.info(this, s"@StR doing get request for $id and $rev on ${getDbName(db)}")
+    }
     val res = requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDbName(db), id), headers = baseHeaders ++ revHeader(rev)))
     res.flatMap { e =>
       e match {
         case Left(StatusCodes.NotFound) if db.endsWith("activations-") =>
-          val dbname = db + (getCurrentDay-1)
-          logging.debug(this, s"doing get request for $id and $rev on $dbname")
-          requestJson[JsObject](mkRequest(HttpMethods.GET, uri(dbname, id), headers = baseHeaders ++ revHeader(rev)))
+          logging.info(this, s"@StR doing get request for $id and $rev on ${db + (getCurrentDay-1)}")
+          requestJson[JsObject](mkRequest(HttpMethods.GET, uri(db + (getCurrentDay-1), id), headers = baseHeaders ++ revHeader(rev)))
         case _ => res
       }
     }

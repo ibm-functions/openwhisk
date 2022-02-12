@@ -88,7 +88,7 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: St
     val docinfoStr = s"id: $id, rev: ${rev.getOrElse("null")}"
     val start = transid.started(this, LoggingMarkers.DATABASE_SAVE, s"[PUT] '$dbName' saving document: '${docinfoStr}'")
 
-    val f = if (useBatching) {
+    val f = if (useBatching && (rev.isEmpty || !dbName.endsWith("activations-"))) { // use batching only for creation of new activations documents
       batcher.put(asJson).map { e =>
         e match {
           case Right(response) =>
