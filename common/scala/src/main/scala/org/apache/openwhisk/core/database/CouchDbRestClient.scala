@@ -52,9 +52,15 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
   private def revHeader(forRev: String) = List(`If-Match`(EntityTagRange(EntityTag(forRev))))
 
-  private def getCurrentDay: Long = System.currentTimeMillis / (24 * 60 * 60 * 1000)
+  private val flexDb = db.endsWith("activations-")
 
-  private def getDbName(db: String): String = if (db.endsWith("activations-")) db + getCurrentDay else db
+  def useFlexDb: Boolean = flexDb // use flexible activations db
+
+  private def getCurrentDay: Long = System.currentTimeMillis / (24 * 60 * 60 * 1000) // epoch day
+
+  private def getDb: String = if (flexDb) db + getCurrentDay else db // get fully qualified db name
+
+  private def getPrevDb: String = db + (getCurrentDay - 1) // get previous activations db name
 
   // Properly encodes the potential slashes in each segment.
   protected def uri(segments: Any*): Uri = {
@@ -64,65 +70,53 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#put--db-docid
   def putDoc(id: String, doc: JsObject): Future[Either[StatusCode, JsObject]] =
-    requestJson[JsObject](mkJsonRequest(HttpMethods.PUT, uri(getDbName(db), id), doc, baseHeaders))
+    requestJson[JsObject](mkJsonRequest(HttpMethods.PUT, uri(getDb, id), doc, baseHeaders))
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#put--db-docid
   def putDoc(id: String, rev: String, doc: JsObject): Future[Either[StatusCode, JsObject]] = {
-    if (db.endsWith("activations-")) {
-      logging.info(this, s"@StR doing put request for $id and $rev on ${getDbName(db)}")
-    }
-    val res = requestJson[JsObject](mkJsonRequest(HttpMethods.PUT, uri(getDbName(db), id), doc, baseHeaders ++ revHeader(rev)))
-    res.flatMap { e =>
-      e match {
-        case Left(StatusCodes.NotFound) if db.endsWith("activations-") =>
-          logging.info(this, s"@StR doing put request for $id and $rev on ${db + (getCurrentDay-1)}")
-          requestJson[JsObject](mkJsonRequest(HttpMethods.PUT, uri(db + (getCurrentDay-1), id), doc, baseHeaders ++ revHeader(rev)))
-        case _ => res
+    requestJson[JsObject](mkJsonRequest(HttpMethods.PUT, uri(getDb, id), doc, baseHeaders ++ revHeader(rev)))
+      .flatMap { e =>
+        e match {
+          case Left(StatusCodes.NotFound) if flexDb =>
+            requestJson[JsObject](
+              mkJsonRequest(HttpMethods.PUT, uri(getPrevDb, id), doc, baseHeaders ++ revHeader(rev)))
+          case _ => Future(e)
+        }
       }
-    }
   }
 
   // http://docs.couchdb.org/en/2.1.0/api/database/bulk-api.html#inserting-documents-in-bulk
   def putDocs(docs: Seq[JsObject]): Future[Either[StatusCode, JsArray]] =
     requestJson[JsArray](
-      mkJsonRequest(HttpMethods.POST, uri(getDbName(db), "_bulk_docs"), JsObject("docs" -> docs.toJson), baseHeaders))
+      mkJsonRequest(HttpMethods.POST, uri(getDb, "_bulk_docs"), JsObject("docs" -> docs.toJson), baseHeaders))
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#get--db-docid
   def getDoc(id: String): Future[Either[StatusCode, JsObject]] = {
-    val res = requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDbName(db), id), headers = baseHeaders))
-    if (db.endsWith("activations-")) {
-      logging.info(this, s"@StR doing get request for $id on ${getDbName(db)}")
-    }
-    res.flatMap { e =>
+    requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDb, id), headers = baseHeaders)).flatMap { e =>
       e match {
-        case Left(StatusCodes.NotFound) if db.endsWith("activations-") =>
-          logging.info(this, s"@StR doing get request for $id on ${db + (getCurrentDay-1)}")
-          requestJson[JsObject](mkRequest(HttpMethods.GET, uri(db + (getCurrentDay-1), id), headers = baseHeaders))
-        case _ => res
+        case Left(StatusCodes.NotFound) if flexDb =>
+          requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getPrevDb, id), headers = baseHeaders))
+        case _ => Future(e)
       }
     }
   }
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#get--db-docid
   def getDoc(id: String, rev: String): Future[Either[StatusCode, JsObject]] = {
-    if (db.endsWith("activations-")) {
-      logging.info(this, s"@StR doing get request for $id and $rev on ${getDbName(db)}")
-    }
-    val res = requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDbName(db), id), headers = baseHeaders ++ revHeader(rev)))
-    res.flatMap { e =>
-      e match {
-        case Left(StatusCodes.NotFound) if db.endsWith("activations-") =>
-          logging.info(this, s"@StR doing get request for $id and $rev on ${db + (getCurrentDay-1)}")
-          requestJson[JsObject](mkRequest(HttpMethods.GET, uri(db + (getCurrentDay-1), id), headers = baseHeaders ++ revHeader(rev)))
-        case _ => res
+    requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDb, id), headers = baseHeaders ++ revHeader(rev)))
+      .flatMap { e =>
+        e match {
+          case Left(StatusCodes.NotFound) if flexDb =>
+            requestJson[JsObject](
+              mkRequest(HttpMethods.GET, uri(getPrevDb, id), headers = baseHeaders ++ revHeader(rev)))
+          case _ => Future(e)
+        }
       }
-    }
   }
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#delete--db-docid
   def deleteDoc(id: String, rev: String): Future[Either[StatusCode, JsObject]] =
-    requestJson[JsObject](
-      mkRequest(HttpMethods.DELETE, uri(getDbName(db), id), headers = baseHeaders ++ revHeader(rev)))
+    requestJson[JsObject](mkRequest(HttpMethods.DELETE, uri(getDb, id), headers = baseHeaders ++ revHeader(rev)))
 
   // http://docs.couchdb.org/en/1.6.1/api/ddoc/views.html
   def executeView(designDoc: String, viewName: String)(startKey: List[Any] = Nil,
@@ -178,7 +172,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
       })
       .toMap
 
-    val viewUri = uri(getDbName(db), "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
+    val viewUri = uri(getDb, "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
 
     requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
   }
@@ -227,7 +221,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     val request =
       mkRequest(
         HttpMethods.PUT,
-        uri(getDbName(db), id, attName),
+        uri(getDb, id, attName),
         Future.successful(entity),
         baseHeaders ++ revHeader(rev))
     requestJson[JsObject](request)
@@ -240,7 +234,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                        attName: String,
                        sink: Sink[ByteString, Future[T]]): Future[Either[StatusCode, (ContentType, T)]] = {
     val httpRequest =
-      mkRequest(HttpMethods.GET, uri(getDbName(db), id, attName), headers = baseHeaders ++ revHeader(rev))
+      mkRequest(HttpMethods.GET, uri(getDb, id, attName), headers = baseHeaders ++ revHeader(rev))
 
     request(httpRequest).flatMap { response =>
       if (response.status.isSuccess) {
