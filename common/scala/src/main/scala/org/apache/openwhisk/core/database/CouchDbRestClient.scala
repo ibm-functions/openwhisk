@@ -181,45 +181,68 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     val viewUri =
       uri(if (flexDb) getDb(dbSfx) else db, "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
 
+    logging.info(this, s"@StR doing request on host $host with uri $viewUri")
     val res = requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
     if (!flexDb) res
     else {
       res.flatMap { e =>
         e match {
           case Right(response) =>
+            logging.info(this, s"@StR Right(response) $response")
             val rows = response.fields("rows").convertTo[List[JsObject]]
+            logging.info(this, s"@StR rows: $rows")
             rows match {
               case _ if (!reduce || (rows.isEmpty || rows.length == 1)) =>
                 val viewUri =
                   uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
+                logging.info(this, s"@StR doing request on host $host with uri $viewUri")
                 requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders)).flatMap { e2 =>
                   e2 match {
                     case Right(response2) =>
+                      logging.info(this, s"@StR Right(response2) $response2")
                       val rows2 = response2.fields("rows").convertTo[List[JsObject]]
+                      logging.info(this, s"@StR rows2: $rows2")
                       rows2 match {
                         case _ if (!reduce || (rows2.isEmpty || rows2.length == 1)) =>
                           // {"rows": [ ]}
                           // {"rows": [{"key": null, "value": 3136}]}
                           // {"total_rows": 8554, "offset": 0, "rows": [{"id": "id", "key": ["id", 1644779646989], "value": {"namespace": "namespace", "name": "wordCount"}}]}
                           if (rows.isEmpty && rows2.isEmpty) {
-                            Future(JsObject("rows" -> JsArray.empty))
+                            logging.info(this, s"@StR return JsArray.empty: ${JsArray.empty}")
+                            Future(Right(JsObject("rows" -> JsArray.empty)))
                           } else if (reduce) {
                             val v = if (rows.isEmpty) 0 else rows.head.fields("value").convertTo[Long]
                             val v2 = if (rows2.isEmpty) 0 else rows2.head.fields("value").convertTo[Long]
-                            Future(JsObject("rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(v + v2)))))
-                          } else {
+                            logging.info(this, s"@StR return ${JsObject(
+                              "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(v + v2))))}")
                             Future(
-                              JsObject("rows" -> (rows ++ rows2).toArray.slice(0, limit.get).toJson.convertTo[JsArray]))
+                              Right(
+                                JsObject("rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(v + v2))))))
+                          } else {
+                            logging.info(this, s"@StR return ${JsObject(
+                              "rows" -> (rows ++ rows2).toArray.slice(0, limit.get).toJson.convertTo[JsArray])}")
+                            Future(
+                              Right(JsObject(
+                                "rows" -> (rows ++ rows2).toArray.slice(0, limit.get).toJson.convertTo[JsArray])))
                           }
-                        case _ => Future(e2) // return right response from second call if assertion is violated
+                        case _ =>
+                          logging.info(
+                            this,
+                            s"@StR return right response from second call if assertion is violated: ${e2}")
+                          Future(e2) // return right response from second call if assertion is violated
                       }
-                    case _ => Future(e2) // return left response from second call
+                    case _ =>
+                      logging.info(this, s"@StR return left response from second: ${e2}")
+                      Future(e2) // return left response from second call
                   }
                 }
-              case _ => Future(e) // return right response from first call if assertion is violated
+              case _ =>
+                logging.info(this, s"@StR return right response from first call if assertion is violated: ${e}")
+                Future(e) // return right response from first call if assertion is violated
             }
-            Future(e)
-          case _ => Future(e) // return left response from first call
+          case _ =>
+            logging.info(this, s"@StR return left response from first call if assertion is violated: ${e}")
+            Future(e) // return left response from first call
         }
       }
     }
@@ -284,21 +307,28 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     val viewUri =
       uri(if (flexDb) getDb(dbSfx) else db, "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
 
+    logging.debug(this, s"@StR doing request on host $host with uri $viewUri")
+
     val res = requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
     if (!flexDb) res
     else {
       res.flatMap { e =>
         e match {
           case Right(response) =>
+            logging.debug(this, s"@StR Right(response) $response")
             val rows = response.fields("rows").convertTo[List[JsObject]]
+            logging.debug(this, s"@StR rows: $rows")
             rows match {
               case _ if rows.isEmpty || rows.length == 1 =>
                 val viewUri =
                   uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
+                logging.info(this, s"@StR doing request on host $host with uri $viewUri")
                 requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders)).flatMap { e2 =>
                   e2 match {
                     case Right(response2) =>
+                      logging.debug(this, s"@StR Right(response2) $response2")
                       val rows2 = response2.fields("rows").convertTo[List[JsObject]]
+                      logging.debug(this, s"@StR rows2: $rows2")
                       rows2 match {
                         case _ if rows2.isEmpty || rows2.length == 1 =>
                           val count = if (rows.nonEmpty) {
@@ -310,8 +340,11 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                             if (count > skip.get) count - skip.get else 0L
                           } else 0L
                           // {"rows": [{"key": null, "value": 3136}]}
+                          logging.debug(this, s"@StR count: $count, count2: $count2, ${JsObject(
+                            "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count + count2))))}")
                           Future(
-                            JsObject("rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count + count2)))))
+                            Right(JsObject(
+                              "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count + count2))))))
                         case _ => Future(e2) // return right response from second call if assertion is violated
                       }
                     case _ => Future(e2) // return left response from second call
@@ -319,7 +352,6 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                 }
               case _ => Future(e) // return right response from first call if assertion is violated
             }
-            Future(e)
           case _ => Future(e) // return left response from first call
         }
       }
