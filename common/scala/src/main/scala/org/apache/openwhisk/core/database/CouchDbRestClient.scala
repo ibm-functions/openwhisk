@@ -219,11 +219,16 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                               Right(
                                 JsObject("rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(v + v2))))))
                           } else {
+                            val allrows = rows ++ rows2
                             logging.info(this, s"@StR return ${JsObject(
-                              "rows" -> (rows ++ rows2).toArray.slice(0, limit.get).toJson.convertTo[JsArray])}")
+                              "rows" -> allrows.toArray.slice(0, if (limit.get > 0) limit.get else allrows.length).toJson.convertTo[JsArray])}")
                             Future(
-                              Right(JsObject(
-                                "rows" -> (rows ++ rows2).toArray.slice(0, limit.get).toJson.convertTo[JsArray])))
+                              Right(
+                                JsObject(
+                                  "rows" -> allrows.toArray
+                                    .slice(0, if (limit.get > 0) limit.get else allrows.length)
+                                    .toJson
+                                    .convertTo[JsArray])))
                           }
                         case _ =>
                           logging.info(
@@ -288,7 +293,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     val args = Seq[(String, Option[String])](
       "startkey" -> list2OptJson(startKey).map(_.toString),
       "endkey" -> list2OptJson(endKey).map(_.toString),
-      "skip" -> skip.filter(_ > 0).map(_.toString),
+      "skip" -> None,
       "limit" -> limit.filter(_ > 0).map(_.toString),
       "stale" -> stale.value,
       "include_docs" -> bool2OptStr(includeDocs),
