@@ -171,12 +171,12 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     def getArgs(skip: Option[Int], limit: Option[Int], zeroLimit: Boolean = false): Seq[(String, Option[String])] = {
       args ++
         (Seq[(String, Option[String])](
-          "skip" -> (if (reduce) None else skip.filter(_ > 0 || zeroLimit).map(_.toString)), // do not specify skip for reduce
-          "limit" -> (if (reduce) None else limit.filter(_ > 0).map(_.toString)))) // do not specify limit for reduce
+          "skip" -> (if (reduce) None else skip.filter(_ > 0).map(_.toString)), // do not specify skip for reduce
+          "limit" -> (if (reduce) None else limit.filter(_ > 0 || zeroLimit).map(_.toString)))) // do not specify limit for reduce
     }
 
     // Throw out all undefined arguments.
-    def argMap(args: Seq[(String, Option[String])]): Map[String, String] =
+    def getArgMap(args: Seq[(String, Option[String])]): Map[String, String] =
       args
         .collect({
           case (l, Some(r)) => (l, r)
@@ -184,9 +184,10 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
         .toMap
 
     val dbSfx = getDbSfx
+    val argMap = getArgMap(getArgs(skip, limit))
     val viewUri =
       uri(if (flexDb) getDb(dbSfx) else db, "_design", designDoc, "_view", viewName)
-        .withQuery(Uri.Query(argMap(getArgs(skip, limit))))
+        .withQuery(Uri.Query(argMap))
 
     logging.info(this, s"@StR doing request on host $host with uri $viewUri")
     val res = requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
@@ -203,14 +204,22 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                 val viewUri2 =
                   if (!reduce && (skip.get > 0 || limit.get > 0)) {
                     // adjust skip and limit in query params
-                    val skip2 = if (rows.length == 0) skip else Some(0) // keep skip in case of empty result (!!)
+                    val skip2 = if (rows.length == 0) skip else Some(0) // keep skip in case of empty result (fuzziness!!)
+                    logging.info(this, s"@StR skip2: $skip2")
                     val limit2 = if (limit.get > 0) Some(limit.get - rows.length) else limit
-                    uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName)
-                      .withQuery(Uri.Query(argMap(getArgs(skip2, limit2, true))))
+                    logging.info(this, s"@StR limit2: $limit2")
+                    logging.info(this, s"@StR getArgs(skip2, limit2, true): ${getArgs(skip2, limit2, true)}")
+                    logging.info(
+                      this,
+                      s"@StR argMap(getArgs(skip2, limit2, true)): ${getArgMap(getArgs(skip2, limit2, true))}")
+                    val viewUri2 = uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName)
+                      .withQuery(Uri.Query(getArgMap(getArgs(skip2, limit2, true))))
+                    logging.info(this, s"@StR viewUri2: $viewUri2")
+                    viewUri2
                   } else {
-                    viewUri
+                    uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
                   }
-                logging.info(this, s"@StR doing request on host $host with uri $viewUri")
+                logging.info(this, s"@StR doing request on host $host with uri $viewUri2")
                 requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri2, headers = baseHeaders)).flatMap { e2 =>
                   e2 match {
                     case Right(response2) =>
@@ -244,14 +253,12 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                                 "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count + count2))))))
                           } else {
                             // {"total_rows": 8554, "offset": 0, "rows": [{"id": "id", "key": ["id", 1644779646989], "value": {"namespace": "namespace", "name": "wordCount"}}]}
-                            logging.info(this, s"@StR return ${JsObject(
-                              "rows" -> (rows ++ rows2).toArray.toJson.convertTo[JsArray])}")
+                            logging.info(
+                              this,
+                              s"@StR return ${JsObject("rows" -> (rows ++ rows2).toArray.toJson.convertTo[JsArray])}")
                             Future(
-                              Right(
-                                JsObject(
-                                  "rows" -> (rows ++ rows2).toArray
-                                    .toJson
-                                    .convertTo[JsArray])))
+                              Right(JsObject("rows" -> (rows ++ rows2).toArray.toJson
+                                .convertTo[JsArray])))
                           }
                         case _ =>
                           logging.info(
