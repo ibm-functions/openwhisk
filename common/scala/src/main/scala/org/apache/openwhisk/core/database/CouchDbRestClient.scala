@@ -162,24 +162,31 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     val args = Seq[(String, Option[String])](
       "startkey" -> list2OptJson(startKey).map(_.toString),
       "endkey" -> list2OptJson(endKey).map(_.toString),
-      "skip" -> skip.filter(_ > 0).map(_.toString),
-      "limit" -> limit.filter(_ > 0).map(_.toString),
       "stale" -> stale.value,
       "include_docs" -> bool2OptStr(includeDocs),
       "descending" -> bool2OptStr(descending),
       "reduce" -> Some(reduce.toString),
       "group" -> bool2OptStr(group))
 
+    def getArgs(skip: Option[Int], limit: Option[Int], zeroLimit: Boolean = false): Seq[(String, Option[String])] = {
+      args ++
+        (Seq[(String, Option[String])](
+          "skip" -> (if (reduce) None else skip.filter(_ > 0 || zeroLimit).map(_.toString)), // do not specify skip for reduce
+          "limit" -> (if (reduce) None else limit.filter(_ > 0).map(_.toString)))) // do not specify limit for reduce
+    }
+
     // Throw out all undefined arguments.
-    val argMap: Map[String, String] = args
-      .collect({
-        case (l, Some(r)) => (l, r)
-      })
-      .toMap
+    def argMap(args: Seq[(String, Option[String])]): Map[String, String] =
+      args
+        .collect({
+          case (l, Some(r)) => (l, r)
+        })
+        .toMap
 
     val dbSfx = getDbSfx
     val viewUri =
-      uri(if (flexDb) getDb(dbSfx) else db, "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
+      uri(if (flexDb) getDb(dbSfx) else db, "_design", designDoc, "_view", viewName)
+        .withQuery(Uri.Query(argMap(getArgs(skip, limit))))
 
     logging.info(this, s"@StR doing request on host $host with uri $viewUri")
     val res = requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
@@ -193,10 +200,18 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
             logging.info(this, s"@StR rows: $rows")
             rows match {
               case _ if (!reduce || (rows.isEmpty || rows.length == 1)) =>
-                val viewUri =
-                  uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
+                val viewUri2 =
+                  if (!reduce && (skip.get > 0 || limit.get > 0)) {
+                    // adjust skip and limit in query params
+                    val skip2 = if (rows.length == 0) skip else Some(0) // keep skip in case of empty result (!!)
+                    val limit2 = if (limit.get > 0) Some(limit.get - rows.length) else limit
+                    uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName)
+                      .withQuery(Uri.Query(argMap(getArgs(skip2, limit2, true))))
+                  } else {
+                    viewUri
+                  }
                 logging.info(this, s"@StR doing request on host $host with uri $viewUri")
-                requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders)).flatMap { e2 =>
+                requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri2, headers = baseHeaders)).flatMap { e2 =>
                   e2 match {
                     case Right(response2) =>
                       logging.info(this, s"@StR Right(response2) $response2")
@@ -204,29 +219,37 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                       logging.info(this, s"@StR rows2: $rows2")
                       rows2 match {
                         case _ if (!reduce || (rows2.isEmpty || rows2.length == 1)) =>
-                          // {"rows": [ ]}
-                          // {"rows": [{"key": null, "value": 3136}]}
-                          // {"total_rows": 8554, "offset": 0, "rows": [{"id": "id", "key": ["id", 1644779646989], "value": {"namespace": "namespace", "name": "wordCount"}}]}
                           if (rows.isEmpty && rows2.isEmpty) {
+                            // {"rows": [ ]}
                             logging.info(this, s"@StR return JsArray.empty: ${JsArray.empty}")
                             Future(Right(JsObject("rows" -> JsArray.empty)))
                           } else if (reduce) {
-                            val v = if (rows.isEmpty) 0 else rows.head.fields("value").convertTo[Long]
-                            val v2 = if (rows2.isEmpty) 0 else rows2.head.fields("value").convertTo[Long]
+                            // {"rows": [{"key": null, "value": 3136}]}
+                            // calculate count for first query result
+                            val co = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0L
+                            val sk = skip.get
+                            val li = limit.get
+                            val cosk = if (co > sk) co - sk else 0L // consider skip
+                            val count = if (li > 0 && cosk > li) li else cosk // consider limit
+                            // calculate count for second query result
+                            val co2 = if (rows2.nonEmpty) rows2.head.fields("value").convertTo[Long] else 0L
+                            val sk2 = if (sk > 0 && sk > co) sk - co else 0L // adjust skip
+                            val cosk2 = if (co2 > sk2) co2 - sk2 else 0L // consider skip
+                            val count2 = if (li > 0 && cosk2 > (li - count)) li - count else cosk2 // consider limit
+
                             logging.info(this, s"@StR return ${JsObject(
-                              "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(v + v2))))}")
+                              "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count + count2))))}")
                             Future(
-                              Right(
-                                JsObject("rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(v + v2))))))
+                              Right(JsObject(
+                                "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count + count2))))))
                           } else {
-                            val allrows = rows ++ rows2
+                            // {"total_rows": 8554, "offset": 0, "rows": [{"id": "id", "key": ["id", 1644779646989], "value": {"namespace": "namespace", "name": "wordCount"}}]}
                             logging.info(this, s"@StR return ${JsObject(
-                              "rows" -> allrows.toArray.slice(0, if (limit.get > 0) limit.get else allrows.length).toJson.convertTo[JsArray])}")
+                              "rows" -> (rows ++ rows2).toArray.toJson.convertTo[JsArray])}")
                             Future(
                               Right(
                                 JsObject(
-                                  "rows" -> allrows.toArray
-                                    .slice(0, if (limit.get > 0) limit.get else allrows.length)
+                                  "rows" -> (rows ++ rows2).toArray
                                     .toJson
                                     .convertTo[JsArray])))
                           }
@@ -258,11 +281,10 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     startKey: List[Any] = Nil,
     endKey: List[Any] = Nil,
     skip: Option[Int] = None,
-    limit: Option[Int] = None,
     stale: StaleParameter = StaleParameter.No,
     includeDocs: Boolean = false,
     descending: Boolean = false,
-    reduce: Boolean = false,
+    reduce: Boolean = true,
     group: Boolean = false): Future[Either[StatusCode, JsObject]] = {
 
     require(reduce || !group, "Parameter 'group=true' cannot be used together with the parameter 'reduce=false'.")
@@ -293,8 +315,8 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     val args = Seq[(String, Option[String])](
       "startkey" -> list2OptJson(startKey).map(_.toString),
       "endkey" -> list2OptJson(endKey).map(_.toString),
-      "skip" -> None,
-      "limit" -> limit.filter(_ > 0).map(_.toString),
+      "skip" -> None, // skip is considered after query
+      "limit" -> None, // limit is not used for count
       "stale" -> stale.value,
       "include_docs" -> bool2OptStr(includeDocs),
       "descending" -> bool2OptStr(descending),
@@ -336,14 +358,14 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                       logging.debug(this, s"@StR rows2: $rows2")
                       rows2 match {
                         case _ if rows2.isEmpty || rows2.length == 1 =>
-                          val count = if (rows.nonEmpty) {
-                            val count = rows.head.fields("value").convertTo[Long]
-                            if (count > skip.get) count - skip.get else 0L
-                          } else 0L
-                          val count2 = if (rows2.nonEmpty) {
-                            val count = rows2.head.fields("value").convertTo[Long]
-                            if (count > skip.get) count - skip.get else 0L
-                          } else 0L
+                          // calculate count for first query result
+                          val co = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0L
+                          val sk = skip.get
+                          val count = if (co > sk) co - sk else 0L // consider skip
+                          // calculate count for second query result
+                          val co2 = if (rows2.nonEmpty) rows2.head.fields("value").convertTo[Long] else 0L
+                          val sk2 = if (sk > 0 && sk > co) sk - co else 0L // re-adjust skip
+                          val count2 = if (co2 > sk2) co2 - sk2 else 0L // consider skip
                           // {"rows": [{"key": null, "value": 3136}]}
                           logging.debug(this, s"@StR count: $count, count2: $count2, ${JsObject(
                             "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count + count2))))}")
