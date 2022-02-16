@@ -159,125 +159,104 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
     def bool2OptStr(bool: Boolean): Option[String] = if (bool) Some("true") else None
 
-    val args = Seq[(String, Option[String])](
+    val baseargs = Seq[(String, Option[String])](
       "startkey" -> list2OptJson(startKey).map(_.toString),
       "endkey" -> list2OptJson(endKey).map(_.toString),
       "stale" -> stale.value,
       "include_docs" -> bool2OptStr(includeDocs),
       "descending" -> bool2OptStr(descending),
-      "reduce" -> Some(reduce.toString),
       "group" -> bool2OptStr(group))
 
-    def getArgs(skip: Option[Int], limit: Option[Int], zeroLimit: Boolean = false): Seq[(String, Option[String])] = {
-      args ++
+    def args(skip: Option[Int], limit: Option[Int], reduce: Boolean): Seq[(String, Option[String])] = {
+      baseargs ++
         (Seq[(String, Option[String])](
-          "skip" -> (if (reduce) None else skip.filter(_ > 0).map(_.toString)), // do not specify skip for reduce
-          "limit" -> (if (reduce) None else limit.filter(_ > 0 || zeroLimit).map(_.toString)))) // do not specify limit for reduce
+          "skip" -> skip.filter(_ > 0).map(_.toString),
+          "limit" -> limit.filter(_ > 0).map(_.toString),
+          "reduce" -> Some(reduce.toString)))
     }
 
     // Throw out all undefined arguments.
-    def getArgMap(args: Seq[(String, Option[String])]): Map[String, String] =
+    def argMap(args: Seq[(String, Option[String])]): Map[String, String] =
       args
         .collect({
           case (l, Some(r)) => (l, r)
         })
         .toMap
 
-    val dbSfx = getDbSfx
-    val argMap = getArgMap(getArgs(skip, limit))
-    val viewUri =
-      uri(if (flexDb) getDb(dbSfx) else db, "_design", designDoc, "_view", viewName)
-        .withQuery(Uri.Query(argMap))
+    if (!flexDb || group || reduce) {
+      if (flexDb) logging.warn(this, s"Parameter 'group=$group' or 'reduce=$reduce' set for activations db '${getDb}'.")
+      val viewUri =
+        uri(getDb, "_design", designDoc, "_view", viewName)
+          .withQuery(Uri.Query(argMap(args(skip, limit, reduce))))
+      logging.info(this, s"@StR (0) doing request on host $host with uri $viewUri")
+      requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
+    } else {
+      val dbSfx = getDbSfx // pin db suffix
+      val sk = skip.getOrElse(0)
+      val li = limit.getOrElse(0)
+      if (sk > 0) {
+        // get activations count from cloudant
+        val viewUri =
+          uri(getDb(dbSfx), "_design", designDoc, "_view", viewName)
+            .withQuery(Uri.Query(argMap(args(None, None, true))))
+        logging.info(this, s"@StR (1) doing request on host $host with uri $viewUri")
+        requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
+      } else {
+        Future(Right(JsObject("rows" -> JsArray.empty))) // dummy response
+      }.flatMap { ecount =>
+        ecount match {
+          case Right(countresponse) =>
+            logging.info(this, s"@StR Right(countresponse) $countresponse")
+            val viewUri =
+              uri(getDb(dbSfx), "_design", designDoc, "_view", viewName)
+                .withQuery(Uri.Query(argMap(args(skip, limit, false))))
+            logging.info(this, s"@StR (1) doing request on host $host with uri $viewUri")
+            requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders)).flatMap { e =>
+              e match {
+                case Right(response) =>
+                  logging.info(this, s"@StR Right(response) $response")
+                  val rows = response.fields("rows").convertTo[List[JsObject]]
+                  // adjust skip and limit for second call
+                  val sk2 =
+                    if (sk == 0 || rows.length > 0) 0
+                    else {
+                      // check response from count call to mitigate fuzziness
+                      val rows = countresponse.fields("rows").convertTo[List[JsObject]]
+                      val count = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0
+                      if (sk > count) sk - count else 0
+                    }.toInt
+                  val li2 = if (li > 0) li - rows.length else li
 
-    logging.info(this, s"@StR doing request on host $host with uri $viewUri")
-    val res = requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
-    if (!flexDb) res
-    else {
-      res.flatMap { e =>
-        e match {
-          case Right(response) =>
-            logging.info(this, s"@StR Right(response) $response")
-            val rows = response.fields("rows").convertTo[List[JsObject]]
-            logging.info(this, s"@StR rows: $rows")
-            rows match {
-              case _ if (!reduce || (rows.isEmpty || rows.length == 1)) =>
-                val viewUri2 =
-                  if (!reduce && (skip.get > 0 || limit.get > 0)) {
-                    // adjust skip and limit in query params
-                    val skip2 = if (rows.length == 0) skip else Some(0) // keep skip in case of empty result (fuzziness!!)
-                    logging.info(this, s"@StR skip2: $skip2")
-                    val limit2 = if (limit.get > 0) Some(limit.get - rows.length) else limit
-                    logging.info(this, s"@StR limit2: $limit2")
-                    logging.info(this, s"@StR getArgs(skip2, limit2, true): ${getArgs(skip2, limit2, true)}")
-                    logging.info(
-                      this,
-                      s"@StR argMap(getArgs(skip2, limit2, true)): ${getArgMap(getArgs(skip2, limit2, true))}")
-                    val viewUri2 = uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName)
-                      .withQuery(Uri.Query(getArgMap(getArgs(skip2, limit2, true))))
-                    logging.info(this, s"@StR viewUri2: $viewUri2")
-                    viewUri2
+                  if (li == 0 || li2 > 0) {
+                    // do second call only if limit is not already exhausted
+                    val viewUri =
+                      uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName)
+                        .withQuery(Uri.Query(argMap(args(Some(sk2), Some(if (li == 0) li else li2), false))))
+                    logging.info(this, s"@StR (2) doing request on host $host with uri $viewUri")
+                    requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
                   } else {
-                    uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
+                    Future(Right(JsObject("rows" -> JsArray.empty))) // dummy response
+                  }.flatMap { e2 =>
+                    e2 match {
+                      case Right(response2) =>
+                        logging.info(this, s"@StR Right(response2) $response2")
+                        val rows2 = response2.fields("rows").convertTo[List[JsObject]]
+                        Future(
+                          Right(JsObject("rows" -> (rows ++ rows2).toArray.toJson
+                            .convertTo[JsArray])))
+                      case _ =>
+                        logging.info(this, s"return left response from second query call: $e2")
+                        Future(e2) // return left response from second query call
+                    }
                   }
-                logging.info(this, s"@StR doing request on host $host with uri $viewUri2")
-                requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri2, headers = baseHeaders)).flatMap { e2 =>
-                  e2 match {
-                    case Right(response2) =>
-                      logging.info(this, s"@StR Right(response2) $response2")
-                      val rows2 = response2.fields("rows").convertTo[List[JsObject]]
-                      logging.info(this, s"@StR rows2: $rows2")
-                      rows2 match {
-                        case _ if (!reduce || (rows2.isEmpty || rows2.length == 1)) =>
-                          if (rows.isEmpty && rows2.isEmpty) {
-                            // {"rows": [ ]}
-                            logging.info(this, s"@StR return JsArray.empty: ${JsArray.empty}")
-                            Future(Right(JsObject("rows" -> JsArray.empty)))
-                          } else if (reduce) {
-                            // {"rows": [{"key": null, "value": 3136}]}
-                            // calculate count for first query result
-                            val co = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0L
-                            val sk = skip.get
-                            val li = limit.get
-                            val cosk = if (co > sk) co - sk else 0L // consider skip
-                            val count = if (li > 0 && cosk > li) li else cosk // consider limit
-                            // calculate count for second query result
-                            val co2 = if (rows2.nonEmpty) rows2.head.fields("value").convertTo[Long] else 0L
-                            val sk2 = if (sk > 0 && sk > co) sk - co else 0L // adjust skip
-                            val cosk2 = if (co2 > sk2) co2 - sk2 else 0L // consider skip
-                            val count2 = if (li > 0 && cosk2 > (li - count)) li - count else cosk2 // consider limit
-
-                            logging.info(this, s"@StR return ${JsObject(
-                              "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count + count2))))}")
-                            Future(
-                              Right(JsObject(
-                                "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count + count2))))))
-                          } else {
-                            // {"total_rows": 8554, "offset": 0, "rows": [{"id": "id", "key": ["id", 1644779646989], "value": {"namespace": "namespace", "name": "wordCount"}}]}
-                            logging.info(
-                              this,
-                              s"@StR return ${JsObject("rows" -> (rows ++ rows2).toArray.toJson.convertTo[JsArray])}")
-                            Future(
-                              Right(JsObject("rows" -> (rows ++ rows2).toArray.toJson
-                                .convertTo[JsArray])))
-                          }
-                        case _ =>
-                          logging.info(
-                            this,
-                            s"@StR return right response from second call if assertion is violated: ${e2}")
-                          Future(e2) // return right response from second call if assertion is violated
-                      }
-                    case _ =>
-                      logging.info(this, s"@StR return left response from second: ${e2}")
-                      Future(e2) // return left response from second call
-                  }
-                }
-              case _ =>
-                logging.info(this, s"@StR return right response from first call if assertion is violated: ${e}")
-                Future(e) // return right response from first call if assertion is violated
+                case _ =>
+                  logging.info(this, s"return left response from first query call: $e")
+                  Future(e) // return left response from first query call
+              }
             }
           case _ =>
-            logging.info(this, s"@StR return left response from first call if assertion is violated: ${e}")
-            Future(e) // return left response from first call
+            logging.info(this, s"return left response from count call: $ecount")
+            Future(ecount) // return left response from count call
         }
       }
     }
