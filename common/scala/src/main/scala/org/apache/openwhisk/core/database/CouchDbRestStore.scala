@@ -333,8 +333,7 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: St
         startKey = startKey,
         endKey = endKey,
         skip = Some(skip),
-        stale = stale,
-        reduce = true)
+        stale = stale)
       .map {
         case Right(response) =>
           val rows = response.fields("rows").convertTo[List[JsObject]]

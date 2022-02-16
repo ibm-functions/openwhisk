@@ -28,6 +28,7 @@ import akka.util.ByteString
 import spray.json.DefaultJsonProtocol._
 import spray.json._
 import org.apache.openwhisk.common.Logging
+import org.apache.openwhisk.core.entity.UUIDs
 import org.apache.openwhisk.http.PoolingRestClient
 import org.apache.openwhisk.http.PoolingRestClient._
 
@@ -159,20 +160,27 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
     def bool2OptStr(bool: Boolean): Option[String] = if (bool) Some("true") else None
 
+    val countargs = Seq[(String, Option[String])](
+      "startkey" -> list2OptJson(startKey).map(_.toString),
+      "endkey" -> list2OptJson(endKey).map(_.toString),
+      "stale" -> stale.value,
+      "descending" -> bool2OptStr(descending),
+      "reduce" -> Some(true.toString))
+
     val baseargs = Seq[(String, Option[String])](
       "startkey" -> list2OptJson(startKey).map(_.toString),
       "endkey" -> list2OptJson(endKey).map(_.toString),
       "stale" -> stale.value,
       "include_docs" -> bool2OptStr(includeDocs),
       "descending" -> bool2OptStr(descending),
+      "reduce" -> Some(reduce.toString),
       "group" -> bool2OptStr(group))
 
-    def args(skip: Option[Int], limit: Option[Int], reduce: Boolean): Seq[(String, Option[String])] = {
+    def args(skip: Option[Int], limit: Option[Int]): Seq[(String, Option[String])] = {
       baseargs ++
         (Seq[(String, Option[String])](
           "skip" -> skip.filter(_ > 0).map(_.toString),
-          "limit" -> limit.filter(_ > 0).map(_.toString),
-          "reduce" -> Some(reduce.toString)))
+          "limit" -> limit.filter(_ > 0).map(_.toString)))
     }
 
     // Throw out all undefined arguments.
@@ -187,34 +195,38 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
       if (flexDb) logging.warn(this, s"Parameter 'group=$group' or 'reduce=$reduce' set for activations db '${getDb}'.")
       val viewUri =
         uri(getDb, "_design", designDoc, "_view", viewName)
-          .withQuery(Uri.Query(argMap(args(skip, limit, reduce))))
+          .withQuery(Uri.Query(argMap(args(skip, limit))))
       logging.info(this, s"@StR (0) doing request on host $host with uri $viewUri")
       requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
     } else {
       val dbSfx = getDbSfx // pin db suffix
       val sk = skip.getOrElse(0)
       val li = limit.getOrElse(0)
-      if (sk > 0) {
-        // get activations count from cloudant
-        val viewUri =
-          uri(getDb(dbSfx), "_design", designDoc, "_view", viewName)
-            .withQuery(Uri.Query(argMap(args(None, None, true))))
-        logging.info(this, s"@StR (1) doing request on host $host with uri $viewUri")
-        requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
-      } else {
-        Future(Right(JsObject("rows" -> JsArray.empty))) // dummy response
-      }.flatMap { ecount =>
+      val acid = UUIDs.randomUUID().toString.filterNot(_ == '-')
+      logging.info(this, s"@StR $acid dbSfx: $dbSfx, sk: $sk, li: $li")
+
+      (sk match {
+        case _ if sk > 0 =>
+          // get activations count from cloudant
+          val viewUri =
+            uri(getDb(dbSfx), "_design", designDoc, "_view", viewName)
+              .withQuery(Uri.Query(argMap(countargs)))
+          logging.info(this, s"@StR $acid (1) doing request on host $host with uri $viewUri")
+          requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
+        case _ =>
+          Future(Right(JsObject("rows" -> JsArray.empty))) // dummy response
+      }).flatMap { ecount =>
         ecount match {
           case Right(countresponse) =>
-            logging.info(this, s"@StR Right(countresponse) $countresponse")
+            logging.info(this, s"@StR $acid Right(countresponse) $countresponse")
             val viewUri =
               uri(getDb(dbSfx), "_design", designDoc, "_view", viewName)
-                .withQuery(Uri.Query(argMap(args(skip, limit, false))))
-            logging.info(this, s"@StR (1) doing request on host $host with uri $viewUri")
+                .withQuery(Uri.Query(argMap(args(skip, limit))))
+            logging.info(this, s"@StR $acid (2) doing request on host $host with uri $viewUri")
             requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders)).flatMap { e =>
               e match {
                 case Right(response) =>
-                  logging.info(this, s"@StR Right(response) $response")
+                  logging.info(this, s"@StR $acid Right(response) $response")
                   val rows = response.fields("rows").convertTo[List[JsObject]]
                   // adjust skip and limit for second call
                   val sk2 =
@@ -226,36 +238,39 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                       if (sk > count) sk - count else 0
                     }.toInt
                   val li2 = if (li > 0) li - rows.length else li
+                  logging.info(this, s"@StR $acid sk: $sk, li: $li, sk2: $sk2, li2: $li2")
 
-                  if (li == 0 || li2 > 0) {
-                    // do second call only if limit is not already exhausted
-                    val viewUri =
-                      uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName)
-                        .withQuery(Uri.Query(argMap(args(Some(sk2), Some(if (li == 0) li else li2), false))))
-                    logging.info(this, s"@StR (2) doing request on host $host with uri $viewUri")
-                    requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
-                  } else {
-                    Future(Right(JsObject("rows" -> JsArray.empty))) // dummy response
-                  }.flatMap { e2 =>
+                  (li match {
+                    case _ if (li == 0 || li2 > 0) =>
+                      // do second call only if limit is not already exhausted
+                      val viewUri =
+                        uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName)
+                          .withQuery(Uri.Query(argMap(args(Some(sk2), Some(if (li == 0) li else li2)))))
+                      logging.info(this, s"@StR $acid (3) doing request on host $host with uri $viewUri")
+                      requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
+                    case _ =>
+                      Future(Right(JsObject("rows" -> JsArray.empty))) // empty dummy response
+                  }).flatMap { e2 =>
                     e2 match {
                       case Right(response2) =>
-                        logging.info(this, s"@StR Right(response2) $response2")
+                        logging.info(this, s"@StR $acid Right(response2) $response2")
                         val rows2 = response2.fields("rows").convertTo[List[JsObject]]
+                        logging.info(this, s"@StR $acid return ${rows ++ rows2}")
                         Future(
                           Right(JsObject("rows" -> (rows ++ rows2).toArray.toJson
                             .convertTo[JsArray])))
                       case _ =>
-                        logging.info(this, s"return left response from second query call: $e2")
+                        logging.info(this, s"$acid return left response from second query call: $e2")
                         Future(e2) // return left response from second query call
                     }
                   }
                 case _ =>
-                  logging.info(this, s"return left response from first query call: $e")
+                  logging.info(this, s"$acid return left response from first query call: $e")
                   Future(e) // return left response from first query call
               }
             }
           case _ =>
-            logging.info(this, s"return left response from count call: $ecount")
+            logging.info(this, s"$acid return left response from count call: $ecount")
             Future(ecount) // return left response from count call
         }
       }
@@ -268,12 +283,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     endKey: List[Any] = Nil,
     skip: Option[Int] = None,
     stale: StaleParameter = StaleParameter.No,
-    includeDocs: Boolean = false,
-    descending: Boolean = false,
-    reduce: Boolean = true,
-    group: Boolean = false): Future[Either[StatusCode, JsObject]] = {
-
-    require(reduce || !group, "Parameter 'group=true' cannot be used together with the parameter 'reduce=false'.")
+    descending: Boolean = false): Future[Either[StatusCode, JsObject]] = {
 
     def any2json(any: Any): JsValue = any match {
       case b: Boolean => JsBoolean(b)
@@ -301,13 +311,9 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
     val args = Seq[(String, Option[String])](
       "startkey" -> list2OptJson(startKey).map(_.toString),
       "endkey" -> list2OptJson(endKey).map(_.toString),
-      "skip" -> None, // skip is considered after query
-      "limit" -> None, // limit is not used for count
       "stale" -> stale.value,
-      "include_docs" -> bool2OptStr(includeDocs),
       "descending" -> bool2OptStr(descending),
-      "reduce" -> Some(reduce.toString),
-      "group" -> bool2OptStr(group))
+      "reduce" -> Some(true.toString))
 
     // Throw out all undefined arguments.
     val argMap: Map[String, String] = args
