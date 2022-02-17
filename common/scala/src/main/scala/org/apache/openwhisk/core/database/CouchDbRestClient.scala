@@ -164,6 +164,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
       "startkey" -> list2OptJson(startKey).map(_.toString),
       "endkey" -> list2OptJson(endKey).map(_.toString),
       "stale" -> stale.value,
+      "descending" -> bool2OptStr(descending),
       "reduce" -> Some(true.toString))
 
     val baseargs = Seq[(String, Option[String])](
@@ -201,25 +202,27 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
       val sk = skip.getOrElse(0)
       val li = limit.getOrElse(0)
 
-      (sk match {
-        case _ if sk > 0 =>
-          // do count (reduce=true) call against cloudant
-          val viewUri =
-            uri(getDb(dbSfx), "_design", designDoc, "_view", viewName)
-              .withQuery(Uri.Query(argMap(countargs)))
-          requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
-        case _ =>
-          Future(Right(JsObject("rows" -> JsArray.empty))) // empty dummy response
-      }).flatMap { ecount =>
-        ecount match {
-          case Right(countresponse) =>
-            val viewUri =
-              uri(getDb(dbSfx), "_design", designDoc, "_view", viewName)
-                .withQuery(Uri.Query(argMap(args(skip = skip, limit = limit))))
-            requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders)).flatMap { e =>
-              e match {
-                case Right(response) =>
-                  val rows = response.fields("rows").convertTo[List[JsObject]]
+      val viewUri =
+        uri(getDb(dbSfx), "_design", designDoc, "_view", viewName)
+          .withQuery(Uri.Query(argMap(args(skip = skip, limit = limit))))
+      requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders)).flatMap { e =>
+        e match {
+          case Right(response) =>
+            val rows = response.fields("rows").convertTo[List[JsObject]]
+            (sk match {
+              case _ if sk > 0 && rows.length == 0 =>
+                // do cloudant count (reduce=true) call to determine number of activations to mitigate fuzziness
+                // empty row set is either returned because there are no matching rows or
+                // its count is within the number to be excluded as specified by the skip param
+                val viewUri =
+                  uri(getDb(dbSfx), "_design", designDoc, "_view", viewName)
+                    .withQuery(Uri.Query(argMap(countargs)))
+                requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
+              case _ =>
+                Future(Right(JsObject("rows" -> JsArray.empty))) // empty dummy response
+            }).flatMap { ecount =>
+              ecount match {
+                case Right(countresponse) =>
                   // adjust skip and limit for second call
                   val sk2 =
                     if (sk == 0 || rows.length > 0) 0
@@ -230,10 +233,9 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                       if (sk > count) sk - count else 0
                     }.toInt
                   val li2 = if (li > 0) li - rows.length else li
-
                   (li match {
                     case _ if (li == 0 || li2 > 0) =>
-                      // do second call if unlimited or limit is not exhausted
+                      // do second query call only if unlimited or limit is not exhausted
                       val viewUri =
                         uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName)
                           .withQuery(Uri.Query(argMap(args(skip = Some(sk2), limit = Some(li2)))))
@@ -250,10 +252,10 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                       case _ => Future(e2) // return left response from second query call
                     }
                   }
-                case _ => Future(e) // return left response from first query call
+                case _ => Future(ecount) // return left response from count call
               }
             }
-          case _ => Future(ecount) // return left response from count call
+          case _ => Future(e) // return left response from first query call
         }
       }
     }
