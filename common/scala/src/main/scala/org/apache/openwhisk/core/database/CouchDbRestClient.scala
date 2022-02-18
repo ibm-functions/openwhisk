@@ -61,7 +61,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
   case class ActivationsDbConfig(useFlexLogic: Boolean)
   private val activationsDbConfig = if (flexDb) loadConfig[ActivationsDbConfig]("whisk.activationsdb").toOption else None
   private val useFlexLogic = activationsDbConfig.exists(_.useFlexLogic)
-  logging.info(this, s"useFlexLogic: $useFlexLogic")
+  if (db.contains("activations")) logging.info(this, s"useFlexActivationsLogic: $useFlexLogic")
   def useFlexActivationsLogic: Boolean = useFlexLogic // use extended flexible activations db logic
 
   private val epochDay: Long = 24 * 60 * 60 * 1000
