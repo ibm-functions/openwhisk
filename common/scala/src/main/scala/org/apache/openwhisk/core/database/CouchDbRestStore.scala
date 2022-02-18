@@ -88,7 +88,7 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: St
     val docinfoStr = s"id: $id, rev: ${rev.getOrElse("null")}"
     val start = transid.started(this, LoggingMarkers.DATABASE_SAVE, s"[PUT] '$dbName' saving document: '${docinfoStr}'")
 
-    val f = if (useBatching && (rev.isEmpty || !client.useFlexDb)) {
+    val f = if (useBatching && (rev.isEmpty || !client.useFlexActivationsLogic)) {
       // for activations db use batching only for creation of new documents to allow look back in previous db
       batcher.put(asJson).map { e =>
         e match {
@@ -342,7 +342,7 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: St
             assert(rows.length == 1, s"result of reduced view contains more than one value: '$rows'")
             val count = rows.head.fields("value").convertTo[Long]
             // in case of flexible activations db use count as returned
-            if (client.useFlexDb) count else if (count > skip) count - skip else 0L
+            if (client.useFlexActivationsLogic) count else if (count > skip) count - skip else 0L
           } else 0L
 
           transid.finished(this, start, s"[COUNT] '$dbName' completed: count $out")

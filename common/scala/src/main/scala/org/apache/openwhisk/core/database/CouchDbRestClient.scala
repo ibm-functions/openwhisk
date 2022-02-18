@@ -32,6 +32,9 @@ import org.apache.openwhisk.core.entity.UUIDs
 import org.apache.openwhisk.http.PoolingRestClient
 import org.apache.openwhisk.http.PoolingRestClient._
 
+import pureconfig._
+import pureconfig.generic.auto._
+
 import scala.concurrent.{ExecutionContext, Future}
 
 /**
@@ -54,7 +57,12 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
   private def revHeader(forRev: String) = List(`If-Match`(EntityTagRange(EntityTag(forRev))))
 
   private val flexDb = db.endsWith("activations-")
-  def useFlexDb: Boolean = flexDb // use flexible activations db
+  // activations db flex logic (consider two activations dbs for crud and view operations)
+  case class ActivationsDbConfig(useFlexLogic: Boolean)
+  private val activationsDbConfig = if (flexDb) loadConfig[ActivationsDbConfig]("whisk.activationsdb").toOption else None
+  private val useFlexLogic = activationsDbConfig.exists(_.useFlexLogic)
+  logging.info(this, s"useFlexLogic: $useFlexLogic")
+  def useFlexActivationsLogic: Boolean = useFlexLogic // use extended flexible activations db logic
 
   private val epochDay: Long = 24 * 60 * 60 * 1000
   private def getDbSfx: Long = System.currentTimeMillis / epochDay // get db suffix based on epoch day
@@ -79,7 +87,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
       mkJsonRequest(HttpMethods.PUT, uri(if (flexDb) getDb(dbSfx) else db, id), doc, baseHeaders ++ revHeader(rev)))
       .flatMap { e =>
         e match {
-          case Left(StatusCodes.NotFound) if flexDb =>
+          case Left(StatusCodes.NotFound) if useFlexLogic =>
             requestJson[JsObject](
               mkJsonRequest(HttpMethods.PUT, uri(getDb(dbSfx - 1), id), doc, baseHeaders ++ revHeader(rev)))
           case _ => Future(e)
@@ -95,10 +103,11 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#get--db-docid
   def getDoc(id: String): Future[Either[StatusCode, JsObject]] = {
     val dbSfx = getDbSfx
-    requestJson[JsObject](mkRequest(HttpMethods.GET, uri(if (flexDb) getDb(dbSfx) else db, id), headers = baseHeaders))
+    requestJson[JsObject](
+      mkRequest(HttpMethods.GET, uri(if (flexDb) getDb(dbSfx) else db, id), headers = baseHeaders))
       .flatMap { e =>
         e match {
-          case Left(StatusCodes.NotFound) if flexDb =>
+          case Left(StatusCodes.NotFound) if useFlexLogic =>
             requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDb(dbSfx - 1), id), headers = baseHeaders))
           case _ => Future(e)
         }
@@ -112,7 +121,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
       mkRequest(HttpMethods.GET, uri(if (flexDb) getDb(dbSfx) else db, id), headers = baseHeaders ++ revHeader(rev)))
       .flatMap { e =>
         e match {
-          case Left(StatusCodes.NotFound) if flexDb =>
+          case Left(StatusCodes.NotFound) if useFlexLogic =>
             requestJson[JsObject](
               mkRequest(HttpMethods.GET, uri(getDb(dbSfx - 1), id), headers = baseHeaders ++ revHeader(rev)))
           case _ => Future(e)
@@ -191,7 +200,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
         })
         .toMap
 
-    if (!flexDb || group || reduce) {
+    if (!useFlexLogic || group || reduce) {
       if (flexDb) logging.warn(this, s"Parameter 'group=$group' or 'reduce=$reduce' set for activations db '${getDb}'.")
       val viewUri =
         uri(getDb, "_design", designDoc, "_view", viewName)
@@ -304,14 +313,15 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
       })
       .toMap
 
-    val dbSfx = getDbSfx
-    val viewUri =
-      uri(if (flexDb) getDb(dbSfx) else db, "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
-
-    val res = requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
-    if (!flexDb) res
-    else {
-      res.flatMap { e =>
+    if (!useFlexLogic) {
+      val viewUri =
+        uri(getDb, "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
+      requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders))
+    } else {
+      val dbSfx = getDbSfx
+      val viewUri =
+        uri(getDb(dbSfx), "_design", designDoc, "_view", viewName).withQuery(Uri.Query(argMap))
+      requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders)).flatMap { e =>
         e match {
           case Right(response) =>
             val rows = response.fields("rows").convertTo[List[JsObject]]
