@@ -332,7 +332,6 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: St
       .executeViewForCount(firstPart, secondPart)(
         startKey = startKey,
         endKey = endKey,
-        skip = Some(skip),
         stale = stale)
       .map {
         case Right(response) =>
@@ -341,8 +340,7 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: St
           val out = if (rows.nonEmpty) {
             assert(rows.length == 1, s"result of reduced view contains more than one value: '$rows'")
             val count = rows.head.fields("value").convertTo[Long]
-            // in case of flexible activations db use count as returned
-            if (client.useFlexActivationsLogic) count else if (count > skip) count - skip else 0L
+            if (count > skip) count - skip else 0L
           } else 0L
 
           transid.finished(this, start, s"[COUNT] '$dbName' completed: count $out")

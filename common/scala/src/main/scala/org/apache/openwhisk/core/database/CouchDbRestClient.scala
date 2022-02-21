@@ -274,7 +274,6 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
   def executeViewForCount(designDoc: String, viewName: String)(
     startKey: List[Any] = Nil,
     endKey: List[Any] = Nil,
-    skip: Option[Int] = None,
     stale: StaleParameter = StaleParameter.No): Future[Either[StatusCode, JsObject]] = {
 
     def any2json(any: Any): JsValue = any match {
@@ -335,18 +334,13 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                       val rows2 = response2.fields("rows").convertTo[List[JsObject]]
                       rows2 match {
                         case _ if rows2.isEmpty || rows2.length == 1 =>
-                          // calculate count for first query result
-                          val co = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0L
-                          val sk = skip.getOrElse(0)
-                          val count = if (co > sk) co - sk else 0L // consider skip
-                          // calculate count for second query result
-                          val co2 = if (rows2.nonEmpty) rows2.head.fields("value").convertTo[Long] else 0L
-                          val sk2 = if (sk > 0 && sk > co) sk - co else 0L // adjust skip
-                          val count2 = if (co2 > sk2) co2 - sk2 else 0L // consider skip
+                          // calculate count for first and second query result
+                          val co1 = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0L
+                          val co2 = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0L
                           // {"rows": [{"key": null, "value": 3136}]}
                           Future(
                             Right(JsObject(
-                              "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count + count2))))))
+                              "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(co1 + co2))))))
                         case _ => Future(e2) // return right response from second call if assertion is violated
                       }
                     case _ => Future(e2) // return left response from second call
