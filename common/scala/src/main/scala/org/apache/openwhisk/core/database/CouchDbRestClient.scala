@@ -217,9 +217,9 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
       requestJson[JsObject](mkRequest(HttpMethods.GET, viewUri, headers = baseHeaders)).flatMap { e =>
         e match {
           case Right(response) =>
-            val rows = response.fields("rows").convertTo[List[JsObject]]
+            val rows1 = response.fields("rows").convertTo[List[JsObject]]
             (sk match {
-              case _ if sk > 0 && rows.length == 0 =>
+              case _ if sk > 0 && rows1.length == 0 =>
                 // do cloudant count (reduce=true) call to determine number of activations to mitigate fuzziness
                 // empty row set is either returned because there are no matching rows or
                 // its count is within the number to be excluded as specified by the skip param
@@ -232,19 +232,17 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
             }).flatMap { ecount =>
               ecount match {
                 case Right(countresponse) =>
-                  // adjust skip and limit for second call
-                  val sk2 =
-                    if (sk == 0 || rows.length > 0) 0
-                    else {
-                      // check response from count call to mitigate fuzziness
-                      val rows = countresponse.fields("rows").convertTo[List[JsObject]]
-                      val count = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0
-                      if (sk > count) sk - count else 0
-                    }.toInt
-                  val li2 = if (li > 0) li - rows.length else li
+                  val li2 = if (li > 0) li - rows1.length else li // adjust limit
                   (li match {
                     case _ if (li == 0 || li2 > 0) =>
                       // do second query call only if unlimited or limit is not exhausted
+                      val sk2 = // adjust skip
+                        if (sk > 0 && rows1.length == 0) {
+                          // check response from count call to mitigate fuzziness
+                          val rows = countresponse.fields("rows").convertTo[List[JsObject]]
+                          val count = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0
+                          if (sk > count) sk - count else 0
+                        }.toInt else 0
                       val viewUri =
                         uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName)
                           .withQuery(Uri.Query(argMap(args(skip = Some(sk2), limit = Some(li2)))))
@@ -256,7 +254,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                       case Right(response2) =>
                         val rows2 = response2.fields("rows").convertTo[List[JsObject]]
                         Future(
-                          Right(JsObject("rows" -> (rows ++ rows2).toArray.toJson
+                          Right(JsObject("rows" -> (rows1 ++ rows2).toArray.toJson
                             .convertTo[JsArray])))
                       case _ => Future(e2) // return left response from second query call
                     }
@@ -334,13 +332,13 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                       val rows2 = response2.fields("rows").convertTo[List[JsObject]]
                       rows2 match {
                         case _ if rows2.isEmpty || rows2.length == 1 =>
-                          // calculate count for first and second query result
-                          val co1 = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0L
-                          val co2 = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0L
+                          // get count from first and second query response
+                          val count1 = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0L
+                          val count2 = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0L
                           // {"rows": [{"key": null, "value": 3136}]}
                           Future(
                             Right(JsObject(
-                              "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(co1 + co2))))))
+                              "rows" -> JsArray(JsObject("key" -> JsNull, "value" -> JsNumber(count1 + count2))))))
                         case _ => Future(e2) // return right response from second call if assertion is violated
                       }
                     case _ => Future(e2) // return left response from second call
