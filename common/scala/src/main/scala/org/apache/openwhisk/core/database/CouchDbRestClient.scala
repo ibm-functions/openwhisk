@@ -59,7 +59,8 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
   private val flexDb = db.endsWith("activations-")
   // activations database flex logic (consider two activations dbs for crud and view operations)
   case class ActivationsDbConfig(useFlexLogic: Boolean)
-  private val activationsDbConfig = if (flexDb) loadConfig[ActivationsDbConfig]("whisk.activationsdb").toOption else None
+  private val activationsDbConfig =
+    if (flexDb) loadConfig[ActivationsDbConfig]("whisk.activationsdb").toOption else None
   private val useFlexLogic = activationsDbConfig.exists(_.useFlexLogic)
   if (db.contains("activations")) logging.info(this, s"useFlexActivationsLogic: $useFlexLogic")
   def useFlexActivationsLogic: Boolean = useFlexLogic // use extended flexible activations database logic
@@ -84,7 +85,11 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
   def putDoc(id: String, rev: String, doc: JsObject): Future[Either[StatusCode, JsObject]] = {
     val dbSfx = if (useFlexLogic) getDbSfx else 0L // pin database suffix if needed
     requestJson[JsObject](
-      mkJsonRequest(HttpMethods.PUT, uri(if (useFlexLogic) getDb(dbSfx) else getDb, id), doc, baseHeaders ++ revHeader(rev)))
+      mkJsonRequest(
+        HttpMethods.PUT,
+        uri(if (useFlexLogic) getDb(dbSfx) else getDb, id),
+        doc,
+        baseHeaders ++ revHeader(rev)))
       .flatMap { e =>
         e match {
           case Left(StatusCodes.NotFound) if useFlexLogic =>
@@ -118,7 +123,10 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
   def getDoc(id: String, rev: String): Future[Either[StatusCode, JsObject]] = {
     val dbSfx = if (useFlexLogic) getDbSfx else 0L // pin database suffix if needed
     requestJson[JsObject](
-      mkRequest(HttpMethods.GET, uri(if (useFlexLogic) getDb(dbSfx) else getDb, id), headers = baseHeaders ++ revHeader(rev)))
+      mkRequest(
+        HttpMethods.GET,
+        uri(if (useFlexLogic) getDb(dbSfx) else getDb, id),
+        headers = baseHeaders ++ revHeader(rev)))
       .flatMap { e =>
         e match {
           case Left(StatusCodes.NotFound) if useFlexLogic =>
@@ -201,7 +209,8 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
         .toMap
 
     if (!useFlexLogic || group || reduce) {
-      if (flexDb) logging.warn(this, s"Parameter 'group=$group' or 'reduce=$reduce' set for activations database '${getDb}'.")
+      if (flexDb)
+        logging.warn(this, s"Parameter 'group=$group' or 'reduce=$reduce' set for activations database '${getDb}'.")
       val viewUri =
         uri(getDb, "_design", designDoc, "_view", viewName)
           .withQuery(Uri.Query(argMap(args(skip = skip, limit = limit))))
@@ -242,7 +251,8 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
                           val rows = countresponse.fields("rows").convertTo[List[JsObject]]
                           val count = if (rows.nonEmpty) rows.head.fields("value").convertTo[Long] else 0
                           if (sk > count) sk - count else 0
-                        }.toInt else 0
+                        }.toInt
+                        else 0
                       val viewUri =
                         uri(getDb(dbSfx - 1), "_design", designDoc, "_view", viewName)
                           .withQuery(Uri.Query(argMap(args(skip = Some(sk2), limit = Some(li2)))))

@@ -329,10 +329,7 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: St
     val start = transid.started(this, LoggingMarkers.DATABASE_QUERY, s"[COUNT] '$dbName' searching '$table")
 
     val f = client
-      .executeViewForCount(firstPart, secondPart)(
-        startKey = startKey,
-        endKey = endKey,
-        stale = stale)
+      .executeViewForCount(firstPart, secondPart)(startKey = startKey, endKey = endKey, stale = stale)
       .map {
         case Right(response) =>
           val rows = response.fields("rows").convertTo[List[JsObject]]
