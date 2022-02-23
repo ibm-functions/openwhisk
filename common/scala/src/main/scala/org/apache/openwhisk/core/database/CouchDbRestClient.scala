@@ -220,7 +220,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
             val rows1 = response.fields("rows").convertTo[List[JsObject]]
             (sk match {
               case _ if sk > 0 && rows1.length == 0 =>
-                // do cloudant count (reduce=true) call to determine number of activations to mitigate fuzziness
+                // count (reduce=true) call to determine number of activations to mitigate fuzziness
                 // empty row set is either returned because there are no matching rows or
                 // its count is within the number to be excluded as specified by the skip param
                 val viewUri =
