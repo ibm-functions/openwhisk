@@ -352,7 +352,9 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
   val requireWhiskAuthHeader = "x-require-whisk-auth"
 
   override val collectionName = "actions"
-  override val cacheEnabled = true
+
+  // disable caching for crud operations to support delayed cluster wide cache invalidation
+  override val cacheEnabled = !sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")
 
   override implicit val serdes = jsonFormat(
     WhiskAction.apply,
@@ -555,7 +557,8 @@ object WhiskActionMetaData
   import WhiskActivation.instantSerdes
 
   override val collectionName = "actions"
-  override val cacheEnabled = true
+  // disable caching for crud operations to support delayed cluster wide cache invalidation
+  override val cacheEnabled = !sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")
 
   override implicit val serdes = jsonFormat(
     WhiskActionMetaData.apply,
