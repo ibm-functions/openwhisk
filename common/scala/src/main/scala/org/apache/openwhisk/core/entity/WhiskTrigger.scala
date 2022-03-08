@@ -119,8 +119,7 @@ object WhiskTrigger
   private implicit val fqnSerdesAsDocId = FullyQualifiedEntityName.serdesAsDocId
   override implicit val serdes = jsonFormat9(WhiskTrigger.apply)
 
-  // disable caching for crud operations to support delayed cluster wide cache invalidation
-  override val cacheEnabled = !sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")
+  override val cacheEnabled = true
 }
 
 object WhiskTriggerPut extends DefaultJsonProtocol {

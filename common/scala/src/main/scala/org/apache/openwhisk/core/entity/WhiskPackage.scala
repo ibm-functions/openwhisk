@@ -206,7 +206,7 @@ object WhiskPackage
   }
 
   // disable caching for crud operations to support delayed cluster wide cache invalidation
-  override val cacheEnabled = !sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")
+  override val cacheEnabled = !isCrudController
 
   lazy val publicPackagesView: View = WhiskQueries.entitiesView(collection = s"$collectionName-public")
 }

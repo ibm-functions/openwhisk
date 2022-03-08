@@ -82,6 +82,8 @@ trait DocumentSerializer {
  */
 trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSingleWriterCache[W, DocInfo] {
 
+  val isCrudController = sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")
+
   /**
    * Puts a record of type W in the datastore.
    *
@@ -121,6 +123,9 @@ trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSing
 
     val key = CacheKey(doc)
     val src = StreamConverters.fromInputStream(() => bytes)
+
+    // invalidate cache for crud operations with attachments
+    //if (isCrudController) cacheInvalidate(key, Future.successful(()))
 
     val p = Promise[W]
     cacheUpdate(p.future, key, db.putAndAttach[W](doc, update, contentType, src, oldAttachment) map {
@@ -186,6 +191,9 @@ trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSing
     implicit val logger = db.logging
     implicit val ec = db.executionContext
     val key = doc.asDocInfo(rev)
+    // invalidate cache for crud operations with attachments
+    implicit val notifier = None
+    if (isCrudController) cacheInvalidate(CacheKey(key), Future.successful(()))
     cacheLookup(CacheKey(key), db.get[W](key, Some(attachmentHandler)).flatMap(postProcess), fromCache)
   }
 
@@ -201,6 +209,8 @@ trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSing
 
     val docInfo = doc.docinfo
     val key = CacheKey(docInfo)
+    // invalidate cache for crud operations with attachments
+    //if (isCrudController) cacheInvalidate(key, Future.successful(()))
     val sink = StreamConverters.fromOutputStream(() => outputStream)
 
     db.readAttachment[IOResult](docInfo, attached, sink).map { _ =>
