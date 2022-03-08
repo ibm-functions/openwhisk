@@ -124,9 +124,6 @@ trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSing
     val key = CacheKey(doc)
     val src = StreamConverters.fromInputStream(() => bytes)
 
-    // invalidate cache for crud operations with attachments
-    //if (isCrudController) cacheInvalidate(key, Future.successful(()))
-
     val p = Promise[W]
     cacheUpdate(p.future, key, db.putAndAttach[W](doc, update, contentType, src, oldAttachment) map {
       case (newDocInfo, attached) =>
@@ -191,8 +188,9 @@ trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSing
     implicit val logger = db.logging
     implicit val ec = db.executionContext
     val key = doc.asDocInfo(rev)
-    // invalidate cache for crud operations with attachments
     implicit val notifier = None
+    if (isCrudController) logger.warn(this, s"@StR getWithAttachment invalidate cache key: ${CacheKey(key)}")
+    // invalidate cache for crud operations with attachments
     if (isCrudController) cacheInvalidate(CacheKey(key), Future.successful(()))
     cacheLookup(CacheKey(key), db.get[W](key, Some(attachmentHandler)).flatMap(postProcess), fromCache)
   }
@@ -209,8 +207,6 @@ trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSing
 
     val docInfo = doc.docinfo
     val key = CacheKey(docInfo)
-    // invalidate cache for crud operations with attachments
-    //if (isCrudController) cacheInvalidate(key, Future.successful(()))
     val sink = StreamConverters.fromOutputStream(() => outputStream)
 
     db.readAttachment[IOResult](docInfo, attached, sink).map { _ =>
