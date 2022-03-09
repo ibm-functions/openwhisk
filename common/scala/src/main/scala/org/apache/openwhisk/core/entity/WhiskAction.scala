@@ -370,6 +370,8 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
   override def put[A >: WhiskAction](db: ArtifactStore[A], doc: WhiskAction, old: Option[WhiskAction])(
     implicit transid: TransactionId,
     notifier: Option[CacheChangeNotification]): Future[DocInfo] = {
+    implicit val ec = db.executionContext
+    implicit val logger = db.logging
 
     def putWithAttachment(code: String, binary: Boolean, exec: AttachedCode) = {
       implicit val logger = db.logging
@@ -393,9 +395,15 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
     } map { _ =>
       doc.exec match {
         case exec @ CodeExecAsAttachment(_, Inline(code), _, binary) =>
-          putWithAttachment(code, binary, exec)
+          val doci = putWithAttachment(code, binary, exec)
+          if (isCrudController) logger.warn(this, s"@StR put case exec @ CodeExecAsAttachment remove cache key: ${CacheKey(doc)}")
+          if (isCrudController) WhiskAction.removeId(CacheKey(doc))
+          doci
         case exec @ BlackBoxExec(_, Some(Inline(code)), _, _, binary) =>
-          putWithAttachment(code, binary, exec)
+          val doci = putWithAttachment(code, binary, exec)
+          if (isCrudController) logger.warn(this, s"@StR put case exec @ BlackBoxExec remove cache key: ${CacheKey(doc)}")
+          if (isCrudController) WhiskAction.removeId(CacheKey(doc))
+          doci
         case _ =>
           super.put(db, doc, old)
       }
@@ -431,12 +439,12 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
       action.exec match {
         case exec @ CodeExecAsAttachment(_, attached: Attached, _, binary) =>
           // invalidate cache for actions with attachments
-          if (isCrudController) logger.warn(this, s"@StR get case exec @ CodeExecAsAttachment invalidate cache key: ${CacheKey(doc.asDocInfo(rev))}")
+          if (isCrudController) logger.warn(this, s"@StR get case exec @ CodeExecAsAttachment remove cache key: ${CacheKey(doc.asDocInfo(rev))}")
           if (isCrudController) WhiskAction.removeId(CacheKey(doc.asDocInfo(rev)))
           getWithAttachment(attached, binary, exec)
         case exec @ BlackBoxExec(_, Some(attached: Attached), _, _, binary) =>
           // invalidate cache for actions with attachments (blackbox)
-          if (isCrudController) logger.warn(this, s"@StR get case exec @ BlackBoxExec invalidate cache key: ${CacheKey(doc.asDocInfo(rev))}")
+          if (isCrudController) logger.warn(this, s"@StR get case exec @ BlackBoxExec remove cache key: ${CacheKey(doc.asDocInfo(rev))}")
           if (isCrudController) WhiskAction.removeId(CacheKey(doc.asDocInfo(rev)))
           getWithAttachment(attached, binary, exec)
         case _ =>

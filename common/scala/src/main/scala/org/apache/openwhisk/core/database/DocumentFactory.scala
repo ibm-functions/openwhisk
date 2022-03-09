@@ -132,7 +132,7 @@ trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSing
         cacheDoc.revision[W](newDocInfo.rev)
         p.success(cacheDoc)
         newDocInfo
-    }, !isCrudController)
+    })
   }
 
   def del[Wsuper >: W](db: ArtifactStore[Wsuper], doc: DocInfo)(
