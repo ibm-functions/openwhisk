@@ -26,6 +26,7 @@ import scala.util.Try
 import spray.json.DefaultJsonProtocol
 import spray.json.DefaultJsonProtocol._
 import spray.json._
+import org.apache.openwhisk.core.database.ArtifactStore
 import org.apache.openwhisk.common.TransactionId
 import org.apache.openwhisk.core.database.DocumentFactory
 import org.apache.openwhisk.core.entity.types.EntityStore
@@ -167,6 +168,19 @@ object WhiskPackage
   val bindingFieldName = "binding"
   override val collectionName = "packages"
 
+  // overriden to remove invalide cache for crud package operation
+  override def get[A >: WhiskPackage](
+    db: ArtifactStore[A],
+    doc: DocId,
+    rev: DocRevision = DocRevision.empty,
+    fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskPackage]): Future[WhiskPackage] = {
+    implicit val ec = db.executionContext
+    implicit val logger = db.logging
+    if (isCrudController) logger.warn(this, s"@StR get remove package cache key: ${CacheKey(doc.asDocInfo(rev))}")
+    if (isCrudController) WhiskPackage.removeId(CacheKey(doc.asDocInfo(rev)))
+    super.get(db, doc, rev, fromCache)
+  }
+
   /**
    * Traverses a binding recursively to find the root package and
    * merges parameters along the way if mergeParameters flag is set.
@@ -205,8 +219,7 @@ object WhiskPackage
     jsonFormat8(WhiskPackage.apply)
   }
 
-  // disable caching for crud operations to support delayed cluster wide cache invalidation
-  override val cacheEnabled = !isCrudController
+  override val cacheEnabled = true
 
   lazy val publicPackagesView: View = WhiskQueries.entitiesView(collection = s"$collectionName-public")
 }
