@@ -132,7 +132,7 @@ trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSing
         cacheDoc.revision[W](newDocInfo.rev)
         p.success(cacheDoc)
         newDocInfo
-    })
+    }, !isCrudController)
   }
 
   def del[Wsuper >: W](db: ArtifactStore[Wsuper], doc: DocInfo)(
@@ -188,10 +188,6 @@ trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSing
     implicit val logger = db.logging
     implicit val ec = db.executionContext
     val key = doc.asDocInfo(rev)
-    implicit val notifier = None
-    if (isCrudController) logger.warn(this, s"@StR getWithAttachment invalidate cache key: ${CacheKey(key)}")
-    // invalidate cache for crud operations with attachments
-    if (isCrudController) cacheInvalidate(CacheKey(key), Future.successful(()))
     cacheLookup(CacheKey(key), db.get[W](key, Some(attachmentHandler)).flatMap(postProcess), fromCache)
   }
 

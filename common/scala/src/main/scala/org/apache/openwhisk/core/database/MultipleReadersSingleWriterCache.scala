@@ -264,12 +264,13 @@ trait MultipleReadersSingleWriterCache[W, Winfo] {
   /**
    * This method posts an update to the backing store, and potentially stores the result in the cache.
    */
-  protected def cacheUpdate(f: Future[W], key: CacheKey, generator: => Future[Winfo])(
+  protected def cacheUpdate(f: Future[W], key: CacheKey, generator: => Future[Winfo], useCache: Boolean = true)(
     implicit ec: ExecutionContext,
     transid: TransactionId,
     logger: Logging,
     notifier: Option[CacheChangeNotification]): Future[Winfo] = {
-    if (cacheEnabled) {
+    if (!useCache) logger.warn(this, s"@StR cacheUpdate do not store key: $key")
+    if (cacheEnabled && useCache) {
 
       // try inserting our desired entry...
       val desiredEntry = Entry(transid, WriteInProgress, Some(f))

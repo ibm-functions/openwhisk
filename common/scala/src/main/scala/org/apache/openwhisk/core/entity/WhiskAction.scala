@@ -413,6 +413,7 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
     fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskAction]): Future[WhiskAction] = {
 
     implicit val ec = db.executionContext
+    implicit val logger = db.logging
 
     val inlineActionCode: WhiskAction => Future[WhiskAction] = { action =>
       def getWithAttachment(attached: Attached, binary: Boolean, exec: AttachedCode) = {
@@ -429,8 +430,14 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
 
       action.exec match {
         case exec @ CodeExecAsAttachment(_, attached: Attached, _, binary) =>
+          // invalidate cache for actions with attachments
+          if (isCrudController) logger.warn(this, s"@StR get case exec @ CodeExecAsAttachment invalidate cache key: ${CacheKey(doc.asDocInfo(rev))}")
+          if (isCrudController) WhiskAction.removeId(CacheKey(doc.asDocInfo(rev)))
           getWithAttachment(attached, binary, exec)
         case exec @ BlackBoxExec(_, Some(attached: Attached), _, _, binary) =>
+          // invalidate cache for actions with attachments (blackbox)
+          if (isCrudController) logger.warn(this, s"@StR get case exec @ BlackBoxExec invalidate cache key: ${CacheKey(doc.asDocInfo(rev))}")
+          if (isCrudController) WhiskAction.removeId(CacheKey(doc.asDocInfo(rev)))
           getWithAttachment(attached, binary, exec)
         case _ =>
           Future.successful(action)
