@@ -98,11 +98,11 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
             logging.warn(this, s"@StR putDoc got StatusCodes.Conflict for id: $id and rev: $rev")
             requestJson[JsObject](mkRequest(HttpMethods.GET, uri(getDb, id), headers = baseHeaders)).flatMap { e2 =>
               e2 match {
-                case Right(response) =>
-                  val rev2 = response.fields("_rev").convertTo[String]
+                case Right(doc2) =>
+                  val rev2 = doc2.fields("_rev").convertTo[String]
                   logging.warn(this, s"@StR putDoc id: $id, rev: $rev, rev2: $rev2")
                   requestJson[JsObject](
-                    mkJsonRequest(HttpMethods.PUT, uri(getDb, id), doc, baseHeaders ++ revHeader(rev2)))
+                    mkJsonRequest(HttpMethods.PUT, uri(getDb, id), doc2, baseHeaders ++ revHeader(rev2)))
                 case _ => Future(e)
               }
             }
