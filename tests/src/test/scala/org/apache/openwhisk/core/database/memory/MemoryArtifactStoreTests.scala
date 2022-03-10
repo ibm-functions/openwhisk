@@ -17,10 +17,46 @@
 
 package org.apache.openwhisk.core.database.memory
 
+import org.apache.openwhisk.common.TransactionId
 import org.junit.runner.RunWith
 import org.scalatest.FlatSpec
 import org.scalatest.junit.JUnitRunner
+import org.apache.openwhisk.core.database.DocumentConflictException
 import org.apache.openwhisk.core.database.test.behavior.ArtifactStoreBehavior
+import org.apache.openwhisk.core.entity.WhiskAuth
 
 @RunWith(classOf[JUnitRunner])
-class MemoryArtifactStoreTests extends FlatSpec with MemoryArtifactStoreBehaviorBase with ArtifactStoreBehavior
+class MemoryArtifactStoreTests extends FlatSpec with MemoryArtifactStoreBehaviorBase with ArtifactStoreBehavior {
+
+  behavior of s"${storeType}ArtifactStore put"
+
+  it should "throw DocumentConflictException when updated with old revision" in {
+    implicit val tid: TransactionId = transid()
+    val auth = newAuth()
+    val doc = put(authStore, auth)
+
+    val auth2 = getWhiskAuth(doc).copy(namespaces = Set(wskNS("foo1"))).revision[WhiskAuth](doc.rev)
+    val doc2 = put(authStore, auth2)
+
+    //Updated with _rev set to older one
+    val auth3 = getWhiskAuth(doc2).copy(namespaces = Set(wskNS("foo2"))).revision[WhiskAuth](doc.rev)
+    intercept[DocumentConflictException] {
+      put(authStore, auth3)
+    }
+  }
+
+  behavior of s"${storeType}ArtifactStore delete"
+
+  it should "throw DocumentConflictException when revision does not match" in {
+    implicit val tid: TransactionId = transid()
+    val auth = newAuth()
+    val doc = put(authStore, auth)
+
+    val auth2 = getWhiskAuth(doc).copy(namespaces = Set(wskNS("foo1"))).revision[WhiskAuth](doc.rev)
+    val doc2 = put(authStore, auth2)
+
+    intercept[DocumentConflictException] {
+      delete(authStore, doc)
+    }
+  }
+}

@@ -62,25 +62,6 @@ trait ArtifactStoreCRUDBehaviors extends ArtifactStoreBehaviorBase {
     doc2.rev.empty shouldBe false
   }
 
-  it should "not throw DocumentConflictException when updated with old revision" in {
-    implicit val tid: TransactionId = transid()
-    val auth = newAuth()
-    val doc = put(authStore, auth)
-
-    val auth2 = getWhiskAuth(doc).copy(namespaces = Set(wskNS("foo1"))).revision[WhiskAuth](doc.rev)
-    val doc2 = put(authStore, auth2)
-
-    //Updated with _rev set to older one
-    val auth3 = getWhiskAuth(doc2).copy(namespaces = Set(wskNS("foo2"))).revision[WhiskAuth](doc.rev)
-    //intercept[DocumentConflictException] {
-    //  put(authStore, auth3)
-    //}
-    val doc3 = put(authStore, auth3)
-    doc3.rev should not be doc.rev
-    doc3.rev should not be doc2.rev
-    doc3.rev.empty shouldBe false
-  }
-
   it should "throw DocumentConflictException if document with same id is inserted twice" in {
     implicit val tid: TransactionId = transid()
     val auth = newAuth()
@@ -127,20 +108,6 @@ trait ArtifactStoreCRUDBehaviors extends ArtifactStoreBehaviorBase {
       implicit val tid: TransactionId = transid()
       delete(authStore, DocInfo ! ("non-existing-doc", "42"))
     }
-  }
-
-  it should "not throws DocumentConflictException when revision does not match" in {
-    implicit val tid: TransactionId = transid()
-    val auth = newAuth()
-    val doc = put(authStore, auth)
-
-    val auth2 = getWhiskAuth(doc).copy(namespaces = Set(wskNS("foo1"))).revision[WhiskAuth](doc.rev)
-    val doc2 = put(authStore, auth2)
-
-    //intercept[DocumentConflictException] {
-    //  delete(authStore, doc)
-    //}
-    delete(authStore, doc) shouldBe true
   }
 
   behavior of s"${storeType}ArtifactStore get"
