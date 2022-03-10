@@ -176,9 +176,10 @@ object WhiskPackage
     fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskPackage]): Future[WhiskPackage] = {
     implicit val ec = db.executionContext
     implicit val logger = db.logging
-    if (isCrudController) logger.warn(this, s"@StR get remove package cache key: ${CacheKey(doc.asDocInfo(rev))}")
-    if (isCrudController) WhiskPackage.removeId(CacheKey(doc.asDocInfo(rev)))
-    super.get(db, doc, rev, fromCache)
+
+    val useCache = fromCache && !isCrudController
+    logger.warn(this, s"@StR fromCache: $fromCache, useCache: ${useCache}")
+    super.get(db, doc, rev, useCache)
   }
 
   /**
