@@ -354,6 +354,10 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
   override val collectionName = "actions"
   override val cacheEnabled = true
 
+  val isCrudController = sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")
+  val cacheInvalidationEnabled =
+    sys.env.get("CONFIG_whisk_controller_cacheinvalidation_enabled").getOrElse("false").toBoolean
+
   override implicit val serdes = jsonFormat(
     WhiskAction.apply,
     "namespace",
@@ -413,6 +417,7 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
     fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskAction]): Future[WhiskAction] = {
 
     implicit val ec = db.executionContext
+    implicit val logger = db.logging
 
     val inlineActionCode: WhiskAction => Future[WhiskAction] = { action =>
       def getWithAttachment(attached: Attached, binary: Boolean, exec: AttachedCode) = {
@@ -436,7 +441,12 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
           Future.successful(action)
       }
     }
-    super.getWithAttachment(db, doc, rev, fromCache, attachmentHandler, inlineActionCode)
+    // bypass cache for crud action get in case cache invalidation using cloudant is enabled
+    val useCache = fromCache && (!isCrudController || !cacheInvalidationEnabled)
+    logger.info(
+      this,
+      s"@StR fromCache: $fromCache, isCrudController: $isCrudController, cacheInvalidationEnabled: $cacheInvalidationEnabled, useCache: ${useCache}")
+    super.getWithAttachment(db, doc, rev, useCache, attachmentHandler, inlineActionCode)
   }
 
   def attachmentHandler(action: WhiskAction, attached: Attached): WhiskAction = {

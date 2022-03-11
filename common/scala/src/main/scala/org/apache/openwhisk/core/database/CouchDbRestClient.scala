@@ -159,7 +159,7 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
               e2 match {
                 case Right(response) =>
                   val rev2 = response.fields("_rev").convertTo[String]
-                  logging.warn(this, s"deleteDoc id: $id, rev: $rev, rev2: $rev2")
+                  logging.debug(this, s"deleteDoc id: $id, rev: $rev, rev2: $rev2")
                   requestJson[JsObject](
                     mkRequest(HttpMethods.DELETE, uri(getDb, id), headers = baseHeaders ++ revHeader(rev2)))
                 case _ => Future(e)
