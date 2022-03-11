@@ -30,6 +30,7 @@ import org.apache.openwhisk.core.database.ArtifactStore
 import org.apache.openwhisk.common.TransactionId
 import org.apache.openwhisk.core.database.DocumentFactory
 import org.apache.openwhisk.core.entity.types.EntityStore
+import pureconfig.loadConfig
 
 /**
  * WhiskPackagePut is a restricted WhiskPackage view that eschews properties
@@ -168,7 +169,11 @@ object WhiskPackage
   val bindingFieldName = "binding"
   override val collectionName = "packages"
 
-  // overriden to remove invalide cache for crud package operation
+  val isCrudController = sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")
+  val cacheInvalidationEnabled =
+    sys.env.get("CONFIG_whisk_controller_cacheinvalidation_enabled").getOrElse("false").toBoolean
+
+  // overriden to bypass cache for crud package get operation
   override def get[A >: WhiskPackage](
     db: ArtifactStore[A],
     doc: DocId,
@@ -177,8 +182,11 @@ object WhiskPackage
     implicit val ec = db.executionContext
     implicit val logger = db.logging
 
-    val useCache = fromCache && !isCrudController
-    logger.warn(this, s"@StR fromCache: $fromCache, useCache: ${useCache}")
+    // bypass cache for crud package get in case cache invalidation using cloudant is enabled
+    val useCache = fromCache && (!isCrudController || !cacheInvalidationEnabled)
+    logger.info(
+      this,
+      s"@StR fromCache: $fromCache, isCrudController: $isCrudController, cacheInvalidationEnabled: $cacheInvalidationEnabled, useCache: ${useCache}")
     super.get(db, doc, rev, useCache)
   }
 

@@ -82,8 +82,6 @@ trait DocumentSerializer {
  */
 trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSingleWriterCache[W, DocInfo] {
 
-  val isCrudController = sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")
-
   /**
    * Puts a record of type W in the datastore.
    *

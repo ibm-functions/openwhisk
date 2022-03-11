@@ -413,7 +413,6 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
     fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskAction]): Future[WhiskAction] = {
 
     implicit val ec = db.executionContext
-    implicit val logger = db.logging
 
     val inlineActionCode: WhiskAction => Future[WhiskAction] = { action =>
       def getWithAttachment(attached: Attached, binary: Boolean, exec: AttachedCode) = {
@@ -437,21 +436,7 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
           Future.successful(action)
       }
     }
-    if (!isCrudController) super.getWithAttachment(db, doc, rev, fromCache, attachmentHandler, inlineActionCode)
-    else
-      super.get(db, doc, rev, fromCache).flatMap { action =>
-        action.exec match {
-          case exec @ CodeExecAsAttachment(_, _, _, _) =>
-            // read again and bypass cache for for actions with attachments
-            logger.warn(this, s"@StR fromCache: $fromCache, useCache: ${fromCache && !isCrudController}")
-            super.getWithAttachment(db, doc, rev, false, attachmentHandler, inlineActionCode)
-          case exec @ BlackBoxExec(_, _, _, _, _) =>
-            // read again and bypass cache for actions with attachments
-            logger.warn(this, s"@StR fromCache: $fromCache, useCache: ${fromCache && !isCrudController}")
-            super.getWithAttachment(db, doc, rev, false, attachmentHandler, inlineActionCode)
-          case _ => Future(action.copy(exec = action.exec).revision[WhiskAction](action.rev))
-        }
-      }
+    super.getWithAttachment(db, doc, rev, fromCache, attachmentHandler, inlineActionCode)
   }
 
   def attachmentHandler(action: WhiskAction, attached: Attached): WhiskAction = {
