@@ -205,13 +205,13 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
 
     CacheInvalidationMessage.parse(raw) match {
       case Success(msg: CacheInvalidationMessage) => {
-        if (msg.instanceId != instanceId) {
+        if (msg.instanceId != instanceId && false) {
           WhiskActionMetaData.removeId(msg.key)
           WhiskAction.removeId(msg.key)
           WhiskPackage.removeId(msg.key)
           WhiskRule.removeId(msg.key)
           WhiskTrigger.removeId(msg.key)
-        }
+        } else logging.info(this, s"@StR skip kafka based cache invalidation for ${msg.key}")
       }
       case Failure(t) => logging.error(this, s"failed processing message: $raw with $t")
     }
