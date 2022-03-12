@@ -363,7 +363,6 @@ class CouchDbRestStore[DocumentAbstraction <: DocumentSerializer](dbProtocol: St
 
     attachmentStore match {
       case Some(as) =>
-        logging.warn(this, s"@StR putAndAttach as: $as")
         attachToExternalStore(doc, update, contentType, docStream, oldAttachment, as)
       case None =>
         attachToCouch(doc, update, contentType, docStream)
