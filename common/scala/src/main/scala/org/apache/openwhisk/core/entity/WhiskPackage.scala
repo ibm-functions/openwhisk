@@ -27,7 +27,7 @@ import spray.json.DefaultJsonProtocol
 import spray.json.DefaultJsonProtocol._
 import spray.json._
 import org.apache.openwhisk.core.database.ArtifactStore
-import org.apache.openwhisk.common.TransactionId
+import org.apache.openwhisk.common.{Logging, PrintStreamLogging, TransactionId}
 import org.apache.openwhisk.core.database.DocumentFactory
 import org.apache.openwhisk.core.entity.types.EntityStore
 import pureconfig.loadConfig
@@ -168,10 +168,17 @@ object WhiskPackage
 
   val bindingFieldName = "binding"
   override val collectionName = "packages"
+  override val cacheEnabled = true
 
+  implicit val logging: Logging = new PrintStreamLogging()
   val isCrudController = sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")
   val cacheInvalidationEnabled =
     sys.env.get("CONFIG_whisk_controller_cacheinvalidation_enabled").getOrElse("false").toBoolean
+  // bypass cache for crud package get for cloudant enabled cache invalidation
+  val useCache = !isCrudController || !cacheInvalidationEnabled
+  logging.info(
+    this,
+    s"cacheEnabled: $cacheEnabled, isCrudController: $isCrudController, cacheInvalidationEnabled: $cacheInvalidationEnabled, useCache: ${useCache}")
 
   // overriden to bypass cache for crud package get operation
   override def get[A >: WhiskPackage](
@@ -179,15 +186,8 @@ object WhiskPackage
     doc: DocId,
     rev: DocRevision = DocRevision.empty,
     fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskPackage]): Future[WhiskPackage] = {
-    implicit val ec = db.executionContext
-    implicit val logger = db.logging
-
-    // bypass cache for crud package get in case cache invalidation using cloudant is enabled
-    val useCache = fromCache && (!isCrudController || !cacheInvalidationEnabled)
-    logger.info(
-      this,
-      s"@StR fromCache: $fromCache, isCrudController: $isCrudController, cacheInvalidationEnabled: $cacheInvalidationEnabled, useCache: ${useCache}")
-    super.get(db, doc, rev, useCache)
+    // bypass cache for crud package get operation
+    super.get(db, doc, rev, fromCache && useCache)
   }
 
   /**
@@ -227,8 +227,6 @@ object WhiskPackage
     }
     jsonFormat8(WhiskPackage.apply)
   }
-
-  override val cacheEnabled = true
 
   lazy val publicPackagesView: View = WhiskQueries.entitiesView(collection = s"$collectionName-public")
 }
