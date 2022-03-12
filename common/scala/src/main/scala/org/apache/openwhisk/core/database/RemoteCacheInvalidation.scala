@@ -205,7 +205,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
 
     CacheInvalidationMessage.parse(raw) match {
       case Success(msg: CacheInvalidationMessage) => {
-        if (msg.instanceId != instanceId && cacheInvalidationPollInterval > 60 * 60 * 24) {
+        if (msg.instanceId != instanceId && cacheInvalidationPollInterval < 60 * 60 * 24) {
           WhiskActionMetaData.removeId(msg.key)
           WhiskAction.removeId(msg.key)
           WhiskPackage.removeId(msg.key)
