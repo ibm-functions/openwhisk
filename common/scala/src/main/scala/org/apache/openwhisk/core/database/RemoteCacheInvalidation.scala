@@ -79,7 +79,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   private val cacheInvalidationEnabled = cacheInvalidationConfig.exists(_.enabled)
   private val cacheInvalidationInitDelay = cacheInvalidationConfig.map(_.initDelay).getOrElse(-1)
   private val cacheInvalidationPollIntervalFromConfig = cacheInvalidationConfig.map(_.pollInterval).getOrElse(-1)
-  private val cacheInvalidationPollInterval = if (cacheInvalidationEnabled && isCrudController) cacheInvalidationPollIntervalFromConfig.max(300) else cacheInvalidationPollIntervalFromConfig
+  private val cacheInvalidationPollInterval = if (cacheInvalidationEnabled && isCrudController) cacheInvalidationPollIntervalFromConfig.max(1) else cacheInvalidationPollIntervalFromConfig
   private val cacheInvalidationPageSize = cacheInvalidationConfig.map(_.pageSize).getOrElse(-1)
   private val cacheInvalidationMaxPages = cacheInvalidationConfig.map(_.maxPages).getOrElse(-1)
   logging.info(
@@ -116,6 +116,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
         .map { resp =>
           lcus = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
           logging.info(this, s"initial lcus: $lcus")
+          assert(!lcus.isEmpty, s"lcus: 'initial $lcus' is empty")
         }
     }
 
@@ -173,7 +174,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
     if (cacheInvalidationEnabled) {
       Scheduler.scheduleWaitAtMost(
         interval = FiniteDuration(cacheInvalidationPollInterval, TimeUnit.SECONDS),
-        initialDelay = FiniteDuration(cacheInvalidationInitDelay, TimeUnit.SECONDS),
+        initialDelay = FiniteDuration(cacheInvalidationInitDelay, TimeUnit.MILLISECONDS),
         name = "CacheInvalidation") { () =>
         getChanges(cacheInvalidationPageSize, cacheInvalidationMaxPages - 1)
       }
