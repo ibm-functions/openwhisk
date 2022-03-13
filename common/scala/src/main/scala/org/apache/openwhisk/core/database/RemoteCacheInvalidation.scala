@@ -80,7 +80,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   private val cacheInvalidationInitDelay = cacheInvalidationConfig.map(_.initDelay).getOrElse(-1)
   private val cacheInvalidationPollIntervalFromConfig = cacheInvalidationConfig.map(_.pollInterval).getOrElse(-1)
   private val cacheInvalidationPollInterval =
-    if (cacheInvalidationEnabled && isCrudController) cacheInvalidationPollIntervalFromConfig.max(5)
+    if (cacheInvalidationEnabled && isCrudController) cacheInvalidationPollIntervalFromConfig.max(15)
     else cacheInvalidationPollIntervalFromConfig
   private val cacheInvalidationPageSize = cacheInvalidationConfig.map(_.pageSize).getOrElse(-1)
   private val cacheInvalidationMaxPages = cacheInvalidationConfig.map(_.maxPages).getOrElse(-1)
@@ -135,9 +135,8 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
           val seqs = resp.fields("results").convertTo[List[JsObject]]
           if (seqs.length > 0) {
             lcus = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
-            logging.debug(this, s"new lcus: $lcus")
             logging.info(this, s"found ${seqs.length} changes (${seqs
-              .count(_.fields.contains("deleted"))} deletions), (new lcus: ${lcus.slice(0, 29)}..(${lcus.length}))")
+              .count(_.fields.contains("deleted"))} deletions), lcus: $lcus")
           }
           seqs.map(_.fields("id").convertTo[String])
         }
@@ -175,7 +174,10 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   def scheduleCacheInvalidation(): Any = {
     if (cacheInvalidationEnabled) {
       Scheduler.scheduleWaitAtMost(
-        interval = FiniteDuration(cacheInvalidationPollInterval, TimeUnit.SECONDS),
+        interval =
+          // do not wait between two runs of the closure for minimum interval
+          if (cacheInvalidationPollInterval == 1) FiniteDuration(cacheInvalidationPollInterval, TimeUnit.NANOSECONDS)
+          else FiniteDuration(cacheInvalidationPollInterval, TimeUnit.SECONDS),
         initialDelay = FiniteDuration(cacheInvalidationInitDelay, TimeUnit.SECONDS),
         name = "CacheInvalidation") { () =>
         getChanges(cacheInvalidationPageSize, cacheInvalidationMaxPages - 1)

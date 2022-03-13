@@ -132,7 +132,6 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
 
   // http://docs.couchdb.org/en/1.6.1/api/document/common.html#get--db-docid
   def getDoc(id: String, rev: String): Future[Either[StatusCode, JsObject]] = {
-    logging.warn(this, s"@StR getDoc id: $id, rev: $rev")
     val dbSfx = if (useFlexLogic) getDbSfx else 0L // pin database suffix if needed
     requestJson[JsObject](
       mkRequest(
