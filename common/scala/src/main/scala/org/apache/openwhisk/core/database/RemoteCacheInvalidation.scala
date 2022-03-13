@@ -73,17 +73,21 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
                                            pollInterval: Int,
                                            pageSize: Int,
                                            maxPages: Int)
+  private val isCrudController = sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")
   private val cacheInvalidationConfigNamespace = "whisk.controller.cacheinvalidation"
   private val cacheInvalidationConfig = loadConfig[CacheInvalidationConfig](cacheInvalidationConfigNamespace).toOption
   private val cacheInvalidationEnabled = cacheInvalidationConfig.exists(_.enabled)
   private val cacheInvalidationInitDelay = cacheInvalidationConfig.map(_.initDelay).getOrElse(-1)
-  private val cacheInvalidationPollInterval = cacheInvalidationConfig.map(_.pollInterval).getOrElse(-1)
+  private val cacheInvalidationPollIntervalFromConfig = cacheInvalidationConfig.map(_.pollInterval).getOrElse(-1)
+  private val cacheInvalidationPollInterval = if (cacheInvalidationEnabled && isCrudController) cacheInvalidationPollIntervalFromConfig.max(300) else cacheInvalidationPollIntervalFromConfig
   private val cacheInvalidationPageSize = cacheInvalidationConfig.map(_.pageSize).getOrElse(-1)
   private val cacheInvalidationMaxPages = cacheInvalidationConfig.map(_.maxPages).getOrElse(-1)
   logging.info(
     this,
-    s"cacheInvalidationEnabled: $cacheInvalidationEnabled, " +
+    s"isCrudController: $isCrudController, " +
+      s"cacheInvalidationEnabled: $cacheInvalidationEnabled, " +
       s"cacheInvalidationInitDelay: $cacheInvalidationInitDelay, " +
+      s"cacheInvalidationPollIntervalFromConfig: $cacheInvalidationPollIntervalFromConfig, " +
       s"cacheInvalidationPollInterval: $cacheInvalidationPollInterval, " +
       s"cacheInvalidationPageSize: $cacheInvalidationPageSize, " +
       s"cacheInvalidationMaxPages: $cacheInvalidationMaxPages")
@@ -126,11 +130,12 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
         .changes()(since = Some(lcus), limit = Some(limit), descending = false)
         .map { resp =>
           val seqs = resp.fields("results").convertTo[List[JsObject]]
-          logging.info(this, s"found ${seqs.length} changes (${seqs.count(_.fields.contains("deleted"))} deletions)")
           if (seqs.length > 0) {
             lcus = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
-            logging.info(this, s"new lcus: $lcus")
+            logging.debug(this, s"new lcus: $lcus")
           }
+          logging.info(this, s"found ${seqs.length} changes (${seqs
+            .count(_.fields.contains("deleted"))} deletions), (new lcus: ${lcus.slice(0, 29)}..(${lcus.length}))")
           seqs.map(_.fields("id").convertTo[String])
         }
     }
@@ -166,7 +171,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
 
   def scheduleCacheInvalidation(): Any = {
     if (cacheInvalidationEnabled) {
-      Scheduler.scheduleWaitAtLeast(
+      Scheduler.scheduleWaitAtMost(
         interval = FiniteDuration(cacheInvalidationPollInterval, TimeUnit.SECONDS),
         initialDelay = FiniteDuration(cacheInvalidationInitDelay, TimeUnit.SECONDS),
         name = "CacheInvalidation") { () =>
@@ -205,7 +210,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
 
     CacheInvalidationMessage.parse(raw) match {
       case Success(msg: CacheInvalidationMessage) => {
-        if (msg.instanceId != instanceId) {
+        if (msg.instanceId != instanceId && false) {
           WhiskActionMetaData.removeId(msg.key)
           WhiskAction.removeId(msg.key)
           WhiskPackage.removeId(msg.key)
