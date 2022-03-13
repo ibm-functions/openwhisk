@@ -144,20 +144,6 @@ class CouchDbRestClient(protocol: String, host: String, port: Int, username: Str
           case Left(StatusCodes.NotFound) if useFlexLogic =>
             requestJson[JsObject](
               mkRequest(HttpMethods.GET, uri(getDb(dbSfx - 1), id), headers = baseHeaders ++ revHeader(rev)))
-          case Left(StatusCodes.NotFound) if !flexDb =>
-            logging.warn(this, s"@StR getDoc not found for id: $id and rev: $rev")
-            requestJson[JsObject](
-              mkRequest(HttpMethods.GET, uri(getDb, id), headers = baseHeaders)).flatMap { e2 =>
-              e2 match {
-                case Right(response) =>
-                  val rev2 = response.fields("_rev").convertTo[String]
-                  logging.warn(this, s"getDoc id: $id, rev: $rev, rev2: $rev2")
-                  Future(e2)
-                case _ =>
-                  logging.warn(this, s"getDoc id: $id, rev: $rev, e2: $e2")
-                  Future(e)
-              }
-            }
           case _ => Future(e)
         }
       }

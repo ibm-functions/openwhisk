@@ -79,7 +79,9 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   private val cacheInvalidationEnabled = cacheInvalidationConfig.exists(_.enabled)
   private val cacheInvalidationInitDelay = cacheInvalidationConfig.map(_.initDelay).getOrElse(-1)
   private val cacheInvalidationPollIntervalFromConfig = cacheInvalidationConfig.map(_.pollInterval).getOrElse(-1)
-  private val cacheInvalidationPollInterval = if (cacheInvalidationEnabled && isCrudController) cacheInvalidationPollIntervalFromConfig.max(300) else cacheInvalidationPollIntervalFromConfig.max(300)
+  private val cacheInvalidationPollInterval =
+    if (cacheInvalidationEnabled && isCrudController) cacheInvalidationPollIntervalFromConfig.max(5)
+    else cacheInvalidationPollIntervalFromConfig
   private val cacheInvalidationPageSize = cacheInvalidationConfig.map(_.pageSize).getOrElse(-1)
   private val cacheInvalidationMaxPages = cacheInvalidationConfig.map(_.maxPages).getOrElse(-1)
   logging.info(
@@ -134,9 +136,9 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
           if (seqs.length > 0) {
             lcus = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
             logging.debug(this, s"new lcus: $lcus")
+            logging.info(this, s"found ${seqs.length} changes (${seqs
+              .count(_.fields.contains("deleted"))} deletions), (new lcus: ${lcus.slice(0, 29)}..(${lcus.length}))")
           }
-          logging.info(this, s"found ${seqs.length} changes (${seqs
-            .count(_.fields.contains("deleted"))} deletions), (new lcus: ${lcus.slice(0, 29)}..(${lcus.length}))")
           seqs.map(_.fields("id").convertTo[String])
         }
     }
