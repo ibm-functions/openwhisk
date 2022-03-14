@@ -168,7 +168,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
 
   def scheduleCacheInvalidation(): Any = {
     if (cacheInvalidationEnabled && isController) {
-      Scheduler.scheduleWaitAtLeast(
+      Scheduler.scheduleWaitAtMost(
         interval = FiniteDuration(cacheInvalidationPollInterval, TimeUnit.SECONDS),
         initialDelay = FiniteDuration(cacheInvalidationInitDelay, TimeUnit.SECONDS),
         name = "CacheInvalidation") { () =>
