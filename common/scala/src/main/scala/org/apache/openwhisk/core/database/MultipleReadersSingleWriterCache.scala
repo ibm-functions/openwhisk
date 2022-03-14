@@ -203,11 +203,15 @@ trait MultipleReadersSingleWriterCache[W, Winfo] {
             // a pre-existing owner will take care of the invalidation
             invalidator
         }
+      } andThen {
+        case _ => notifier.foreach(_(key))
       }
-    } else {
-      invalidator // not caching
-    } andThen {
-      case _ if cacheChangeNotificationEnabled => notifier.foreach(_(key))
+    }
+    else {
+      // not caching
+      invalidator andThen {
+        case _ if cacheChangeNotificationEnabled => notifier.foreach(_(key))
+      }
     }
   }
 
@@ -299,11 +303,15 @@ trait MultipleReadersSingleWriterCache[W, Winfo] {
             invalidateEntryAfter(generator, key, actualEntry)
           }
         }
+      } andThen {
+        case _ => notifier.foreach(_(key))
       }
-    } else {
-      generator // not caching
-    } andThen {
-      case _ if cacheChangeNotificationEnabled => notifier.foreach(_(key))
+    }
+    else {
+      // not caching
+      generator andThen {
+        case _ if cacheChangeNotificationEnabled => notifier.foreach(_(key))
+      }
     }
   }
 

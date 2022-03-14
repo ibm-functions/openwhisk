@@ -19,6 +19,7 @@ package org.apache.openwhisk.core.cli.test
 
 import java.util.Base64
 
+import scala.concurrent.duration.DurationInt
 import scala.util.Failure
 import scala.util.Try
 import org.junit.runner.RunWith
@@ -50,6 +51,9 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
   val whiskEdgeHost = WhiskProperties.getEdgeHost
   println(s"whiskEdgeHost: ${whiskEdgeHost}")
 
+  private val retriesOnTestFailures = 5
+  private val waitBeforeRetry = 1.second
+
   behavior of "Wsk Web Actions"
 
   it should "ensure response content-type is text/plain for requested text/html content-type in header field of response for filtered domain" in {
@@ -65,9 +69,15 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
         action.create(name, file, web = Some("true"))
       }
 
-      val response = RestAssured.given().config(sslconfig).get(url)
-      response.statusCode shouldBe 200
-      response.header("Content-type") should startWith("text/plain")
+      org.apache.openwhisk.utils.retry(
+        {
+          val response = RestAssured.given().config(sslconfig).get(url)
+          response.statusCode shouldBe 200
+          response.header("Content-type") should startWith("text/plain")
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
     }
   }
 
@@ -83,9 +93,15 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
         action.create(name, file, web = Some("true"))
       }
 
-      val response = RestAssured.given().config(sslconfig).get(url)
-      response.statusCode shouldBe 200
-      response.header("Content-type") should startWith("text/plain")
+      org.apache.openwhisk.utils.retry(
+        {
+          val response = RestAssured.given().config(sslconfig).get(url)
+          response.statusCode shouldBe 200
+          response.header("Content-type") should startWith("text/plain")
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
     }
   }
 
@@ -101,28 +117,38 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
         action.create(name, file, web = Some("true"))
       }
 
-      val response = RestAssured.given().header("cookie", "USER_TOKEN=yes;USER_TOKEN2=no").config(sslconfig).get(url)
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            val response =
+              RestAssured.given().header("cookie", "USER_TOKEN=yes;USER_TOKEN2=no").config(sslconfig).get(url)
 
-      response.statusCode shouldBe 200
-      response.header("Content-type") shouldBe "application/json"
+            response.statusCode shouldBe 200
+            response.header("Content-type") shouldBe "application/json"
 
-      val __ow_headers = response.body.asString.parseJson.asJsObject.fields("__ow_headers")
-      val __ow_method = response.body.asString.parseJson.asJsObject.fields("__ow_method")
-      val __ow_path = response.body.asString.parseJson.asJsObject.fields("__ow_path")
-      val env =
-        response.body.asString.parseJson.asJsObject
-          .fields("env")
-          .asJsObject
-          .fields
-          .filter(!_._1.equals("__OW_API_KEY"))
-      println(s"__ow_headers: ${__ow_headers}, __ow_method: ${__ow_method}, __ow_path: ${__ow_path}, env: ${env})")
-      response.body.asString.parseJson.asJsObject
-        .fields("__ow_headers")
-        .asJsObject
-        .fields
-        .get("cookie")
-        .getOrElse("")
-        .toString shouldBe ""
+            val __ow_headers = response.body.asString.parseJson.asJsObject.fields("__ow_headers")
+            val __ow_method = response.body.asString.parseJson.asJsObject.fields("__ow_method")
+            val __ow_path = response.body.asString.parseJson.asJsObject.fields("__ow_path")
+            val env =
+              response.body.asString.parseJson.asJsObject
+                .fields("env")
+                .asJsObject
+                .fields
+                .filter(!_._1.equals("__OW_API_KEY"))
+            println(
+              s"__ow_headers: ${__ow_headers}, __ow_method: ${__ow_method}, __ow_path: ${__ow_path}, env: ${env})")
+            response.body.asString.parseJson.asJsObject
+              .fields("__ow_headers")
+              .asJsObject
+              .fields
+              .get("cookie")
+              .getOrElse("")
+              .toString shouldBe ""
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
+
     }
   }
 
@@ -137,24 +163,43 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
       action.create(name, file, web = Some("true"))
     }
 
-    val resWithContentType =
-      RestAssured.given().contentType("application/json").body(bodyContent.compactPrint).config(sslconfig).post(url)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val resWithContentType =
+            RestAssured
+              .given()
+              .contentType("application/json")
+              .body(bodyContent.compactPrint)
+              .config(sslconfig)
+              .post(url)
 
-    resWithContentType.statusCode shouldBe 200
-    resWithContentType.header("Content-type") shouldBe "application/json"
-    resWithContentType.body.asString.parseJson.asJsObject
-      .fields("__ow_headers")
-      .asJsObject
-      .fields("content-type") shouldBe "application/json".toJson
+          resWithContentType.statusCode shouldBe 200
+          resWithContentType.header("Content-type") shouldBe "application/json"
+          resWithContentType.body.asString.parseJson.asJsObject
+            .fields("__ow_headers")
+            .asJsObject
+            .fields("content-type") shouldBe "application/json".toJson
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
 
-    val resWithoutContentType =
-      RestAssured.given().config(sslconfig).get(url)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val resWithoutContentType =
+            RestAssured.given().config(sslconfig).get(url)
 
-    resWithoutContentType.statusCode shouldBe 200
-    resWithoutContentType.header("Content-type") shouldBe "application/json"
-    resWithoutContentType.body.asString.parseJson.asJsObject
-      .fields("__ow_headers")
-      .toString should not include ("content-type")
+          resWithoutContentType.statusCode shouldBe 200
+          resWithoutContentType.header("Content-type") shouldBe "application/json"
+          resWithoutContentType.body.asString.parseJson.asJsObject
+            .fields("__ow_headers")
+            .toString should not include ("content-type")
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
   }
 
   /**
@@ -171,28 +216,36 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
       action.create(name, file, web = Some("true"))
     }
 
-    Seq(
-      ("A", 200),
-      ("A" * padAmount, 200),
-      // ideally the bad case is just +1 but there's some differences
-      // in how characters are counted i.e., whether these count "https://:443"
-      // or not; it seems sufficient to test right around the boundary
-      ("A" * (padAmount + 100), 414))
-      .foreach {
-        case (pad, code) =>
-          val url = (requestPath + pad)
-          val response = RestAssured.given().config(sslconfig).get(url)
-          val responseCode = response.statusCode
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          Seq(
+            ("A", 200),
+            ("A" * padAmount, 200),
+            // ideally the bad case is just +1 but there's some differences
+            // in how characters are counted i.e., whether these count "https://:443"
+            // or not; it seems sufficient to test right around the boundary
+            ("A" * (padAmount + 100), 414))
+            .foreach {
+              case (pad, code) =>
+                val url = (requestPath + pad)
+                val response = RestAssured.given().config(sslconfig).get(url)
+                val responseCode = response.statusCode
 
-          withClue(s"response code: $responseCode, url length: ${url.length}, pad amount: ${pad.length}, url: $url") {
-            responseCode shouldBe code
-            if (code == 200) {
-              response.body.asString.parseJson.asJsObject.fields("a").convertTo[String] shouldBe pad
-            } else {
-              response.body.asString should include("414 Request-URI Too Large") // from nginx
+                withClue(
+                  s"response code: $responseCode, url length: ${url.length}, pad amount: ${pad.length}, url: $url") {
+                  responseCode shouldBe code
+                  if (code == 200) {
+                    response.body.asString.parseJson.asJsObject.fields("a").convertTo[String] shouldBe pad
+                  } else {
+                    response.body.asString should include("414 Request-URI Too Large") // from nginx
+                  }
+                }
             }
-          }
-      }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} Wsk Web Actions call $requestPath not successful, retrying.."))
   }
 
   /**
@@ -209,19 +262,36 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
         action.create(name, file, web = Some("true"), annotations = Map("require-whisk-auth" -> true.toJson))
       }
 
-      val unauthorizedResponse = RestAssured.given().config(sslconfig).get(url)
-      unauthorizedResponse.statusCode shouldBe 401
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            val unauthorizedResponse = RestAssured.given().config(sslconfig).get(url)
+            unauthorizedResponse.statusCode shouldBe 401
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
 
-      val authorizedResponse = RestAssured
-        .given()
-        .config(sslconfig)
-        .auth()
-        .preemptive()
-        .basic(wskprops.authKey.split(":")(0), wskprops.authKey.split(":")(1))
-        .get(url)
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            val authorizedResponse = RestAssured
+              .given()
+              .config(sslconfig)
+              .auth()
+              .preemptive()
+              .basic(wskprops.authKey.split(":")(0), wskprops.authKey.split(":")(1))
+              .get(url)
 
-      authorizedResponse.statusCode shouldBe 200
-      authorizedResponse.body.asString.parseJson.asJsObject.fields("__ow_user").convertTo[String] shouldBe namespace
+            authorizedResponse.statusCode shouldBe 200
+            authorizedResponse.body.asString.parseJson.asJsObject
+              .fields("__ow_user")
+              .convertTo[String] shouldBe namespace
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
+
   }
 
   it should "ensure that CORS header is preserved for custom options" in withAssetCleaner(wskprops) {
@@ -235,14 +305,21 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
         action.create(name, file, web = Some("true"), annotations = Map("web-custom-options" -> true.toJson))
       }
 
-      val response = RestAssured.given().config(sslconfig).options(url)
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            val response = RestAssured.given().config(sslconfig).options(url)
 
-      response.statusCode shouldBe 200
-      response.header("Access-Control-Allow-Origin") shouldBe "Origin set from Web Action"
-      response.header("Access-Control-Allow-Methods") shouldBe "Methods set from Web Action"
-      response.header("Access-Control-Allow-Headers") shouldBe "Headers set from Web Action"
-      response.header("Location") shouldBe "openwhisk.org"
-      response.header("Set-Cookie") shouldBe "cookie-cookie-cookie"
+            response.statusCode shouldBe 200
+            response.header("Access-Control-Allow-Origin") shouldBe "Origin set from Web Action"
+            response.header("Access-Control-Allow-Methods") shouldBe "Methods set from Web Action"
+            response.header("Access-Control-Allow-Headers") shouldBe "Headers set from Web Action"
+            response.header("Location") shouldBe "openwhisk.org"
+            response.header("Set-Cookie") shouldBe "cookie-cookie-cookie"
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
   }
 
   it should "ensure that default CORS header is preserved" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
@@ -255,35 +332,43 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
       action.create(name, file, web = Some("true"))
     }
 
-    Seq(
-      RestAssured
-        .given()
-        .config(sslconfig)
-        .header("Access-Control-Request-Headers", "x-custom-header")
-        .options(s"$url.http"),
-      RestAssured
-        .given()
-        .config(sslconfig)
-        .header("Access-Control-Request-Headers", "x-custom-header")
-        .get(s"$url.json")).foreach { response =>
-      response.statusCode shouldBe 200
-      response.header("Access-Control-Allow-Origin") shouldBe "*"
-      response.header("Access-Control-Allow-Methods") shouldBe "OPTIONS, GET, DELETE, POST, PUT, HEAD, PATCH"
-      response.header("Access-Control-Allow-Headers") shouldBe "x-custom-header"
-      response.header("Location") shouldBe null
-      response.header("Set-Cookie") shouldBe null
-    }
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          Seq(
+            RestAssured
+              .given()
+              .config(sslconfig)
+              .header("Access-Control-Request-Headers", "x-custom-header")
+              .options(s"$url.http"),
+            RestAssured
+              .given()
+              .config(sslconfig)
+              .header("Access-Control-Request-Headers", "x-custom-header")
+              .get(s"$url.json")).foreach { response =>
+            response.statusCode shouldBe 200
+            response.header("Access-Control-Allow-Origin") shouldBe "*"
+            response.header("Access-Control-Allow-Methods") shouldBe "OPTIONS, GET, DELETE, POST, PUT, HEAD, PATCH"
+            response.header("Access-Control-Allow-Headers") shouldBe "x-custom-header"
+            response.header("Location") shouldBe null
+            response.header("Set-Cookie") shouldBe null
+          }
 
-    Seq(
-      RestAssured.given().config(sslconfig).options(s"$url.http"),
-      RestAssured.given().config(sslconfig).get(s"$url.json")).foreach { response =>
-      response.statusCode shouldBe 200
-      response.header("Access-Control-Allow-Origin") shouldBe "*"
-      response.header("Access-Control-Allow-Methods") shouldBe "OPTIONS, GET, DELETE, POST, PUT, HEAD, PATCH"
-      response.header("Access-Control-Allow-Headers") shouldBe "Authorization, Origin, X-Requested-With, Content-Type, Accept, User-Agent"
-      response.header("Location") shouldBe null
-      response.header("Set-Cookie") shouldBe null
-    }
+          Seq(
+            RestAssured.given().config(sslconfig).options(s"$url.http"),
+            RestAssured.given().config(sslconfig).get(s"$url.json")).foreach {
+            response =>
+              response.statusCode shouldBe 200
+              response.header("Access-Control-Allow-Origin") shouldBe "*"
+              response.header("Access-Control-Allow-Methods") shouldBe "OPTIONS, GET, DELETE, POST, PUT, HEAD, PATCH"
+              response.header("Access-Control-Allow-Headers") shouldBe "Authorization, Origin, X-Requested-With, Content-Type, Accept, User-Agent"
+              response.header("Location") shouldBe null
+              response.header("Set-Cookie") shouldBe null
+          }
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
   }
 
   it should "invoke web action to ensure the returned body argument is correct" in withAssetCleaner(wskprops) {
@@ -298,13 +383,21 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
         action.create(name, file, web = Some("true"))
       }
 
-      val paramRes = RestAssured.given().contentType("text/html").param("key", "value").config(sslconfig).post(url)
-      paramRes.statusCode shouldBe 200
-      paramRes.body.asString().parseJson.asJsObject.fields("__ow_body").convertTo[String] shouldBe "key=value"
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            val paramRes =
+              RestAssured.given().contentType("text/html").param("key", "value").config(sslconfig).post(url)
+            paramRes.statusCode shouldBe 200
+            paramRes.body.asString().parseJson.asJsObject.fields("__ow_body").convertTo[String] shouldBe "key=value"
 
-      val bodyRes = RestAssured.given().contentType("text/html").body(bodyContent).config(sslconfig).post(url)
-      bodyRes.statusCode shouldBe 200
-      bodyRes.body.asString().parseJson.asJsObject.fields("__ow_body").convertTo[String] shouldBe bodyContent
+            val bodyRes = RestAssured.given().contentType("text/html").body(bodyContent).config(sslconfig).post(url)
+            bodyRes.statusCode shouldBe 200
+            bodyRes.body.asString().parseJson.asJsObject.fields("__ow_body").convertTo[String] shouldBe bodyContent
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
   }
 
   it should "reject invocation of web action with invalid accept header" in withAssetCleaner(wskprops) {
@@ -318,9 +411,16 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
         action.create(name, file, web = Some("true"))
       }
 
-      val response = RestAssured.given().header("accept", "application/json").config(sslconfig).get(url)
-      response.statusCode shouldBe 406
-      response.body.asString should include("Resource representation is only available with these types:\\ntext/")
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            val response = RestAssured.given().header("accept", "application/json").config(sslconfig).get(url)
+            response.statusCode shouldBe 406
+            response.body.asString should include("Resource representation is only available with these types:\\ntext/")
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
   }
 
   it should "support multiple response header values" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
@@ -333,12 +433,19 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
       action.create(name, file, web = Some("true"), annotations = Map("web-custom-options" -> true.toJson))
     }
 
-    val response = RestAssured.given().config(sslconfig).options(url)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val response = RestAssured.given().config(sslconfig).options(url)
 
-    response.statusCode shouldBe 200
-    val cookieHeaders = response.headers.getList("Set-Cookie")
-    cookieHeaders should contain allOf (new Header("Set-Cookie", "a=b"),
-    new Header("Set-Cookie", "c=d"))
+          response.statusCode shouldBe 200
+          val cookieHeaders = response.headers.getList("Set-Cookie")
+          cookieHeaders should contain allOf (new Header("Set-Cookie", "a=b"),
+          new Header("Set-Cookie", "c=d"))
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
   }
 
   it should "handle http web action returning JSON as string" in withAssetCleaner(wskprops) { (wp, assetHelper) =>
@@ -351,11 +458,18 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
       action.create(name, file, web = Some("raw"))
     }
 
-    val response = RestAssured.given().config(sslconfig).get(url)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val response = RestAssured.given().config(sslconfig).get(url)
 
-    response.statusCode shouldBe 200
-    response.header("Content-type") shouldBe "application/json"
-    response.body.asString.parseJson.asJsObject shouldBe JsObject("status" -> "success".toJson)
+          response.statusCode shouldBe 200
+          response.header("Content-type") shouldBe "application/json"
+          response.body.asString.parseJson.asJsObject shouldBe JsObject("status" -> "success".toJson)
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
   }
 
   it should "handle http web action with base64 encoded binary response" in withAssetCleaner(wskprops) {
@@ -374,11 +488,18 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
         action.create(name, file, web = Some("true"))
       }
 
-      val response = RestAssured.given().config(sslconfig).get(url)
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            val response = RestAssured.given().config(sslconfig).get(url)
 
-      response.statusCode shouldBe 200
-      response.header("Content-type") shouldBe "image/png"
-      response.body.asByteArray shouldBe Base64.getDecoder().decode(png)
+            response.statusCode shouldBe 200
+            response.header("Content-type") shouldBe "image/png"
+            response.body.asByteArray shouldBe Base64.getDecoder().decode(png)
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
   }
 
   /**
@@ -394,17 +515,24 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
       action.create(name, file, web = Some("true"))
     }
 
-    val authorizedResponse = RestAssured
-      .given()
-      .config(sslconfig)
-      .auth()
-      .preemptive()
-      .basic(wskprops.authKey.split(":")(0), wskprops.authKey.split(":")(1))
-      .head(url)
+    org.apache.openwhisk.utils
+      .retry(
+        {
+          val authorizedResponse = RestAssured
+            .given()
+            .config(sslconfig)
+            .auth()
+            .preemptive()
+            .basic(wskprops.authKey.split(":")(0), wskprops.authKey.split(":")(1))
+            .head(url)
 
-    authorizedResponse.statusCode shouldBe 200
-    authorizedResponse.body.asString() shouldBe ""
-    authorizedResponse.getHeader("Request-type") shouldBe "head"
+          authorizedResponse.statusCode shouldBe 200
+          authorizedResponse.body.asString() shouldBe ""
+          authorizedResponse.getHeader("Request-type") shouldBe "head"
+        },
+        retriesOnTestFailures,
+        Some(waitBeforeRetry),
+        Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
   }
 
   private val subdomainRegex = Seq.fill(WhiskProperties.getPartsInVanitySubdomain)("[a-zA-Z0-9]+").mkString("-")
@@ -446,31 +574,37 @@ class WskWebActionsTests extends TestHelpers with WskTestHelpers with RestUtil w
 
       val url = getServiceApiHost(vanitySubdomain, true) + s"/default/$actionName.json/a?a=A"
       println(s"url: $url")
+      org.apache.openwhisk.utils
+        .retry(
+          {
+            // try the rest assured path first, failing that, try curl with explicit resolve
+            Try {
+              val response = RestAssured.given().config(sslconfig).get(url)
+              val responseCode = response.statusCode
+              responseCode shouldBe 200
+              response.body.asString.parseJson.asJsObject.fields("a").convertTo[String] shouldBe "A"
+            } match {
+              case Failure(t) =>
+                println(s"RestAssured path failed, trying curl: $t")
+                implicit val tid = TransactionId.testing
+                implicit val logger = new PrintStreamLogging(Console.out)
+                val host = getServiceApiHost(vanitySubdomain, false)
+                // if the edge host is a name, try to resolve it, otherwise, it should be an ip address already
+                val edgehost = WhiskProperties.getEdgeHost
+                val ip = Try(java.net.InetAddress.getByName(edgehost).getHostAddress) getOrElse "???"
+                println(s"edge: $edgehost, ip: $ip")
+                val cmd = Seq("curl", "-k", url, "--resolve", s"$host:$ip")
+                val (stdout, stderr, exitCode) = SimpleExec.syncRunCmd(cmd)
+                withClue(s"\n$stderr\n") {
+                  stdout.parseJson.asJsObject.fields("a").convertTo[String] shouldBe "A"
+                  exitCode shouldBe 0
+                }
 
-      // try the rest assured path first, failing that, try curl with explicit resolve
-      Try {
-        val response = RestAssured.given().config(sslconfig).get(url)
-        val responseCode = response.statusCode
-        responseCode shouldBe 200
-        response.body.asString.parseJson.asJsObject.fields("a").convertTo[String] shouldBe "A"
-      } match {
-        case Failure(t) =>
-          println(s"RestAssured path failed, trying curl: $t")
-          implicit val tid = TransactionId.testing
-          implicit val logger = new PrintStreamLogging(Console.out)
-          val host = getServiceApiHost(vanitySubdomain, false)
-          // if the edge host is a name, try to resolve it, otherwise, it should be an ip address already
-          val edgehost = WhiskProperties.getEdgeHost
-          val ip = Try(java.net.InetAddress.getByName(edgehost).getHostAddress) getOrElse "???"
-          println(s"edge: $edgehost, ip: $ip")
-          val cmd = Seq("curl", "-k", url, "--resolve", s"$host:$ip")
-          val (stdout, stderr, exitCode) = SimpleExec.syncRunCmd(cmd)
-          withClue(s"\n$stderr\n") {
-            stdout.parseJson.asJsObject.fields("a").convertTo[String] shouldBe "A"
-            exitCode shouldBe 0
-          }
-
-        case _ =>
-      }
+              case _ =>
+            }
+          },
+          retriesOnTestFailures,
+          Some(waitBeforeRetry),
+          Some(s"${this.getClass.getName} Wsk Web Actions call $url not successful, retrying.."))
   }
 }
