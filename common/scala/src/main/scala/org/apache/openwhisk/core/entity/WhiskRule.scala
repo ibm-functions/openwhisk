@@ -236,6 +236,7 @@ object WhiskRule extends DocumentFactory[WhiskRule] with WhiskEntityQueries[Whis
   }
 
   override val cacheEnabled = false
+  override val cacheChangeNotificationEnabled = false
 }
 
 object WhiskRuleResponse extends DefaultJsonProtocol {

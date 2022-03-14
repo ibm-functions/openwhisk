@@ -20,6 +20,7 @@ package org.apache.openwhisk.core.entity
 import java.time.Instant
 
 import spray.json.DefaultJsonProtocol
+import org.apache.openwhisk.common.{Logging, PrintStreamLogging}
 import org.apache.openwhisk.core.database.DocumentFactory
 import spray.json._
 
@@ -119,7 +120,12 @@ object WhiskTrigger
   private implicit val fqnSerdesAsDocId = FullyQualifiedEntityName.serdesAsDocId
   override implicit val serdes = jsonFormat9(WhiskTrigger.apply)
 
-  override val cacheEnabled = true
+  override val cacheEnabled = useCache
+
+  implicit val logging: Logging = new PrintStreamLogging()
+  logging.info(
+    this,
+    s"cacheEnabled: $cacheEnabled, isController: $isController, cacheInvalidationEnabled: $cacheInvalidationEnabled, useCache: $useCache, cacheChangeNotificationEnabled: $cacheChangeNotificationEnabled")
 }
 
 object WhiskTriggerPut extends DefaultJsonProtocol {

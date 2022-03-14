@@ -92,6 +92,7 @@ trait MultipleReadersSingleWriterCache[W, Winfo] {
   import MultipleReadersSingleWriterCache._
 
   /** Subclasses: Toggle this to enable/disable caching for your entity type. */
+  protected val cacheChangeNotificationEnabled = true
   protected val cacheEnabled = true
   protected val evictionPolicy: EvictionPolicy = AccessTime
   protected val fixedCacheSize = 0
@@ -202,10 +203,12 @@ trait MultipleReadersSingleWriterCache[W, Winfo] {
             // a pre-existing owner will take care of the invalidation
             invalidator
         }
-      } andThen {
-        case _ => notifier.foreach(_(key))
       }
-    } else invalidator // not caching
+    } else {
+      invalidator // not caching
+    } andThen {
+      case _ if cacheChangeNotificationEnabled => notifier.foreach(_(key))
+    }
   }
 
   /**
@@ -296,10 +299,12 @@ trait MultipleReadersSingleWriterCache[W, Winfo] {
             invalidateEntryAfter(generator, key, actualEntry)
           }
         }
-      } andThen {
-        case _ => notifier.foreach(_(key))
       }
-    } else generator // not caching
+    } else {
+      generator // not caching
+    } andThen {
+      case _ if cacheChangeNotificationEnabled => notifier.foreach(_(key))
+    }
   }
 
   def cacheSize: Int = cache.size

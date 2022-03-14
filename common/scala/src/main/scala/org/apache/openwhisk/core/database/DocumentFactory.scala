@@ -82,6 +82,12 @@ trait DocumentSerializer {
  */
 trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSingleWriterCache[W, DocInfo] {
 
+  val isController = sys.env.get("CONTROLLER_NAME").getOrElse("").equals("controller")
+  val cacheInvalidationEnabled =
+    sys.env.get("CONFIG_whisk_controller_cacheinvalidation_enabled").getOrElse("false").toBoolean
+  // bypass cache for crud action get for cloudant enabled cache invalidation
+  val useCache = isController || !cacheInvalidationEnabled
+
   /**
    * Puts a record of type W in the datastore.
    *

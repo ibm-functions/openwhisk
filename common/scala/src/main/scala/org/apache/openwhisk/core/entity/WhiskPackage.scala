@@ -26,7 +26,7 @@ import scala.util.Try
 import spray.json.DefaultJsonProtocol
 import spray.json.DefaultJsonProtocol._
 import spray.json._
-import org.apache.openwhisk.common.TransactionId
+import org.apache.openwhisk.common.{Logging, PrintStreamLogging, TransactionId}
 import org.apache.openwhisk.core.database.DocumentFactory
 import org.apache.openwhisk.core.entity.types.EntityStore
 
@@ -205,7 +205,13 @@ object WhiskPackage
     jsonFormat8(WhiskPackage.apply)
   }
 
-  override val cacheEnabled = true
+  override val cacheEnabled = useCache
+
+  implicit val logging: Logging = new PrintStreamLogging()
+  logging.info(
+    this,
+    s"cacheEnabled: $cacheEnabled, isController: $isController, cacheInvalidationEnabled: $cacheInvalidationEnabled, useCache: $useCache, cacheChangeNotificationEnabled: $cacheChangeNotificationEnabled")
+
 
   lazy val publicPackagesView: View = WhiskQueries.entitiesView(collection = s"$collectionName-public")
 }
