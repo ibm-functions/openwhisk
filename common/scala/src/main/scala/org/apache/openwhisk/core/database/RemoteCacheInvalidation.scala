@@ -210,7 +210,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
         logging.warn(
           this,
           s"@StR msg: $msg, msg.instanceId: ${msg.instanceId}, instanceId: $instanceId, isController: $isController, cacheInvalidationEnabled: $cacheInvalidationEnabled")
-        if (msg.instanceId != instanceId && (isController || !cacheInvalidationEnabled) && false) {
+        if (msg.instanceId != instanceId && (isController || !cacheInvalidationEnabled)) {
           WhiskActionMetaData.removeId(msg.key)
           WhiskAction.removeId(msg.key)
           WhiskPackage.removeId(msg.key)
