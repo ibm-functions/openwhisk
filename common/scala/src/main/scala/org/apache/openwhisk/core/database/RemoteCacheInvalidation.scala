@@ -128,10 +128,10 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
         .changes()(since = Some(lcus), limit = Some(limit), descending = false)
         .map { resp =>
           val seqs = resp.fields("results").convertTo[List[JsObject]]
-          logging.info(this, s"found ${seqs.length} changes (${seqs.count(_.fields.contains("deleted"))} deletions)")
           if (seqs.length > 0) {
             lcus = resp.fields("last_seq").asInstanceOf[JsString].convertTo[String]
-            logging.info(this, s"new lcus: $lcus")
+            logging.info(this, s"found ${seqs.length} changes (${seqs
+              .count(_.fields.contains("deleted"))} deletions), lcus: $lcus")
           }
           seqs.map(_.fields("id").convertTo[String])
         }
@@ -178,7 +178,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   }
 
   def ensureInitialSequence(): Future[Unit] = {
-    if (cacheInvalidationEnabled) {
+    if (cacheInvalidationEnabled && isController) {
       dbChanges.ensureInitialSequence()
     } else {
       Future.successful(())

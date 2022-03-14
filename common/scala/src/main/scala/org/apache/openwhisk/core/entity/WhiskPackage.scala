@@ -210,7 +210,7 @@ object WhiskPackage
   implicit val logging: Logging = new PrintStreamLogging()
   logging.info(
     this,
-    s"cacheEnabled: $cacheEnabled, isController: $isController, cacheInvalidationEnabled: $cacheInvalidationEnabled, useCache: $useCache, cacheChangeNotificationEnabled: $cacheChangeNotificationEnabled")
+    s"isController: $isController, cacheInvalidationEnabled: $cacheInvalidationEnabled, useCache: $useCache, cacheChangeNotificationEnabled: $cacheChangeNotificationEnabled")
 
 
   lazy val publicPackagesView: View = WhiskQueries.entitiesView(collection = s"$collectionName-public")
