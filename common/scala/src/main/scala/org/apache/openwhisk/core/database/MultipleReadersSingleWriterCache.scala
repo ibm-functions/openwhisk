@@ -206,8 +206,7 @@ trait MultipleReadersSingleWriterCache[W, Winfo] {
       } andThen {
         case _ => notifier.foreach(_(key))
       }
-    }
-    else {
+    } else {
       // not caching
       invalidator andThen {
         case _ if cacheChangeNotificationEnabled => notifier.foreach(_(key))
@@ -306,8 +305,7 @@ trait MultipleReadersSingleWriterCache[W, Winfo] {
       } andThen {
         case _ => notifier.foreach(_(key))
       }
-    }
-    else {
+    } else {
       // not caching
       generator andThen {
         case _ if cacheChangeNotificationEnabled => notifier.foreach(_(key))
