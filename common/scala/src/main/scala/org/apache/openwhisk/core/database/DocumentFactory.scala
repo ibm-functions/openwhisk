@@ -85,7 +85,7 @@ trait DocumentFactory[W <: DocumentRevisionProvider] extends MultipleReadersSing
   val isController = sys.env.get("CONTROLLER_NAME").getOrElse("").equals("controller")
   val cacheInvalidationEnabled =
     sys.env.get("CONFIG_whisk_controller_cacheinvalidation_enabled").getOrElse("false").toBoolean
-  // bypass cache for crud action get for cloudant enabled cache invalidation
+  // bypass cache for crud operations if cloudant based cache invalidation is enabled
   val useCache = isController || !cacheInvalidationEnabled
 
   /**

@@ -212,7 +212,6 @@ object WhiskPackage
     this,
     s"isController: $isController, cacheInvalidationEnabled: $cacheInvalidationEnabled, useCache: $useCache, cacheChangeNotificationEnabled: $cacheChangeNotificationEnabled")
 
-
   lazy val publicPackagesView: View = WhiskQueries.entitiesView(collection = s"$collectionName-public")
 }
 

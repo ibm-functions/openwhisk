@@ -167,6 +167,8 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   }
 
   def scheduleCacheInvalidation(): Any = {
+    // do cloudant based cache invalidation only on controller side
+    // as caching is bypassed on crudcontroller side in this case
     if (cacheInvalidationEnabled && isController) {
       Scheduler.scheduleWaitAtMost(
         interval = FiniteDuration(cacheInvalidationPollInterval, TimeUnit.SECONDS),
@@ -178,6 +180,8 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   }
 
   def ensureInitialSequence(): Future[Unit] = {
+    // do cloudant based cache invalidation only on controller side
+    // as caching is bypassed on crudcontroller side in this case
     if (cacheInvalidationEnabled && isController) {
       dbChanges.ensureInitialSequence()
     } else {
@@ -207,9 +211,9 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
 
     CacheInvalidationMessage.parse(raw) match {
       case Success(msg: CacheInvalidationMessage) => {
-        logging.warn(
-          this,
-          s"@StR msg: $msg, msg.instanceId: ${msg.instanceId}, instanceId: $instanceId, isController: $isController, cacheInvalidationEnabled: $cacheInvalidationEnabled")
+        // do kafka based cache invalidation only on controller side if
+        // cloudant based cache invalidation is enabled as caching is bypassed
+        // on crudcontroller side in this case
         if (msg.instanceId != instanceId && (isController || !cacheInvalidationEnabled)) {
           WhiskActionMetaData.removeId(msg.key)
           WhiskAction.removeId(msg.key)

@@ -419,7 +419,6 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
     fromCache: Boolean)(implicit transid: TransactionId, mw: Manifest[WhiskAction]): Future[WhiskAction] = {
 
     implicit val ec = db.executionContext
-    implicit val logger = db.logging
 
     val inlineActionCode: WhiskAction => Future[WhiskAction] = { action =>
       def getWithAttachment(attached: Attached, binary: Boolean, exec: AttachedCode) = {
@@ -443,7 +442,6 @@ object WhiskAction extends DocumentFactory[WhiskAction] with WhiskEntityQueries[
           Future.successful(action)
       }
     }
-    logger.warn(this, s"@StR get fromCache: $fromCache")
     super.getWithAttachment(db, doc, rev, fromCache, attachmentHandler, inlineActionCode)
   }
 
