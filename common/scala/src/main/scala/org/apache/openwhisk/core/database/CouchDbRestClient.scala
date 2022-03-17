@@ -28,7 +28,6 @@ import akka.util.ByteString
 import spray.json.DefaultJsonProtocol._
 import spray.json._
 import org.apache.openwhisk.common.Logging
-import org.apache.openwhisk.core.entity.UUIDs
 import org.apache.openwhisk.http.PoolingRestClient
 import org.apache.openwhisk.http.PoolingRestClient._
 

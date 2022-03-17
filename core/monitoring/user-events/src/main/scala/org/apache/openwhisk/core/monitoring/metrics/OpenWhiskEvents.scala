@@ -54,7 +54,7 @@ object OpenWhiskEvents extends SLF4JLogging {
     }
     val port = metricConfig.port
     val api = new PrometheusEventsApi(eventConsumer, prometheusRecorder)
-    val httpBinding = Http().bindAndHandle(api.routes, "0.0.0.0", port)
+    val httpBinding = Http().newServerAt("0.0.0.0", port).bindFlow(api.routes)
     httpBinding.foreach(_ => log.info(s"Started the http server on http://localhost:$port"))(system.dispatcher)
     httpBinding
   }

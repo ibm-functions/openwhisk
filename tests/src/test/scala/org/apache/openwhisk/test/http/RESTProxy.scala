@@ -80,7 +80,7 @@ class RESTProxy(val host: String, val port: Int)(val serviceAuthority: Uri.Autho
       implicit val m = ActorMaterializer()
       materializer = Some(m)
       log.debug(s"[RESTProxy] Binding to '$host:$port'.")
-      val b = Await.result(Http().bindAndHandle(mkRequestFlow(m), host, port), 5.seconds)
+      val b = Await.result(Http().newServerAt(host, port).bindFlow(mkRequestFlow(m)), 5.seconds)
       binding = Some(b)
     }
   }
@@ -128,7 +128,7 @@ class RESTProxy(val host: String, val port: Int)(val serviceAuthority: Uri.Autho
         }
 
         // akka-http doesn't like us to set those headers ourselves.
-        val upstreamRequest = request.copy(headers = request.headers.filter(_ match {
+        val upstreamRequest = request.withHeaders(headers = request.headers.filter(_ match {
           case `Timeout-Access`(_) => false
           case _                   => true
         }))

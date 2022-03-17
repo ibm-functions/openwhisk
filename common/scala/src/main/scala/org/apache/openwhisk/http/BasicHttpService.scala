@@ -207,7 +207,7 @@ object BasicHttpService {
     RejectionHandler.default.mapRejectionResponse {
       case res @ HttpResponse(_, _, ent: HttpEntity.Strict, _) =>
         val error = ErrorResponse(ent.data.utf8String, transid).toJson
-        res.copy(entity = HttpEntity(ContentTypes.`application/json`, error.compactPrint))
+        res.withEntity(HttpEntity(ContentTypes.`application/json`, error.compactPrint))
       case x => x
     }
   }
