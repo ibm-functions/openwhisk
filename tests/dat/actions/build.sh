@@ -27,7 +27,9 @@ fi
 jv=$(java -version 2>&1 | head -1 | awk -F'"' '{print $2}')
 if [[ $jv == 1.8.* ]]; then
   echo "java version is $jv (ok)"
-  (cd unicode.tests/src/java/unicode && ../../../../../../../gradlew build && cp build/libs/unicode-1.0.jar ../../../java-8.bin)
+  (cd unicode.tests/src/java/unicode && ../../../../../../../gradlew build && \
+   cp build/libs/unicode-1.0.jar ../../../java-8.bin && \
+   cp build/libs/unicode-1.0.jar ../../../java.bin )
   (cd src/java/sleep && ../../../../../../gradlew build && cp build/libs/sleep-1.0.jar ../../../sleep.jar)
 else
   echo "java version is $jv (not ok)"
