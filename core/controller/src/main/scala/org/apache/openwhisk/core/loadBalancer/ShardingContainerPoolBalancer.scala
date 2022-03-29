@@ -193,7 +193,7 @@ class ShardingContainerPoolBalancer(
     MetricEmitter.emitGaugeMetric(
       UNRESPONSIVE_INVOKER_MANAGED,
       schedulingState.managedInvokers.count(_.status == Unresponsive))
-    MetricEmitter.emitGaugeMetric(OFFLINE_INVOKER_MANAGED, schedulingState.managedInvokers.count(_.status == Offline))
+    MetricEmitter.emitGaugeMetric(OFFLINE_INVOKER_MANAGED, schedulingState.managedInvokers.count(_.status == Offline()))
     MetricEmitter.emitGaugeMetric(HEALTHY_INVOKER_BLACKBOX, schedulingState.blackboxInvokers.count(_.status == Healthy))
     MetricEmitter.emitGaugeMetric(
       UNHEALTHY_INVOKER_BLACKBOX,
@@ -201,7 +201,7 @@ class ShardingContainerPoolBalancer(
     MetricEmitter.emitGaugeMetric(
       UNRESPONSIVE_INVOKER_BLACKBOX,
       schedulingState.blackboxInvokers.count(_.status == Unresponsive))
-    MetricEmitter.emitGaugeMetric(OFFLINE_INVOKER_BLACKBOX, schedulingState.blackboxInvokers.count(_.status == Offline))
+    MetricEmitter.emitGaugeMetric(OFFLINE_INVOKER_BLACKBOX, schedulingState.blackboxInvokers.count(_.status == Offline()))
   }
 
   /** State needed for scheduling. */

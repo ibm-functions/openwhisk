@@ -365,9 +365,11 @@ class InvokerReactive(
       .send(
         "health",
         PingMessage(
-          instance,
-          namespaceBlacklist
-            .isBlacklisted(instance.displayedName.getOrElse("")) || rootfspcent >= 85 || logsfspcent >= 85))
+          instance = instance,
+          isBlacklisted = namespaceBlacklist.isBlacklisted(instance.displayedName.getOrElse("")),
+          hasDiskPressure = rootfspcent >= 85 || logsfspcent >= 85,
+          rootfspcent = rootfspcent,
+          logsfspcent = logsfspcent))
       .andThen {
         case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
       }

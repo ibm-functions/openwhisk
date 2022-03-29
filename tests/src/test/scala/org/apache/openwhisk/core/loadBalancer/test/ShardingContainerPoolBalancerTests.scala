@@ -90,7 +90,7 @@ class ShardingContainerPoolBalancerTests
   def healthy(i: Int, memory: ByteSize = defaultUserMemory) =
     new InvokerHealth(InvokerInstanceId(i, userMemory = memory), Healthy)
   def unhealthy(i: Int) = new InvokerHealth(InvokerInstanceId(i, userMemory = defaultUserMemory), Unhealthy)
-  def offline(i: Int) = new InvokerHealth(InvokerInstanceId(i, userMemory = defaultUserMemory), Offline)
+  def offline(i: Int) = new InvokerHealth(InvokerInstanceId(i, userMemory = defaultUserMemory), Offline())
 
   def semaphores(count: Int, max: Int): IndexedSeq[NestedSemaphore[FullyQualifiedEntityName]] =
     IndexedSeq.fill(count)(new NestedSemaphore[FullyQualifiedEntityName](max))
