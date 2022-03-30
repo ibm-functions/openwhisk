@@ -69,7 +69,7 @@ object InvokerState {
       extends Unusable {
     val DOWN = "down"
     val asString =
-      if (isBlacklisted) s"$DOWN/disabled($rootfspcent,$logsfspcent,${System.currentTimeMillis})"
+      if (isBlacklisted) s"$DOWN/disabled(${System.currentTimeMillis})"
       else if (hasDiskPressure) s"$DOWN/diskpressure($rootfspcent,$logsfspcent,${System.currentTimeMillis})"
       else DOWN
     def canEqual(a: Any) = a.isInstanceOf[InvokerState]
