@@ -78,7 +78,7 @@ object InvokerState {
         case that: InvokerState => that.asString.startsWith(DOWN)
         case _                  => false
       }
-    override def hashCode = DOWN.hashCode
+    override def hashCode = s"${isUsable}.$DOWN".hashCode
   }
 }
 // Possible answers of an activation
