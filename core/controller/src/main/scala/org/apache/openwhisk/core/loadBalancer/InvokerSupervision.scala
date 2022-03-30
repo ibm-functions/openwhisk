@@ -69,9 +69,8 @@ object InvokerState {
       extends Unusable {
     val DOWN = "down"
     val asString =
-      if (isBlacklisted) s"$DOWN/blocked($rootfspcent,$logsfspcent,${System.currentTimeMillis})"
+      if (isBlacklisted) s"$DOWN/disabled($rootfspcent,$logsfspcent,${System.currentTimeMillis})"
       else if (hasDiskPressure) s"$DOWN/diskpressure($rootfspcent,$logsfspcent,${System.currentTimeMillis})"
-      else if (rootfspcent != -1) s"$DOWN($rootfspcent,$logsfspcent,${System.currentTimeMillis})"
       else DOWN
     def canEqual(a: Any) = a.isInstanceOf[InvokerState]
     override def equals(that: Any): Boolean =
@@ -332,8 +331,14 @@ class InvokerActor(invokerInstance: InvokerInstanceId, controllerInstance: Contr
 
   /** An Offline invoker represents an existing but broken invoker. This means, that it does not send pings anymore. */
   when(Offline()) {
-    case Event(p: PingMessage, _) if p.isBlacklisted || p.hasDiskPressure =>
+    case Event(p: PingMessage, _) if p.isBlacklisted =>
       stay // avoid unhandled event {"isBlacklisted":true,..} in state Offline
+    case Event(p: PingMessage, _) if p.hasDiskPressure =>
+      val stateOffline = stateName.asInstanceOf[InvokerState.Offline]
+      if (p.rootfspcent != stateOffline.rootfspcent || p.logsfspcent != stateOffline.logsfspcent) {
+        // edge case, reflect latest fs percentage in case of disk pressure
+        goto(Offline(false, true, p.rootfspcent, p.logsfspcent))
+      } else stay // avoid unhandled event {"hasDiskPressure":true,..} in state Offline
     case Event(p: PingMessage, _) => goto(Unhealthy)
   }
 
