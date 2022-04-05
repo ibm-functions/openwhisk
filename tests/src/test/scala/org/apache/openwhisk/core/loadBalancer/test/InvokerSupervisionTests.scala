@@ -121,7 +121,8 @@ class InvokerSupervisionTests
       invoker5.expectMsg(ping0)
 
       invoker5.send(supervisor, CurrentState(invoker5.ref, Healthy))
-      allStates(supervisor) shouldBe zipWithInstance(IndexedSeq(Offline(), Offline(), Offline(), Offline(), Offline(), Healthy))
+      allStates(supervisor) shouldBe zipWithInstance(
+        IndexedSeq(Offline(), Offline(), Offline(), Offline(), Offline(), Healthy))
 
       // create second invoker
       val ping1 = PingMessage(invoker2Instance)
@@ -130,17 +131,20 @@ class InvokerSupervisionTests
       invoker2.expectMsg(ping1)
 
       invoker2.send(supervisor, CurrentState(invoker2.ref, Healthy))
-      allStates(supervisor) shouldBe zipWithInstance(IndexedSeq(Offline(), Offline(), Healthy, Offline(), Offline(), Healthy))
+      allStates(supervisor) shouldBe zipWithInstance(
+        IndexedSeq(Offline(), Offline(), Healthy, Offline(), Offline(), Healthy))
 
       // ping the first invoker again
       supervisor ! ping0
       invoker5.expectMsg(ping0)
 
-      allStates(supervisor) shouldBe zipWithInstance(IndexedSeq(Offline(), Offline(), Healthy, Offline(), Offline(), Healthy))
+      allStates(supervisor) shouldBe zipWithInstance(
+        IndexedSeq(Offline(), Offline(), Healthy, Offline(), Offline(), Healthy))
 
       // one invoker goes offline
       invoker2.send(supervisor, Transition(invoker2.ref, Healthy, Offline()))
-      allStates(supervisor) shouldBe zipWithInstance(IndexedSeq(Offline(), Offline(), Offline(), Offline(), Offline(), Healthy))
+      allStates(supervisor) shouldBe zipWithInstance(
+        IndexedSeq(Offline(), Offline(), Offline(), Offline(), Offline(), Healthy))
     }
   }
 
