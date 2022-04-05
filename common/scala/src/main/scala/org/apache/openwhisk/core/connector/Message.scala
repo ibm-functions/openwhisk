@@ -254,13 +254,19 @@ object AcknowledegmentMessage extends DefaultJsonProtocol {
   }
 }
 
-case class PingMessage(instance: InvokerInstanceId, isBlacklisted: Boolean = false, hasDiskPressure: Boolean = false, rootfspcent: Int = -1, logsfspcent: Int = -1) extends Message {
+case class PingMessage(instance: InvokerInstanceId,
+                       isBlacklisted: Boolean = false,
+                       hasDiskPressure: Boolean = false,
+                       rootfspcent: Int = -1,
+                       logsfspcent: Int = -1)
+    extends Message {
   override def serialize = PingMessage.serdes.write(this).compactPrint
 }
 
 object PingMessage extends DefaultJsonProtocol {
   def parse(msg: String) = Try(serdes.read(msg.parseJson))
-  implicit val serdes = jsonFormat(PingMessage.apply, "name", "isBlacklisted", "hasDiskPressure", "rootfspcent", "logsfspcent")
+  implicit val serdes =
+    jsonFormat(PingMessage.apply, "name", "isBlacklisted", "hasDiskPressure", "rootfspcent", "logsfspcent")
 }
 
 trait EventMessageBody extends Message {
