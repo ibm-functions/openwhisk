@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-FROM adoptopenjdk/openjdk8-openj9:x86_64-alpine-jdk8u312-b07_openj9-0.29.0
+FROM adoptopenjdk/openjdk8-openj9:x86_64-alpine-jdk8u322-b06_openj9-0.30.0
 
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
