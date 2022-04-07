@@ -306,7 +306,7 @@ class ShardingContainerPoolBalancer(
             s"mem limit ${memoryLimit.megabytes} MB (${memoryLimitInfo}), " +
             s"time limit ${timeLimit.duration.toMillis} ms (${timeLimitInfo}) " +
             s"to ${invoker} " +
-            s"(${schedulingState.invokerSlots(invoker.instance).availablePermits} of ${invoker.userMemory.toMB / schedulingState.clusterSize} MB free)")
+            s"(${schedulingState.invokerSlots(invoker.instance).availablePermits} of ${invoker.userMemory.toMB / (schedulingState.clusterSize max 2)} MB free)")
         val activationResult = setupActivation(msg, action, invoker)
         sendActivationToInvoker(messageProducer, msg, invoker).map(_ => activationResult)
       }
@@ -506,12 +506,12 @@ case class ShardingContainerPoolBalancerState(
    * @return calculated invoker slot
    */
   private def getInvokerSlot(memory: ByteSize): ByteSize = {
-    val invokerShardMemorySize = memory / (_clusterSize max 2) // if cluster size < 2 calculate half of the invoker capacity anyway
+    val invokerShardMemorySize = memory / (clusterSize max 2) // if cluster size < 2 calculate half of the invoker capacity anyway
     val newTreshold = if (invokerShardMemorySize < MemoryLimit.MIN_MEMORY) {
       logging.error(
         this,
         s"registered controllers: calculated controller's invoker shard memory size falls below the min memory of one action. "
-          + s"Setting to min memory. Expect invoker overloads. Cluster size ${_clusterSize}, invoker user memory size ${memory.toMB.MB}, "
+          + s"Setting to min memory. Expect invoker overloads. Cluster size ${clusterSize}, invoker user memory size ${memory.toMB.MB}, "
           + s"min action memory size ${MemoryLimit.MIN_MEMORY.toMB.MB}, calculated shard size ${invokerShardMemorySize.toMB.MB}.")(
         TransactionId.loadbalancer)
       MemoryLimit.MIN_MEMORY
@@ -574,7 +574,7 @@ case class ShardingContainerPoolBalancerState(
   }
 
   /**
-   * Updates the size of a cluster. Throws away all state for simplicity.
+   * Do not updates the size of a cluster and especially do not throws away all state for simplicity.
    *
    * This is okay to not happen atomically, since a dirty read of the values set are not dangerous. At worst the
    * scheduler works on outdated invoker-load data which is acceptable.
@@ -583,16 +583,18 @@ case class ShardingContainerPoolBalancerState(
    */
   def updateCluster(newSize: Int): Unit = {
     val actualSize = newSize max 1 // if a cluster size < 1 is reported, falls back to a size of 1 (alone)
-    if (_clusterSize != actualSize) {
-      val oldSize = _clusterSize
+    if (clusterSize != actualSize) {
+      val oldSize = clusterSize
       _clusterSize = actualSize
-      _invokerSlots = _invokers.map { invoker =>
-        new NestedSemaphore[FullyQualifiedEntityName](getInvokerSlot(invoker.id.userMemory).toMB.toInt)
-      }
+      //_invokerSlots = _invokers.map { invoker =>
+      //  new NestedSemaphore[FullyQualifiedEntityName](getInvokerSlot(invoker.id.userMemory).toMB.toInt)
+      //}
       // Directly after startup, no invokers have registered yet. This needs to be handled gracefully.
       val invokerCount = _invokers.size
       val totalInvokerMemory =
         _invokers.foldLeft(0L)((total, invoker) => total + getInvokerSlot(invoker.id.userMemory).toMB).MB
+      val availableInvokerMemory =
+        _invokers.foldLeft(0L)((available, invoker) => available + _invokerSlots(invoker.id.instance).availablePermits)
       val averageInvokerMemory =
         if (totalInvokerMemory.toMB > 0 && invokerCount > 0) {
           (totalInvokerMemory / invokerCount).toMB.MB
@@ -601,7 +603,9 @@ case class ShardingContainerPoolBalancerState(
         }
       logging.info(
         this,
-        s"loadbalancer cluster size changed from $oldSize to $actualSize active nodes. ${invokerCount} invokers with ${averageInvokerMemory} average memory size - total invoker memory ${totalInvokerMemory}.")(
+        s"loadbalancer cluster size changed from $oldSize to $actualSize active nodes. " +
+          s"${invokerCount} invokers with ${averageInvokerMemory} average memory size - " +
+          s"total invoker memory ${totalInvokerMemory} - available memory ${availableInvokerMemory} MB.")(
         TransactionId.loadbalancer)
     }
   }
