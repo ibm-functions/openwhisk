@@ -586,6 +586,7 @@ case class ShardingContainerPoolBalancerState(
     if (clusterSize != actualSize) {
       val oldSize = clusterSize
       _clusterSize = actualSize
+      // we now keep cluster state (invoker slots) in case of a cluster change
       //_invokerSlots = _invokers.map { invoker =>
       //  new NestedSemaphore[FullyQualifiedEntityName](getInvokerSlot(invoker.id.userMemory).toMB.toInt)
       //}
