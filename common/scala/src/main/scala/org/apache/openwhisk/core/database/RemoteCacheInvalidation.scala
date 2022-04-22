@@ -68,11 +68,7 @@ class RemoteCacheInvalidation(config: WhiskConfig, component: String, instance: 
   private val cacheInvalidationProducer = msgProvider.getProducer(config)
 
   // config for controller cache invalidation
-  final case class CacheInvalidationConfig(enabled: Boolean,
-                                           initDelay: Int,
-                                           pollInterval: Int,
-                                           pageSize: Int,
-                                           maxPages: Int)
+  case class CacheInvalidationConfig(enabled: Boolean, initDelay: Int, pollInterval: Int, pageSize: Int, maxPages: Int)
   private val isController = sys.env.get("CONTROLLER_NAME").getOrElse("").equals("controller")
   private val cacheInvalidationConfigNamespace = "whisk.controller.cacheinvalidation"
   private val cacheInvalidationConfig = loadConfig[CacheInvalidationConfig](cacheInvalidationConfigNamespace).toOption
