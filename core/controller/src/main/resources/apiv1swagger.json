@@ -1891,7 +1891,6 @@
             "blackbox",
             "java:8",
             "java:default",
-            "nodejs:6",
             "nodejs:8",
             "nodejs:10",
             "nodejs:12",
