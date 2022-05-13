@@ -15,18 +15,17 @@
 # limitations under the License.
 #
 
-FROM adoptopenjdk/openjdk8-openj9:x86_64-alpine-jdk8u332-b09_openj9-0.32.0
+FROM ibm-semeru-runtimes:open-8u332-b09-jdk-focal
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
 
-# get latest certificates for https
-RUN apk add --update ca-certificates
-
-# Switch to the HTTPS endpoint for the apk repositories as per https://github.com/gliderlabs/docker-alpine/issues/184
-RUN sed -i 's/http\:\/\/dl-cdn.alpinelinux.org/https\:\/\/alpine.global.ssl.fastly.net/g' /etc/apk/repositories
-
-RUN apk add --update sed curl bash && apk update && apk upgrade
+RUN apt update &&\
+    # Upgrade installed packages to get latest security fixes if the base image does not contain them already.
+    apt upgrade -y --no-install-recommends && \
+    apt install -y ca-certificates curl && \
+    # Cleanup apt data, we do not need them later on.
+    apt clean && rm -rf /var/lib/apt/lists/*
 
 RUN mkdir /logs
 
