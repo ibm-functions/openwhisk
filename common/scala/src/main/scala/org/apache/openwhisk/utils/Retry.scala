@@ -21,6 +21,8 @@ import scala.concurrent.duration._
 
 object retry {
 
+  val regexek = "[0-9a-f]{8}-([0-9a-f]{4}-){3}[0-9a-f]{12}:[0-9a-zA-Z]{64}".r
+
   /**
    * Retries a method which returns a value or throws an exception on failure, up to N times,
    * and optionally sleeping up to specified duration between retries.
@@ -41,7 +43,9 @@ object retry {
     try fn
     catch {
       case t: Throwable if N > 1 =>
-        println(s"caught exception: ${t.getMessage}")
+        val msg = t.getMessage
+        println(
+          s"caught exception: ${regexek.findFirstIn(msg).map(match1 => msg.replace(match1.slice(37, 37 + 64), "***")).getOrElse(msg)}, retry ($N attempts left)..")
         retryMessage.foreach(println)
         waitBeforeRetry.foreach(t => Thread.sleep(t.toMillis))
         retry(fn, N - 1, waitBeforeRetry, retryMessage)
