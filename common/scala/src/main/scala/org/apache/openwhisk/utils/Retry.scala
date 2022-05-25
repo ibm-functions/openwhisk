@@ -37,22 +37,25 @@ object retry {
   def apply[T](fn: => T,
                N: Int = 3,
                waitBeforeRetry: Option[Duration] = Some(50.milliseconds),
-               retryMessage: Option[String] = None): T = {
+               retryMessage: Option[String] = None,
+               logException: Boolean = true): T = {
     require(N >= 1, "maximum number of fn applications must be greater than 1")
 
     try fn
     catch {
       case t: Throwable if N > 1 =>
-        val msg = t.getMessage
-        println(
-          s"caught exception: ${regexek.findFirstIn(msg).map(match1 => msg.replace(match1.slice(37, 37 + 64), "***")).getOrElse(msg)}, retry ($N attempts left)..")
+        if (logException) {
+          val msg = t.getMessage
+          println(s"caught exception: ${if (msg == null) msg
+          else regexek.findFirstIn(msg).map(match1 => msg.replace(match1.slice(37, 37 + 64), "***")).getOrElse(msg)}, retry ($N attempts left)..")
+        }
         retryMessage.foreach(println)
         waitBeforeRetry.foreach(t => Thread.sleep(t.toMillis))
-        retry(fn, N - 1, waitBeforeRetry, retryMessage)
+        retry(fn, N - 1, waitBeforeRetry, retryMessage, logException)
       case _ if N > 1 =>
         retryMessage.foreach(println)
         waitBeforeRetry.foreach(t => Thread.sleep(t.toMillis))
-        retry(fn, N - 1, waitBeforeRetry, retryMessage)
+        retry(fn, N - 1, waitBeforeRetry, retryMessage, logException)
     }
   }
 }

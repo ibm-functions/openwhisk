@@ -709,7 +709,7 @@ class RestActivationOperations(implicit val actorSystem: ActorSystem)
         val result =
           idsActivation(listActivation(filter = entity, limit = limit, since = since, skip = skip, docs = false))
         if (result.length >= N) result else throw PartialResult(result)
-      }, retries, waitBeforeRetry = Some(pollPeriod))
+      }, retries, waitBeforeRetry = Some(pollPeriod), logException = false)
     } match {
       case Success(ids)                => ids
       case Failure(PartialResult(ids)) => ids

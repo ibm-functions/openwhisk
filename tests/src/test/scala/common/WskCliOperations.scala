@@ -629,7 +629,7 @@ class CliActivationOperations(val wsk: RunCliCmd) extends ActivationOperations w
       retry({
         val result = ids(list(filter = entity, limit = limit, since = since, skip = skip))
         if (result.length >= N) result else throw PartialResult(result)
-      }, retries, waitBeforeRetry = Some(pollPeriod))
+      }, retries, waitBeforeRetry = Some(pollPeriod), logException = false)
     } match {
       case Success(ids)                => ids
       case Failure(PartialResult(ids)) => ids
