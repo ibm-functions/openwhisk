@@ -275,7 +275,7 @@ gradle.projectsEvaluated {
 
     tasks.withType(Test) {
         systemProperties(System.getProperties())
-        systemProperty("whisk.server.jar", getStandaloneJarFilePath())
+        //systemProperty("whisk.server.jar", getStandaloneJarFilePath())
 
         testLogging {
             events "passed", "skipped", "failed"
