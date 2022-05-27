@@ -20,7 +20,7 @@ include 'common:scala'
 include 'core:controller'
 include 'core:invoker'
 include 'core:cosmosdb:cache-invalidator'
-include 'core:standalone'
+//include 'core:standalone'
 include 'core:monitoring:user-events'
 
 include 'tests'
