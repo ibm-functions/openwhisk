@@ -565,7 +565,7 @@ trait WhiskWebActionsApi
                 onComplete(verifyWebAction(fullActionName, onBehalfOf.isDefined)) {
                   case Success((actionOwnerIdentity, action)) =>
                     val requiredAuthOk =
-                      requiredWhiskAuthSuccessful(action.annotations, context.headers).getOrElse(true)
+                      requiredWhiskAuthSuccessful(action.annotations, context.headers, context.method).getOrElse(true)
                     if (!requiredAuthOk) {
                       logging.debug(
                         this,
@@ -845,19 +845,22 @@ trait WhiskWebActionsApi
    *
    * @param annotations - web action annotations
    * @param reqHeaders  - web action invocation request headers
+   * @param method      - web action invocation method
    * @return Option[Boolean]
-   *         None if annotations does not include require-whisk-auth (i.e. auth test not needed)
+   *         None if annotations does not include require-whisk-auth (i.e. auth test not needed) or it is an options request
    *         Some(true) if annotations includes require-whisk-auth and it's value matches the request header `X-Require-Whisk-Auth` value
    *         Some(false) if annotations includes require-whisk-auth and the request does not include the header `X-Require-Whisk-Auth`
    *         Some(false) if annotations includes require-whisk-auth and it's value deos not match the request header `X-Require-Whisk-Auth` value
    */
-  private def requiredWhiskAuthSuccessful(annotations: Parameters, reqHeaders: Seq[HttpHeader]): Option[Boolean] = {
+  private def requiredWhiskAuthSuccessful(annotations: Parameters,
+                                          reqHeaders: Seq[HttpHeader],
+                                          method: HttpMethod): Option[Boolean] = {
     annotations
       .get(Annotations.RequireWhiskAuthAnnotation)
       .flatMap {
-        case JsString(authStr) => Some(authStr)
-        case JsNumber(authNum) => Some(authNum.toString)
-        case _                 => None
+        case JsString(authStr) if method != OPTIONS => Some(authStr)
+        case JsNumber(authNum) if method != OPTIONS => Some(authNum.toString)
+        case _                                      => None
       }
       .map { reqWhiskAuthAnnotationStr =>
         reqHeaders
