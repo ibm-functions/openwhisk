@@ -474,7 +474,7 @@ trait WebActionsApiBaseTests extends ControllerTestCommon with BeforeAndAfterEac
           m(s"$testRoutePath/${path}.json") ~> addHeader("X-Require-Whisk-Auth", requireAuthenticationKey + "-bad") ~> Route
             .seal(routes(creds)) ~> check {
             if (m == Options) {
-              status should be(OK)
+              status should be(OK) // options should always respond
             } else {
               status should be(Unauthorized)
             }
@@ -483,7 +483,7 @@ trait WebActionsApiBaseTests extends ControllerTestCommon with BeforeAndAfterEac
           // web action require-whisk-auth is set, but the header X-Require-Whisk-Auth value is not set
           m(s"$testRoutePath/${path}.json") ~> Route.seal(routes(creds)) ~> check {
             if (m == Options) {
-              status should be(OK)
+              status should be(OK) // options should always respond
             } else {
               status should be(Unauthorized)
             }
