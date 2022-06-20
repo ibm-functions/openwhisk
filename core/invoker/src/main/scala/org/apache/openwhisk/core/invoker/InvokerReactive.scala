@@ -158,7 +158,11 @@ class InvokerReactive(
   private val namespaceBlacklist = new NamespaceBlacklist(authStore)
   private val rootfs = "/"
   private val logsfs = "/logs"
+  private val fspecentmax = 85
   private var rootfspcent = -1
+  private var rootfspecentmax = fspecentmax
+  private val rootfspecentup = fspecentmax
+  private val rootfspecentlow = fspecentmax - 3
   private var logsfspcent = -1
 
   Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) { () =>
@@ -168,12 +172,13 @@ class InvokerReactive(
     val rootfsraw = Try((s"df $rootfs" #| s"grep $rootfs" !!).trim.replaceAll(" +", " ")).getOrElse("??")
     val rootfspcentraw = Try(rootfsraw.split(" ")(4)).getOrElse("??")
     rootfspcent = Try(rootfspcentraw.substring(0, rootfspcentraw.indexOf("%")).toInt).getOrElse(-1)
+    rootfspecentmax = if (rootfspcent >= rootfspecentmax) rootfspecentlow else rootfspecentup
     val logsfsraw = Try((s"df $logsfs" #| s"grep $logsfs" !!).trim.replaceAll(" +", " ")).getOrElse("??")
     val logsfspcentraw = Try(logsfsraw.split(" ")(4)).getOrElse("??")
     logsfspcent = Try(logsfspcentraw.substring(0, logsfspcentraw.indexOf("%")).toInt).getOrElse(-1)
     logging.warn(
       this,
-      s"invoker fs space: '$rootfsraw ($rootfspcentraw($rootfspcent))', '$logsfsraw ($logsfspcentraw($logsfspcent))'")
+      s"invoker fs space: '$rootfsraw ($rootfspcentraw($rootfspcent($rootfspecentmax)))', '$logsfsraw ($logsfspcentraw($logsfspcent($fspecentmax)))'")
 
     namespaceBlacklist.refreshBlacklist()(ec, TransactionId.invoker).andThen {
       case Success(set) => {
@@ -367,7 +372,7 @@ class InvokerReactive(
         PingMessage(
           instance = instance,
           isBlacklisted = namespaceBlacklist.isBlacklisted(instance.displayedName.getOrElse("")),
-          hasDiskPressure = rootfspcent >= 85 || logsfspcent >= 85,
+          hasDiskPressure = rootfspcent >= rootfspecentmax || logsfspcent >= fspecentmax,
           rootfspcent = rootfspcent,
           logsfspcent = logsfspcent))
       .andThen {
