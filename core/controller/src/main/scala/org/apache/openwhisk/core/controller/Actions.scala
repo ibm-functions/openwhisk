@@ -108,6 +108,12 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
   /** JSON response formatter. */
   import RestApiCommons.jsonDefaultResponsePrinter
 
+  /** Allowed action request payload field names. */
+  protected[core] val ALLOWED_FIELDS = classOf[WhiskAction].getDeclaredFields.map(_.getName).toList
+
+  /** System namespaces */
+  protected[core] val SYSTEM_NAMESPACES = List("lime@us.ibm.com", "whisk.system")
+
   /**
    * Handles operations on action resources, which encompass these cases:
    *
@@ -204,19 +210,38 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
    */
   override def create(user: Identity, entityName: FullyQualifiedEntityName)(implicit transid: TransactionId) = {
     parameter('overwrite ? false) { overwrite =>
-      entity(as[WhiskActionPut]) { content =>
-        val request = content.resolve(user.namespace)
-        val checkAdditionalPrivileges = entitleReferencedEntities(user, Privilege.READ, request.exec).flatMap {
-          case _ => entitlementProvider.check(user, content.exec)
-        }
+      //logging.debug(this, "checking if sequence components are accessible")
+      entity(as[Option[JsObject]]) { payload =>
+        logging.info(
+          this,
+          s"@StR request payload fields: ${payload.map(_.fields.keySet)}, allowedFields: $ALLOWED_FIELDS")
+        val allowCreate = payload
+          .map(_.fields.keySet.forall(key => ALLOWED_FIELDS.contains(key)))
+          .getOrElse(true)
+        val invalidFields = payload
+          .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
+          .getOrElse(Set())
+        logging.info(this, s"@StR allowCreate $allowCreate, invalidFields: $invalidFields")
 
-        onComplete(checkAdditionalPrivileges) {
-          case Success(_) =>
-            putEntity(WhiskAction, entityStore, entityName.toDocId, overwrite, update(user, request) _, () => {
-              make(user, entityName, request)
-            })
-          case Failure(f) =>
-            super.handleEntitlementFailure(f)
+        if (invalidFields.isEmpty /*|| SYSTEM_NAMESPACES.contains(user.namespace.name.asString)*/ ) {
+          entity(as[WhiskActionPut]) { content =>
+            val request = content.resolve(user.namespace)
+            val checkAdditionalPrivileges = entitleReferencedEntities(user, Privilege.READ, request.exec).flatMap {
+              case _ => entitlementProvider.check(user, content.exec)
+            }
+
+            onComplete(checkAdditionalPrivileges) {
+              case Success(_) =>
+                putEntity(WhiskAction, entityStore, entityName.toDocId, overwrite, update(user, request) _, () => {
+                  make(user, entityName, request)
+                })
+              case Failure(f) =>
+                super.handleEntitlementFailure(f)
+            }
+          }
+        } else {
+          logging.error(this, s"[PUT] rejected because of invalid fields in request payload: $invalidFields")
+          terminate(BadRequest, Messages.errorExtractingRequestBody)
         }
       }
     }
