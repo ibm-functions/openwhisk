@@ -109,10 +109,7 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
   import RestApiCommons.jsonDefaultResponsePrinter
 
   /** Allowed action request payload field names. */
-  protected[core] val ALLOWED_FIELDS = classOf[WhiskAction].getDeclaredFields.map(_.getName).toList
-
-  /** System namespaces */
-  protected[core] val SYSTEM_NAMESPACES = List("lime@us.ibm.com", "whisk.system")
+  protected[core] val ALLOWED_FIELDS = classOf[WhiskAction].getDeclaredFields.map(_.getName).toList ++ List("name")
 
   /**
    * Handles operations on action resources, which encompass these cases:
@@ -212,18 +209,11 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
     parameter('overwrite ? false) { overwrite =>
       //logging.debug(this, "checking if sequence components are accessible")
       entity(as[Option[JsObject]]) { payload =>
-        logging.info(
-          this,
-          s"@StR request payload fields: ${payload.map(_.fields.keySet)}, allowedFields: $ALLOWED_FIELDS")
-        val allowCreate = payload
-          .map(_.fields.keySet.forall(key => ALLOWED_FIELDS.contains(key)))
-          .getOrElse(true)
         val invalidFields = payload
           .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
-          .getOrElse(Set())
-        logging.info(this, s"@StR allowCreate $allowCreate, invalidFields: $invalidFields")
+          .getOrElse(List())
 
-        if (invalidFields.isEmpty /*|| SYSTEM_NAMESPACES.contains(user.namespace.name.asString)*/ ) {
+        if (invalidFields.isEmpty) {
           entity(as[WhiskActionPut]) { content =>
             val request = content.resolve(user.namespace)
             val checkAdditionalPrivileges = entitleReferencedEntities(user, Privilege.READ, request.exec).flatMap {
@@ -240,7 +230,9 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
             }
           }
         } else {
-          logging.error(this, s"[PUT] rejected because of invalid fields in request payload: $invalidFields")
+          logging.error(
+            this,
+            s"[PUT] rejected because of ${invalidFields.size} invalid fields in request payload: ${invalidFields.head}")
           terminate(BadRequest, Messages.errorExtractingRequestBody)
         }
       }

@@ -22,6 +22,8 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.StandardRoute
 import akka.http.scaladsl.unmarshalling.Unmarshaller
+import spray.json._
+import spray.json.DefaultJsonProtocol._
 import spray.json.DeserializationException
 import org.apache.openwhisk.common.TransactionId
 import org.apache.openwhisk.core.controller.RestApiCommons.{ListLimit, ListSkip}
@@ -56,6 +58,11 @@ trait WhiskRulesApi extends WhiskCollectionAPI with ReferencedEntities {
   /** Path to Rules REST API. */
   protected val rulesPath = "rules"
 
+  /** Allowed rule request payload field names. */
+  protected[core] val ALLOWED_FIELDS = classOf[WhiskRule].getDeclaredFields.map(_.getName).toList ++ List(
+    "name",
+    "status") // status is set in request playload by test code
+
   /**
    * Creates or updates rule if it already exists. The PUT content is deserialized into a WhiskRulePut
    * which is a subset of WhiskRule (it eschews the namespace, entity name and status since the former
@@ -81,37 +88,50 @@ trait WhiskRulesApi extends WhiskCollectionAPI with ReferencedEntities {
    */
   override def create(user: Identity, entityName: FullyQualifiedEntityName)(implicit transid: TransactionId) = {
     parameter('overwrite ? false) { overwrite =>
-      entity(as[WhiskRulePut]) { content =>
-        val request = content.resolve(entityName.namespace)
-        onComplete(entitlementProvider.check(user, Privilege.READ, referencedEntities(request))) {
-          case Success(_) =>
-            putEntity(
-              WhiskRule,
-              entityStore,
-              entityName.toDocId,
-              overwrite,
-              update(request) _,
-              () => {
-                create(request, entityName)
-              },
-              postProcess = Some { rule: WhiskRule =>
-                if (overwrite == true) {
-                  val getRuleWithStatus = getTrigger(rule.trigger) map { trigger =>
-                    getStatus(trigger, FullyQualifiedEntityName(rule.namespace, rule.name))
-                  } map { status =>
-                    rule.withStatus(status)
-                  }
+      entity(as[Option[JsObject]]) { payload =>
+        val invalidFields = payload
+          .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
+          .getOrElse(List())
 
-                  onComplete(getRuleWithStatus) {
-                    case Success(r) => completeAsRuleResponse(rule, r.status)
-                    case Failure(t) => terminate(InternalServerError)
-                  }
-                } else {
-                  completeAsRuleResponse(rule, Status.ACTIVE)
-                }
-              })
-          case Failure(f) =>
-            handleEntitlementFailure(f)
+        if (invalidFields.isEmpty) {
+          entity(as[WhiskRulePut]) { content =>
+            val request = content.resolve(entityName.namespace)
+            onComplete(entitlementProvider.check(user, Privilege.READ, referencedEntities(request))) {
+              case Success(_) =>
+                putEntity(
+                  WhiskRule,
+                  entityStore,
+                  entityName.toDocId,
+                  overwrite,
+                  update(request) _,
+                  () => {
+                    create(request, entityName)
+                  },
+                  postProcess = Some { rule: WhiskRule =>
+                    if (overwrite == true) {
+                      val getRuleWithStatus = getTrigger(rule.trigger) map { trigger =>
+                        getStatus(trigger, FullyQualifiedEntityName(rule.namespace, rule.name))
+                      } map { status =>
+                        rule.withStatus(status)
+                      }
+
+                      onComplete(getRuleWithStatus) {
+                        case Success(r) => completeAsRuleResponse(rule, r.status)
+                        case Failure(t) => terminate(InternalServerError)
+                      }
+                    } else {
+                      completeAsRuleResponse(rule, Status.ACTIVE)
+                    }
+                  })
+              case Failure(f) =>
+                handleEntitlementFailure(f)
+            }
+          }
+        } else {
+          logging.error(
+            this,
+            s"[PUT] rejected because of ${invalidFields.size} invalid fields in request payload: ${invalidFields.head}")
+          terminate(BadRequest, errorExtractingRequestBody)
         }
       }
     }
