@@ -108,9 +108,6 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
   /** JSON response formatter. */
   import RestApiCommons.jsonDefaultResponsePrinter
 
-  /** Allowed action request payload field names. */
-  protected[core] val ALLOWED_FIELDS = classOf[WhiskAction].getDeclaredFields.map(_.getName).toList ++ List("name")
-
   /**
    * Handles operations on action resources, which encompass these cases:
    *
@@ -207,33 +204,19 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
    */
   override def create(user: Identity, entityName: FullyQualifiedEntityName)(implicit transid: TransactionId) = {
     parameter('overwrite ? false) { overwrite =>
-      //logging.debug(this, "checking if sequence components are accessible")
-      entity(as[Option[JsObject]]) { payload =>
-        val invalidFields = payload
-          .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
-          .getOrElse(List())
+      entity(as[WhiskActionPut]) { content =>
+        val request = content.resolve(user.namespace)
+        val checkAdditionalPrivileges = entitleReferencedEntities(user, Privilege.READ, request.exec).flatMap {
+          case _ => entitlementProvider.check(user, content.exec)
+        }
 
-        if (invalidFields.isEmpty) {
-          entity(as[WhiskActionPut]) { content =>
-            val request = content.resolve(user.namespace)
-            val checkAdditionalPrivileges = entitleReferencedEntities(user, Privilege.READ, request.exec).flatMap {
-              case _ => entitlementProvider.check(user, content.exec)
-            }
-
-            onComplete(checkAdditionalPrivileges) {
-              case Success(_) =>
-                putEntity(WhiskAction, entityStore, entityName.toDocId, overwrite, update(user, request) _, () => {
-                  make(user, entityName, request)
-                })
-              case Failure(f) =>
-                super.handleEntitlementFailure(f)
-            }
-          }
-        } else {
-          logging.error(
-            this,
-            s"[PUT] rejected because of ${invalidFields.size} invalid fields in request payload: ${invalidFields.head}")
-          terminate(BadRequest, Messages.errorExtractingRequestBody)
+        onComplete(checkAdditionalPrivileges) {
+          case Success(_) =>
+            putEntity(WhiskAction, entityStore, entityName.toDocId, overwrite, update(user, request) _, () => {
+              make(user, entityName, request)
+            })
+          case Failure(f) =>
+            super.handleEntitlementFailure(f)
         }
       }
     }
