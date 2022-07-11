@@ -1132,7 +1132,7 @@ trait RunRestCmd extends Matchers with ScalaFutures with SwaggerValidator {
 
   val protocol: String = loadConfigOrThrow[String]("whisk.controller.protocol")
   val idleTimeout: FiniteDuration = 90 seconds
-  val toStrictTimeout: FiniteDuration = 30 seconds
+  val toStrictTimeout: FiniteDuration = 60 seconds
   val queueSize = 10
   val maxOpenRequest = 1024
   val basePath = Path("/api/v1")
