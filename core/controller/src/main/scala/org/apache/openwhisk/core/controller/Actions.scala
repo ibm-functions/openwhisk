@@ -108,6 +108,9 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
   /** JSON response formatter. */
   import RestApiCommons.jsonDefaultResponsePrinter
 
+  /** Allowed action request payload field names. */
+  protected[core] val ALLOWED_FIELDS = classOf[WhiskAction].getDeclaredFields.map(_.getName).toList ++ List("name")
+
   /**
    * Handles operations on action resources, which encompass these cases:
    *
@@ -204,19 +207,30 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
    */
   override def create(user: Identity, entityName: FullyQualifiedEntityName)(implicit transid: TransactionId) = {
     parameter('overwrite ? false) { overwrite =>
-      entity(as[WhiskActionPut]) { content =>
-        val request = content.resolve(user.namespace)
-        val checkAdditionalPrivileges = entitleReferencedEntities(user, Privilege.READ, request.exec).flatMap {
-          case _ => entitlementProvider.check(user, content.exec)
+      //logging.debug(this, "checking if sequence components are accessible")
+      entity(as[Option[JsObject]]) { payload =>
+        val invalidFields = payload
+          .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
+          .getOrElse(List())
+        if (invalidFields.size > 0) {
+          logging.warn(
+            this,
+            s"[PUT] ${invalidFields.size} invalid fields in action request payload: ${invalidFields.slice(0, invalidFields.size min 100).mkString(",")}")
         }
+        entity(as[WhiskActionPut]) { content =>
+          val request = content.resolve(user.namespace)
+          val checkAdditionalPrivileges = entitleReferencedEntities(user, Privilege.READ, request.exec).flatMap {
+            case _ => entitlementProvider.check(user, content.exec)
+          }
 
-        onComplete(checkAdditionalPrivileges) {
-          case Success(_) =>
-            putEntity(WhiskAction, entityStore, entityName.toDocId, overwrite, update(user, request) _, () => {
-              make(user, entityName, request)
-            })
-          case Failure(f) =>
-            super.handleEntitlementFailure(f)
+          onComplete(checkAdditionalPrivileges) {
+            case Success(_) =>
+              putEntity(WhiskAction, entityStore, entityName.toDocId, overwrite, update(user, request) _, () => {
+                make(user, entityName, request)
+              })
+            case Failure(f) =>
+              super.handleEntitlementFailure(f)
+          }
         }
       }
     }

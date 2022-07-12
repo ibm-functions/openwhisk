@@ -23,6 +23,8 @@ import akka.http.scaladsl.marshallers.sprayjson.SprayJsonSupport._
 import akka.http.scaladsl.model.StatusCodes._
 import akka.http.scaladsl.server.{RequestContext, RouteResult}
 import akka.http.scaladsl.unmarshalling.Unmarshaller
+import spray.json._
+import spray.json.DefaultJsonProtocol._
 import org.apache.openwhisk.common.TransactionId
 import org.apache.openwhisk.core.controller.RestApiCommons.{ListLimit, ListSkip}
 import org.apache.openwhisk.core.database.{CacheChangeNotification, DocumentTypeMismatchException, NoDocumentException}
@@ -52,6 +54,9 @@ trait WhiskPackagesApi extends WhiskCollectionAPI with ReferencedEntities {
   /** Reserved package names. */
   protected[core] val RESERVED_NAMES = Set("default")
 
+  /** Allowed package request payload field names. */
+  protected[core] val ALLOWED_FIELDS = classOf[WhiskPackage].getDeclaredFields.map(_.getName).toList ++ List("name")
+
   /**
    * Creates or updates package/binding if it already exists. The PUT content is deserialized into a
    * WhiskPackagePut which is a subset of WhiskPackage (it eschews the namespace and entity name since
@@ -71,24 +76,34 @@ trait WhiskPackagesApi extends WhiskCollectionAPI with ReferencedEntities {
   override def create(user: Identity, entityName: FullyQualifiedEntityName)(implicit transid: TransactionId) = {
     parameter('overwrite ? false) { overwrite =>
       if (!RESERVED_NAMES.contains(entityName.name.asString)) {
-        entity(as[WhiskPackagePut]) { content =>
-          val request = content.resolve(entityName.namespace)
-          request.binding.map { b =>
-            logging.debug(this, "checking if package is accessible")
+        entity(as[Option[JsObject]]) { payload =>
+          val invalidFields = payload
+            .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
+            .getOrElse(List())
+          if (invalidFields.size > 0) {
+            logging.warn(
+              this,
+              s"[PUT] ${invalidFields.size} invalid fields in package request payload: ${invalidFields.slice(0, invalidFields.size min 100).mkString(",")}")
           }
-          val referencedentities = referencedEntities(request)
+          entity(as[WhiskPackagePut]) { content =>
+            val request = content.resolve(entityName.namespace)
+            request.binding.map { b =>
+              logging.debug(this, "checking if package is accessible")
+            }
+            val referencedentities = referencedEntities(request)
 
-          onComplete(entitlementProvider.check(user, Privilege.READ, referencedentities)) {
-            case Success(_) =>
-              putEntity(
-                WhiskPackage,
-                entityStore,
-                entityName.toDocId,
-                overwrite,
-                update(request) _,
-                () => create(request, entityName))
-            case Failure(f) =>
-              rewriteEntitlementFailure(f)
+            onComplete(entitlementProvider.check(user, Privilege.READ, referencedentities)) {
+              case Success(_) =>
+                putEntity(
+                  WhiskPackage,
+                  entityStore,
+                  entityName.toDocId,
+                  overwrite,
+                  update(request) _,
+                  () => create(request, entityName))
+              case Failure(f) =>
+                rewriteEntitlementFailure(f)
+            }
           }
         }
       } else {

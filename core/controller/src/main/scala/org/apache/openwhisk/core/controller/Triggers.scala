@@ -61,6 +61,9 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
   /** Database service to CRUD triggers. */
   protected val entityStore: EntityStore
 
+  /** JSON response formatter. */
+  import RestApiCommons.jsonDefaultResponsePrinter
+
   /** Connection context for HTTPS */
   protected lazy val httpsConnectionContext = {
     val sslConfig = AkkaSSLConfig().mapSettings { s =>
@@ -96,6 +99,9 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
   protected val triggersPath = "triggers"
   protected val url = Uri(s"${controllerProtocol}://localhost:${whiskConfig.servicePort}")
 
+  /** Allowed trigger request payload field names. */
+  protected[core] val ALLOWED_FIELDS = classOf[WhiskTrigger].getDeclaredFields.map(_.getName).toList ++ List("name")
+
   protected implicit val materializer: ActorMaterializer
 
   import RestApiCommons.emptyEntityToJsObject
@@ -115,12 +121,22 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
    */
   override def create(user: Identity, entityName: FullyQualifiedEntityName)(implicit transid: TransactionId) = {
     parameter('overwrite ? false) { overwrite =>
-      entity(as[WhiskTriggerPut]) { content =>
-        putEntity(WhiskTrigger, entityStore, entityName.toDocId, overwrite, update(content) _, () => {
-          create(content, entityName)
-        }, postProcess = Some { trigger =>
-          completeAsTriggerResponse(trigger)
-        })
+      entity(as[Option[JsObject]]) { payload =>
+        val invalidFields = payload
+          .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
+          .getOrElse(List())
+        if (invalidFields.size > 0) {
+          logging.warn(
+            this,
+            s"[PUT] ${invalidFields.size} invalid fields in trigger request payload: ${invalidFields.slice(0, invalidFields.size min 100).mkString(",")}")
+        }
+        entity(as[WhiskTriggerPut]) { content =>
+          putEntity(WhiskTrigger, entityStore, entityName.toDocId, overwrite, update(content) _, () => {
+            create(content, entityName)
+          }, postProcess = Some { trigger =>
+            completeAsTriggerResponse(trigger)
+          })
+        }
       }
     }
   }
