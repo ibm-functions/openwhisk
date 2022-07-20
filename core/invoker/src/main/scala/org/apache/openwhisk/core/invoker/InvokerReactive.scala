@@ -165,8 +165,17 @@ class InvokerReactive(
   private val rootfspecentlow = fspecentmax - 3
   private var logsfspcent = -1
 
-  Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) { () =>
+  //Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) { () =>
+  Scheduler.scheduleWaitAtLeast(30.seconds) { () =>
     logging.debug(this, "running background job to update blacklist")
+
+    logging.warn(
+      this,
+      s"invoker container pool, " +
+        s"freePoolSize: ${containerPool.freePool.size} containers and ${containerPool.freePool.map(_._2.memoryLimit.toMB).sum} MB, " +
+        s"busyPoolSize: ${containerPool.busyPool.size} containers and ${containerPool.busyPool.map(_._2.memoryLimit.toMB).sum} MB, " +
+        s"maxContainersMemory ${poolConfig.userMemory.toMB} MB, " +
+        s"waiting messages: ${containerPool.runBuffer.size}")
 
     //val rootfspcentraw = (s"df $rootfs" #| s"grep $rootfs" #| "awk '{ print $5}'" !!)
     val rootfsraw = Try((s"df $rootfs" #| s"grep $rootfs" !!).trim.replaceAll(" +", " ")).getOrElse("??")
@@ -235,8 +244,17 @@ class InvokerReactive(
     }.toList
   }
 
-  private val pool =
-    actorSystem.actorOf(ContainerPool.props(childFactory, poolConfig, activationFeed, prewarmingConfigs))
+  private val containerPool = new ContainerPool(childFactory, activationFeed, prewarmingConfigs, poolConfig)
+  private val pool = actorSystem.actorOf(Props(containerPool))
+
+  //private val pool =
+  //  actorSystem.actorOf(ContainerPool.props(childFactory, poolConfig, activationFeed, prewarmingConfigs))
+
+  /*def props(factory: ActorRefFactory => ActorRef,
+            poolConfig: ContainerPoolConfig,
+            feed: ActorRef,
+            prewarmConfig: List[PrewarmingConfig] = List.empty) =
+    Props(new ContainerPool(factory, feed, prewarmConfig, poolConfig))*/
 
   /** Is called when an ActivationMessage is read from Kafka */
   def processActivationMessage(bytes: Array[Byte]): Future[Unit] = {
@@ -374,7 +392,9 @@ class InvokerReactive(
           isBlacklisted = namespaceBlacklist.isBlacklisted(instance.displayedName.getOrElse("")),
           hasDiskPressure = rootfspcent >= rootfspecentmax || logsfspcent >= fspecentmax,
           rootfspcent = rootfspcent,
-          logsfspcent = logsfspcent))
+          logsfspcent = logsfspcent,
+          busyPoolSize = containerPool.busyPool.size,
+          waitingMessages = containerPool.runBuffer.size))
       .andThen {
         case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
       }
