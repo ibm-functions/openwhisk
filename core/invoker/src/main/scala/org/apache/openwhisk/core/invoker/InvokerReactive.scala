@@ -165,6 +165,8 @@ class InvokerReactive(
   private val rootfspecentlow = fspecentmax - 3
   private var logsfspcent = -1
 
+  private val poolState = new ContainerPoolState
+
   //Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) { () =>
   Scheduler.scheduleWaitAtLeast(30.seconds) { () =>
     logging.debug(this, "running background job to update blacklist")
@@ -172,10 +174,8 @@ class InvokerReactive(
     logging.warn(
       this,
       s"invoker container pool, " +
-        s"freePoolSize: ${containerPool.freePool.size} containers and ${containerPool.freePool.map(_._2.memoryLimit.toMB).sum} MB, " +
-        s"busyPoolSize: ${containerPool.busyPool.size} containers and ${containerPool.busyPool.map(_._2.memoryLimit.toMB).sum} MB, " +
-        s"maxContainersMemory ${poolConfig.userMemory.toMB} MB, " +
-        s"waiting messages: ${containerPool.runBuffer.size}")
+        s"busyPoolSize: ${poolState.busyPoolSize} containers, " +
+        s"waiting messages: ${poolState.runBufferSize}")
 
     //val rootfspcentraw = (s"df $rootfs" #| s"grep $rootfs" #| "awk '{ print $5}'" !!)
     val rootfsraw = Try((s"df $rootfs" #| s"grep $rootfs" !!).trim.replaceAll(" +", " ")).getOrElse("??")
@@ -244,17 +244,23 @@ class InvokerReactive(
     }.toList
   }
 
-  private val containerPool = new ContainerPool(childFactory, activationFeed, prewarmingConfigs, poolConfig)
-  private val pool = actorSystem.actorOf(Props(containerPool))
+  // Failed to initialize reactive invoker:
+  // You cannot create an instance of [org.apache.openwhisk.core.containerpool.ContainerPool] explicitly using the constructor (new).
+  // You have to use one of the 'actorOf' factory methods to create a new actor. See the documentation.
+  // The only correct way to create an actor instance is by using one of the actorOf methods.
+  // You can't call any methods within the actor directly, you can only send messages to it and receive messages from it.
+  // Otherwise, if that would be possible it would break Actor encapsulation.
+  // If you want to share code between an actor and a regular class you can put that shared code in a trait and inherit from it.
+  // However, your actor will be able to use that code internally only and will not expose any methods, its instance type returned from actorOf will still be Actor only.
+  // Interacting with an Actor in Akka is done through an ActorRef[T] where T is the type of messages the actor accepts, also known as the “protocol”.
+  // This ensures that only the right kind of messages can be sent to an actor and also that no one else but the Actor itself can access the Actor instance internals.
 
-  //private val pool =
-  //  actorSystem.actorOf(ContainerPool.props(childFactory, poolConfig, activationFeed, prewarmingConfigs))
+  //private val containerPool = new ContainerPool(childFactory, activationFeed, prewarmingConfigs, poolConfig)
+  //private val pool = actorSystem.actorOf(Props(containerPool))
 
-  /*def props(factory: ActorRefFactory => ActorRef,
-            poolConfig: ContainerPoolConfig,
-            feed: ActorRef,
-            prewarmConfig: List[PrewarmingConfig] = List.empty) =
-    Props(new ContainerPool(factory, feed, prewarmConfig, poolConfig))*/
+  //private val poolState = new ContainerPoolState
+  private val pool =
+    actorSystem.actorOf(ContainerPool.props(childFactory, poolConfig, activationFeed, prewarmingConfigs, poolState))
 
   /** Is called when an ActivationMessage is read from Kafka */
   def processActivationMessage(bytes: Array[Byte]): Future[Unit] = {
@@ -393,8 +399,8 @@ class InvokerReactive(
           hasDiskPressure = rootfspcent >= rootfspecentmax || logsfspcent >= fspecentmax,
           rootfspcent = rootfspcent,
           logsfspcent = logsfspcent,
-          busyPoolSize = containerPool.busyPool.size,
-          waitingMessages = containerPool.runBuffer.size))
+          busyPoolSize = poolState.busyPoolSize,
+          waitingMessages = poolState.runBufferSize))
       .andThen {
         case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
       }

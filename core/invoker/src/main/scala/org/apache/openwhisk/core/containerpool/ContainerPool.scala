@@ -36,6 +36,11 @@ case class WorkerData(data: ContainerData, state: WorkerState)
 
 case object EmitMetrics
 
+class ContainerPoolState() {
+  var busyPoolSize: Int = -1
+  var runBufferSize: Int = -1
+}
+
 /**
  * A pool managing containers to run actions on.
  *
@@ -59,7 +64,8 @@ case object EmitMetrics
 class ContainerPool(childFactory: ActorRefFactory => ActorRef,
                     feed: ActorRef,
                     prewarmConfig: List[PrewarmingConfig] = List.empty,
-                    poolConfig: ContainerPoolConfig)
+                    poolConfig: ContainerPoolConfig,
+                    state: ContainerPoolState)
     extends Actor {
   import ContainerPool.memoryConsumptionOf
 
@@ -68,11 +74,13 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 
   var freePool = immutable.Map.empty[ActorRef, ContainerData]
   var busyPool = immutable.Map.empty[ActorRef, ContainerData]
+  state.busyPoolSize = 0
   var prewarmedPool = immutable.Map.empty[ActorRef, ContainerData]
   // If all memory slots are occupied and if there is currently no container to be removed, than the actions will be
   // buffered here to keep order of computation.
   // Otherwise actions with small memory-limits could block actions with large memory limits.
   var runBuffer = immutable.Queue.empty[Run]
+  state.runBufferSize = 0
   // Track the resent buffer head - so that we don't resend buffer head multiple times
   var resent: Option[Run] = None
   val logMessageInterval = 10.seconds
@@ -216,6 +224,9 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         // These waiting actions were not able to free up enough memory.
         runBuffer = runBuffer.enqueue(r)
       }
+      // reflect state
+      state.busyPoolSize = busyPool.size
+      state.runBufferSize = runBuffer.size
 
     // Container is free to take more work
     case NeedWork(warmData: WarmedData) =>
@@ -241,6 +252,9 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         freePool = freePool - sender()
       }
       processBufferOrFeed()
+      // reflect state
+      state.busyPoolSize = busyPool.size
+
     // Container is prewarmed and ready to take work
     case NeedWork(data: PreWarmedData) =>
       prewarmedPool = prewarmedPool + (sender() -> data)
@@ -257,6 +271,9 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         busyPool = busyPool - sender()
       }
       processBufferOrFeed()
+      // reflect state
+      state.busyPoolSize = busyPool.size
+
     // This message is received for one of these reasons:
     // 1. Container errored while resuming a warm container, could not process the job, and sent the job back
     // 2. The container aged, is destroying itself, and was assigned a job which it had to send back
@@ -265,6 +282,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     case RescheduleJob =>
       freePool = freePool - sender()
       busyPool = busyPool - sender()
+      // reflect state
+      state.busyPoolSize = busyPool.size
     case EmitMetrics =>
       emitMetrics()
   }
@@ -458,8 +477,9 @@ object ContainerPool {
   def props(factory: ActorRefFactory => ActorRef,
             poolConfig: ContainerPoolConfig,
             feed: ActorRef,
-            prewarmConfig: List[PrewarmingConfig] = List.empty) =
-    Props(new ContainerPool(factory, feed, prewarmConfig, poolConfig))
+            prewarmConfig: List[PrewarmingConfig] = List.empty,
+            containerPoolState: ContainerPoolState = new ContainerPoolState) =
+    Props(new ContainerPool(factory, feed, prewarmConfig, poolConfig, containerPoolState))
 }
 
 /** Contains settings needed to perform container prewarming. */
