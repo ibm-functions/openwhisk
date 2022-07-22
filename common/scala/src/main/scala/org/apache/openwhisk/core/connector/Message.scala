@@ -259,8 +259,7 @@ case class PingMessage(instance: InvokerInstanceId,
                        hasDiskPressure: Boolean = false,
                        rootfspcent: Int = -1,
                        logsfspcent: Int = -1,
-                       busyPoolSize: Int = -1,
-                       waitingMessages: Int = -1)
+                       scheduled: Int = -1)
     extends Message {
   override def serialize = PingMessage.serdes.write(this).compactPrint
 }
@@ -275,8 +274,7 @@ object PingMessage extends DefaultJsonProtocol {
       "hasDiskPressure",
       "rootfspcent",
       "logsfspcent",
-      "busyPoolSize",
-      "waitingMessages")
+      "scheduled")
 }
 
 trait EventMessageBody extends Message {

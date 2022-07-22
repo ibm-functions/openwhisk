@@ -36,9 +36,12 @@ case class WorkerData(data: ContainerData, state: WorkerState)
 
 case object EmitMetrics
 
+// container pool state visible to invoker
 class ContainerPoolState() {
-  var busyPoolSize: Int = -1
-  var runBufferSize: Int = -1
+  var busy: Int = -1
+  var free: Int = -1
+  var prewarmed: Int = -1
+  var waiting: Int = -1
 }
 
 /**
@@ -74,18 +77,21 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
 
   var freePool = immutable.Map.empty[ActorRef, ContainerData]
   var busyPool = immutable.Map.empty[ActorRef, ContainerData]
-  state.busyPoolSize = 0
   var prewarmedPool = immutable.Map.empty[ActorRef, ContainerData]
   // If all memory slots are occupied and if there is currently no container to be removed, than the actions will be
   // buffered here to keep order of computation.
   // Otherwise actions with small memory-limits could block actions with large memory limits.
   var runBuffer = immutable.Queue.empty[Run]
-  state.runBufferSize = 0
   // Track the resent buffer head - so that we don't resend buffer head multiple times
   var resent: Option[Run] = None
   val logMessageInterval = 10.seconds
   //periodically emit metrics (don't need to do this for each message!)
   context.system.scheduler.schedule(30.seconds, 10.seconds, self, EmitMetrics)
+  // reflect initial state to invoker
+  state.free = 0
+  state.busy = 0
+  state.prewarmed = 0
+  state.waiting = 0
 
   prewarmConfig.foreach { config =>
     logging.info(this, s"pre-warming ${config.count} ${config.exec.kind} ${config.memoryLimit.toString}")(
@@ -224,9 +230,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         // These waiting actions were not able to free up enough memory.
         runBuffer = runBuffer.enqueue(r)
       }
-      // reflect state
-      state.busyPoolSize = busyPool.size
-      state.runBufferSize = runBuffer.size
+      // reflect state to invoker
+      relectState()
 
     // Container is free to take more work
     case NeedWork(warmData: WarmedData) =>
@@ -252,12 +257,14 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         freePool = freePool - sender()
       }
       processBufferOrFeed()
-      // reflect state
-      state.busyPoolSize = busyPool.size
+      // reflect state to invoker
+      relectState()
 
     // Container is prewarmed and ready to take work
     case NeedWork(data: PreWarmedData) =>
       prewarmedPool = prewarmedPool + (sender() -> data)
+      // reflect prewarmed state to invoker
+      state.prewarmed = prewarmedPool.size
 
     // Container got removed
     case ContainerRemoved =>
@@ -271,8 +278,8 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
         busyPool = busyPool - sender()
       }
       processBufferOrFeed()
-      // reflect state
-      state.busyPoolSize = busyPool.size
+      // reflect state to invoker
+      relectState()
 
     // This message is received for one of these reasons:
     // 1. Container errored while resuming a warm container, could not process the job, and sent the job back
@@ -282,10 +289,18 @@ class ContainerPool(childFactory: ActorRefFactory => ActorRef,
     case RescheduleJob =>
       freePool = freePool - sender()
       busyPool = busyPool - sender()
-      // reflect state
-      state.busyPoolSize = busyPool.size
+      // reflect state to invoker
+      relectState()
     case EmitMetrics =>
       emitMetrics()
+  }
+
+  /** Reflect state to invoker */
+  def relectState() = {
+    state.busy = busyPool.size
+    state.free = freePool.size
+    state.prewarmed = prewarmedPool.size
+    state.waiting = runBuffer.size
   }
 
   /** Resend next item in the buffer, or trigger next item in the feed, if no items in the buffer. */

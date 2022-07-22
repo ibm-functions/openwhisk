@@ -66,12 +66,11 @@ object InvokerState {
                      hasDiskPressure: Boolean = false,
                      rootfspcent: Int = -1,
                      logsfspcent: Int = -1,
-                     busyPoolSize: Int = -1,
-                     waitingMessages: Int = -1)
+                     scheduled: Int = -1)
       extends Unusable {
     val DOWN = "down"
     val asString =
-      if (isBlacklisted) s"$DOWN/disabled($busyPoolSize,$waitingMessages,${System.currentTimeMillis})"
+      if (isBlacklisted) s"$DOWN/disabled($scheduled,${System.currentTimeMillis})"
       else if (hasDiskPressure) s"$DOWN/diskpressure($rootfspcent,$logsfspcent,${System.currentTimeMillis})"
       else DOWN
     def canEqual(a: Any) = a.isInstanceOf[InvokerState]
@@ -336,9 +335,9 @@ class InvokerActor(invokerInstance: InvokerInstanceId, controllerInstance: Contr
   when(Offline(), stateTimeout = healthyTimeoutInOffline) {
     case Event(p: PingMessage, _) if p.isBlacklisted =>
       val state = stateName.asInstanceOf[InvokerState.Offline]
-      if (p.busyPoolSize != state.busyPoolSize || p.waitingMessages != state.waitingMessages) {
+      if (p.scheduled != state.scheduled) {
         // transition to offline due to disabled invoker, reflect latest busy pool size and number of waiting messages
-        goto(Offline(isBlacklisted = true, busyPoolSize = p.busyPoolSize, waitingMessages = p.waitingMessages))
+        goto(Offline(isBlacklisted = true, scheduled = p.scheduled))
       } else stay // avoid unhandled event {"isBlacklisted":true,..} in state Offline
     case Event(p: PingMessage, _) if p.hasDiskPressure =>
       val state = stateName.asInstanceOf[InvokerState.Offline]
@@ -357,7 +356,7 @@ class InvokerActor(invokerInstance: InvokerInstanceId, controllerInstance: Contr
   // To be used for all states that should send test actions to reverify the invoker
   val healthPingingState: StateFunction = {
     case Event(p: PingMessage, _) if p.isBlacklisted =>
-      goto(Offline(isBlacklisted = true, busyPoolSize = p.busyPoolSize, waitingMessages = p.waitingMessages))
+      goto(Offline(isBlacklisted = true, scheduled = p.scheduled))
     case Event(p: PingMessage, _) if p.hasDiskPressure =>
       goto(Offline(hasDiskPressure = true, rootfspcent = p.rootfspcent, logsfspcent = p.logsfspcent))
     case Event(p: PingMessage, _) => stay
@@ -379,7 +378,7 @@ class InvokerActor(invokerInstance: InvokerInstanceId, controllerInstance: Contr
    */
   when(Healthy, stateTimeout = healthyTimeout) {
     case Event(p: PingMessage, _) if p.isBlacklisted =>
-      goto(Offline(isBlacklisted = true, busyPoolSize = p.busyPoolSize, waitingMessages = p.waitingMessages))
+      goto(Offline(isBlacklisted = true, scheduled = p.scheduled))
     case Event(p: PingMessage, _) if p.hasDiskPressure =>
       goto(Offline(hasDiskPressure = true, rootfspcent = p.rootfspcent, logsfspcent = p.logsfspcent))
     case Event(p: PingMessage, _) => stay

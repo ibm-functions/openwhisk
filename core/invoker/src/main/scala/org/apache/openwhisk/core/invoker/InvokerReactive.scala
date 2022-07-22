@@ -167,15 +167,8 @@ class InvokerReactive(
 
   private val poolState = new ContainerPoolState
 
-  //Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) { () =>
-  Scheduler.scheduleWaitAtLeast(30.seconds) { () =>
+  Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) { () =>
     logging.debug(this, "running background job to update blacklist")
-
-    logging.warn(
-      this,
-      s"invoker container pool, " +
-        s"busyPoolSize: ${poolState.busyPoolSize} containers, " +
-        s"waiting messages: ${poolState.runBufferSize}")
 
     //val rootfspcentraw = (s"df $rootfs" #| s"grep $rootfs" #| "awk '{ print $5}'" !!)
     val rootfsraw = Try((s"df $rootfs" #| s"grep $rootfs" !!).trim.replaceAll(" +", " ")).getOrElse("??")
@@ -187,7 +180,14 @@ class InvokerReactive(
     logsfspcent = Try(logsfspcentraw.substring(0, logsfspcentraw.indexOf("%")).toInt).getOrElse(-1)
     logging.warn(
       this,
-      s"invoker fs space: '$rootfsraw ($rootfspcentraw($rootfspcent($rootfspecentmax)))', '$logsfsraw ($logsfspcentraw($logsfspcent($fspecentmax)))'")
+      s"invoker fs space: " +
+        s"'$rootfsraw ($rootfspcentraw($rootfspcent($rootfspecentmax)))', " +
+        s"'$logsfsraw ($logsfspcentraw($logsfspcent($fspecentmax)))', " +
+        s"invoker container pool: " +
+        s"freePoolSize: ${poolState.free} containers, " +
+        s"busyPoolSize: ${poolState.busy} containers, " +
+        s"prewarmedPoolSize: ${poolState.prewarmed} containers, " +
+        s"waiting messages: ${poolState.waiting}")
 
     namespaceBlacklist.refreshBlacklist()(ec, TransactionId.invoker).andThen {
       case Success(set) => {
@@ -244,21 +244,11 @@ class InvokerReactive(
     }.toList
   }
 
-  // Failed to initialize reactive invoker:
-  // You cannot create an instance of [org.apache.openwhisk.core.containerpool.ContainerPool] explicitly using the constructor (new).
-  // You have to use one of the 'actorOf' factory methods to create a new actor. See the documentation.
-  // The only correct way to create an actor instance is by using one of the actorOf methods.
-  // You can't call any methods within the actor directly, you can only send messages to it and receive messages from it.
-  // Otherwise, if that would be possible it would break Actor encapsulation.
-  // If you want to share code between an actor and a regular class you can put that shared code in a trait and inherit from it.
-  // However, your actor will be able to use that code internally only and will not expose any methods, its instance type returned from actorOf will still be Actor only.
-  // Interacting with an Actor in Akka is done through an ActorRef[T] where T is the type of messages the actor accepts, also known as the “protocol”.
-  // This ensures that only the right kind of messages can be sent to an actor and also that no one else but the Actor itself can access the Actor instance internals.
-
-  //private val containerPool = new ContainerPool(childFactory, activationFeed, prewarmingConfigs, poolConfig)
-  //private val pool = actorSystem.actorOf(Props(containerPool))
-
-  //private val poolState = new ContainerPoolState
+  // failed to initialize reactive invoker:
+  // you cannot create an instance of [org.apache.openwhisk.core.containerpool.ContainerPool] explicitly using the constructor (new)
+  // you have to use one of the 'actorOf' factory methods to create a new actor
+  // you can't call any methods within the actor directly (as this would break actor encapsulation)
+  // you can only send messages to it and receive messages from it
   private val pool =
     actorSystem.actorOf(ContainerPool.props(childFactory, poolConfig, activationFeed, prewarmingConfigs, poolState))
 
@@ -399,8 +389,7 @@ class InvokerReactive(
           hasDiskPressure = rootfspcent >= rootfspecentmax || logsfspcent >= fspecentmax,
           rootfspcent = rootfspcent,
           logsfspcent = logsfspcent,
-          busyPoolSize = poolState.busyPoolSize,
-          waitingMessages = poolState.runBufferSize))
+          scheduled = poolState.busy + poolState.waiting))
       .andThen {
         case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
       }
