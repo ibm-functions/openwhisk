@@ -267,14 +267,7 @@ case class PingMessage(instance: InvokerInstanceId,
 object PingMessage extends DefaultJsonProtocol {
   def parse(msg: String) = Try(serdes.read(msg.parseJson))
   implicit val serdes =
-    jsonFormat(
-      PingMessage.apply,
-      "name",
-      "isBlacklisted",
-      "hasDiskPressure",
-      "rootfspcent",
-      "logsfspcent",
-      "scheduled")
+    jsonFormat(PingMessage.apply, "name", "isBlacklisted", "hasDiskPressure", "rootfspcent", "logsfspcent", "scheduled")
 }
 
 trait EventMessageBody extends Message {
