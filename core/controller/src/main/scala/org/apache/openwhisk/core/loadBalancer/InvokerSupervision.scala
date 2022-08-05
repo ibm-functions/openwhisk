@@ -66,14 +66,14 @@ object InvokerState {
                      hasDiskPressure: Boolean = false,
                      rootfspcent: Int = -1,
                      logsfspcent: Int = -1,
-                     scheduled: Int = -1)
+                     running: Int = -1)
       extends Unusable {
     val DOWN = "down"
     val asString =
       if (isBlacklisted)
-        s"$DOWN/disabled(running=$scheduled,rootfs=$rootfspcent%,logsfs=$logsfspcent%,time=${System.currentTimeMillis})"
+        s"$DOWN/disabled(running=$running,rootfs=$rootfspcent%,logsfs=$logsfspcent%,time=${System.currentTimeMillis})"
       else if (hasDiskPressure)
-        s"$DOWN/diskpressure(running=$scheduled,rootfs=$rootfspcent%,logsfs=$logsfspcent%,time=${System.currentTimeMillis})"
+        s"$DOWN/diskpressure(running=$running,rootfs=$rootfspcent%,logsfs=$logsfspcent%,time=${System.currentTimeMillis})"
       else DOWN
     def canEqual(a: Any) = a.isInstanceOf[InvokerState]
     override def equals(that: Any): Boolean =
@@ -337,27 +337,27 @@ class InvokerActor(invokerInstance: InvokerInstanceId, controllerInstance: Contr
   when(Offline(), stateTimeout = healthyTimeoutInOffline) {
     case Event(p: PingMessage, _) if p.isBlacklisted =>
       val state = stateName.asInstanceOf[InvokerState.Offline]
-      if (!state.isBlacklisted || p.scheduled != state.scheduled) {
-        // transition to offline due to disabled invoker, reflect latest scheduled/running actions
+      if (!state.isBlacklisted || p.running != state.running) {
+        // transition to offline due to disabled invoker, reflect latest running/scheduled actions
         goto(
           Offline(
             isBlacklisted = p.isBlacklisted,
             hasDiskPressure = p.hasDiskPressure,
             rootfspcent = p.rootfspcent,
             logsfspcent = p.logsfspcent,
-            scheduled = p.scheduled))
+            running = p.running))
       } else stay // avoid unhandled event {"isBlacklisted":true,..} in state Offline
     case Event(p: PingMessage, _) if p.hasDiskPressure =>
       val state = stateName.asInstanceOf[InvokerState.Offline]
-      if (!state.hasDiskPressure || p.rootfspcent != state.rootfspcent || p.logsfspcent != state.logsfspcent || p.scheduled != state.scheduled) {
-        // transition to offline due to disk pressure, reflect latest fs percentage and scheduled/running actions
+      if (!state.hasDiskPressure || p.rootfspcent != state.rootfspcent || p.logsfspcent != state.logsfspcent || p.running != state.running) {
+        // transition to offline due to disk pressure, reflect latest fs percentage and running/scheduled actions
         goto(
           Offline(
             isBlacklisted = p.isBlacklisted,
             hasDiskPressure = p.hasDiskPressure,
             rootfspcent = p.rootfspcent,
             logsfspcent = p.logsfspcent,
-            scheduled = p.scheduled))
+            running = p.running))
       } else stay // avoid unhandled event {"hasDiskPressure":true,..} in state Offline
     case Event(p: PingMessage, _) => goto(Unhealthy)
     case Event(StateTimeout, _) =>
@@ -376,7 +376,7 @@ class InvokerActor(invokerInstance: InvokerInstanceId, controllerInstance: Contr
           hasDiskPressure = p.hasDiskPressure,
           rootfspcent = p.rootfspcent,
           logsfspcent = p.logsfspcent,
-          scheduled = p.scheduled))
+          running = p.running))
     case Event(p: PingMessage, _) => stay
     case Event(StateTimeout, _)   => goto(Offline())
     case Event(Tick, _) =>
@@ -402,7 +402,7 @@ class InvokerActor(invokerInstance: InvokerInstanceId, controllerInstance: Contr
           hasDiskPressure = p.hasDiskPressure,
           rootfspcent = p.rootfspcent,
           logsfspcent = p.logsfspcent,
-          scheduled = p.scheduled))
+          running = p.running))
     case Event(p: PingMessage, _) => stay
     case Event(StateTimeout, _)   => goto(Offline())
   }

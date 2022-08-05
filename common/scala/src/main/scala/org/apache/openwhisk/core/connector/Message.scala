@@ -259,7 +259,7 @@ case class PingMessage(instance: InvokerInstanceId,
                        hasDiskPressure: Boolean = false,
                        rootfspcent: Int = -1,
                        logsfspcent: Int = -1,
-                       scheduled: Int = -1)
+                       running: Int = -1)
     extends Message {
   override def serialize = PingMessage.serdes.write(this).compactPrint
 }
@@ -267,7 +267,7 @@ case class PingMessage(instance: InvokerInstanceId,
 object PingMessage extends DefaultJsonProtocol {
   def parse(msg: String) = Try(serdes.read(msg.parseJson))
   implicit val serdes =
-    jsonFormat(PingMessage.apply, "name", "isBlacklisted", "hasDiskPressure", "rootfspcent", "logsfspcent", "scheduled")
+    jsonFormat(PingMessage.apply, "name", "isBlacklisted", "hasDiskPressure", "rootfspcent", "logsfspcent", "running")
 }
 
 trait EventMessageBody extends Message {

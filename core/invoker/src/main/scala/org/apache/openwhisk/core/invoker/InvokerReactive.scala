@@ -389,7 +389,7 @@ class InvokerReactive(
           hasDiskPressure = rootfspcent >= rootfspecentmax || logsfspcent >= fspecentmax,
           rootfspcent = rootfspcent,
           logsfspcent = logsfspcent,
-          scheduled = poolState.busy + poolState.waiting))
+          running = poolState.busy + poolState.waiting))
       .andThen {
         case Failure(t) => logging.error(this, s"failed to ping the controller: $t")
       }
