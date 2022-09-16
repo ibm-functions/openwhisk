@@ -443,7 +443,9 @@ object ShardingContainerPoolBalancer extends LoadBalancerProvider {
             // Choose a healthy invoker randomly
             val random = healthyInvokers(ThreadLocalRandom.current().nextInt(healthyInvokers.size)).id
             dispatched(random.toInt).forceAcquireConcurrent(fqn, maxConcurrent, slots)
-            logging.warn(this, s"system is overloaded. Chose invoker${random.toInt} by random assignment.")
+            logging.warn(
+              this,
+              s"system is overloaded. Chose invoker${random.toInt} by random assignment for action '${fqn.fullPath}' with mem limit $slots MB.")
             Some(random, true)
           } else {
             None
