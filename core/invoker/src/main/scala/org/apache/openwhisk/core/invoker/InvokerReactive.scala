@@ -158,45 +158,49 @@ class InvokerReactive(
   private val namespaceBlacklist = new NamespaceBlacklist(authStore)
   private val rootfs = "/"
   private val logsfs = "/logs"
-  private val fspecentmax = 85
-  private var rootfspcent = -1
-  private var rootfspecentmax = fspecentmax
-  private val rootfspecentup = fspecentmax
-  private val rootfspecentlow = fspecentmax - 3
-  private var logsfspcent = -1
+  private val fspcentmax = 85
+  private var rootfspcent = 0
+  private var logsfspcent = 0
+
+  private def epochMinute: Long = System.currentTimeMillis / (60 * 1000) // epoch minute
 
   private val poolState = new ContainerPoolState
 
-  Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) { () =>
+  Scheduler.scheduleWaitAtMost(60 seconds) { () =>
     logging.debug(this, "running background job to update blacklist")
 
+    val firstrun = rootfspcent == 0
     //val rootfspcentraw = (s"df $rootfs" #| s"grep $rootfs" #| "awk '{ print $5}'" !!)
     val rootfsraw = Try((s"df $rootfs" #| s"grep $rootfs" !!).trim.replaceAll(" +", " ")).getOrElse("??")
     val rootfspcentraw = Try(rootfsraw.split(" ")(4)).getOrElse("??")
     rootfspcent = Try(rootfspcentraw.substring(0, rootfspcentraw.indexOf("%")).toInt).getOrElse(-1)
-    rootfspecentmax = if (rootfspcent >= rootfspecentmax) rootfspecentlow else rootfspecentup
     val logsfsraw = Try((s"df $logsfs" #| s"grep $logsfs" !!).trim.replaceAll(" +", " ")).getOrElse("??")
     val logsfspcentraw = Try(logsfsraw.split(" ")(4)).getOrElse("??")
     logsfspcent = Try(logsfspcentraw.substring(0, logsfspcentraw.indexOf("%")).toInt).getOrElse(-1)
     logging.warn(
       this,
       s"invoker fs space: " +
-        s"'$rootfsraw ($rootfspcentraw($rootfspcent($rootfspecentmax)))', " +
-        s"'$logsfsraw ($logsfspcentraw($logsfspcent($fspecentmax)))', " +
+        s"'$rootfsraw ($rootfspcentraw($rootfspcent($fspcentmax)))', " +
+        s"'$logsfsraw ($logsfspcentraw($logsfspcent($fspcentmax)))', " +
         s"invoker container pool: " +
         s"freePoolSize: ${poolState.free} containers, " +
         s"busyPoolSize: ${poolState.busy} containers, " +
         s"prewarmedPoolSize: ${poolState.prewarmed} containers, " +
         s"waiting messages: ${poolState.waiting}")
 
-    namespaceBlacklist.refreshBlacklist()(ec, TransactionId.invoker).andThen {
-      case Success(set) => {
-        logging.warn(this, s"updated blacklist to ${set.size} entries")
-        if (set.contains(instance.displayedName.getOrElse(""))) {
-          logging.warn(this, s"invoker ${instance.toString} is blacklisted")
+    // run database query at the start of the schedule and every fifth minute
+    if (epochMinute % 5 == 0 || firstrun) {
+      namespaceBlacklist.refreshBlacklist()(ec, TransactionId.invoker).andThen {
+        case Success(set) => {
+          logging.warn(this, s"updated blacklist to ${set.size} entries")
+          if (set.contains(instance.displayedName.getOrElse(""))) {
+            logging.warn(this, s"invoker ${instance.toString} is blacklisted")
+          }
         }
+        case Failure(t) => logging.error(this, s"error on updating the blacklist: ${t.getMessage}")
       }
-      case Failure(t) => logging.error(this, s"error on updating the blacklist: ${t.getMessage}")
+    } else {
+      Future(())
     }
   }
 
@@ -386,7 +390,7 @@ class InvokerReactive(
         PingMessage(
           instance = instance,
           isBlacklisted = namespaceBlacklist.isBlacklisted(instance.displayedName.getOrElse("")),
-          hasDiskPressure = rootfspcent >= rootfspecentmax || logsfspcent >= fspecentmax,
+          hasDiskPressure = rootfspcent >= fspcentmax || logsfspcent >= fspcentmax,
           rootfspcent = rootfspcent,
           logsfspcent = logsfspcent,
           running = poolState.busy + poolState.waiting))
