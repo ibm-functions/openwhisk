@@ -156,6 +156,18 @@ class InvokerReactive(
   private val authStore = WhiskAuthStore.datastore()
 
   private val namespaceBlacklist = new NamespaceBlacklist(authStore)
+
+  private val imageStoreConfig = loadConfigOrThrow[CouchDbConfig]("whisk.couchdb")
+  private val imageStore = new CouchDbRestClient(
+    imageStoreConfig.protocol,
+    imageStoreConfig.host,
+    imageStoreConfig.port,
+    imageStoreConfig.username,
+    imageStoreConfig.password,
+    "fn-dev-pg2_imagemonitor")
+
+  private val imageMonitor = new ImageMonitor(0, instance.instance, instance.uniqueName, imageStore)
+
   private val rootfs = "/"
   private val logsfs = "/logs"
   private val fspcentmax = 85
@@ -187,6 +199,12 @@ class InvokerReactive(
         s"busyPoolSize: ${poolState.busy} containers, " +
         s"prewarmedPoolSize: ${poolState.prewarmed} containers, " +
         s"waiting messages: ${poolState.waiting}")
+
+    if (firstrun) {
+      imageMonitor.read()
+    } else if (epochMinute % 10 == 0) {
+      imageMonitor.write()
+    }
 
     // run database query at the start of the schedule and every fifth minute
     if (epochMinute % 5 == 0 || firstrun) {
@@ -288,6 +306,9 @@ class InvokerReactive(
             .flatMap { action =>
               action.toExecutableWhiskAction match {
                 case Some(executable) =>
+                  if (executable.exec.pull) {
+                    imageMonitor.add(executable.exec.image.name, action.name.name)
+                  }
                   pool ! Run(executable, msg)
                   Future.successful(())
                 case None =>
