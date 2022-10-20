@@ -157,16 +157,35 @@ class InvokerReactive(
 
   private val namespaceBlacklist = new NamespaceBlacklist(authStore)
 
+  // config for invoker image monitor
+  case class ImageMonitorConfig(enabled: Boolean, cluster: Int, dbname: String, staleTime: Int, writeInterval: Int)
+  private val imageMonitorConfigNamespace = "whisk.invoker.imagemonitor"
+  private val imageMonitorConfig = loadConfig[ImageMonitorConfig](imageMonitorConfigNamespace).toOption
+  private val imageMonitorEnabled = imageMonitorConfig.exists(_.enabled)
+  private val imageMonitorCluster = imageMonitorConfig.map(_.cluster).getOrElse(-1)
+  private val imageMonitorDbName = imageMonitorConfig.map(_.dbname).getOrElse("")
+  private val imageMonitorStaleTime = imageMonitorConfig.map(_.staleTime).getOrElse(-1)
+  private val imageMonitorWriteInterval = imageMonitorConfig.map(_.writeInterval).getOrElse(-1)
+  logging.warn(
+    this,
+    s"imageMonitorConfig : $imageMonitorConfig, " +
+      s"imageMonitorEnabled: $imageMonitorEnabled, " +
+      s"imageMonitorCluster: $imageMonitorCluster, " +
+      s"imageMonitorDbName: $imageMonitorDbName, " +
+      s"imageMonitorStaleTime: $imageMonitorStaleTime, " +
+      s"imageMonitorWriteInterval: $imageMonitorWriteInterval")
+
   private val imageStoreConfig = loadConfigOrThrow[CouchDbConfig]("whisk.couchdb")
-  private val imageStore = new CouchDbRestClient(
+  private lazy val imageStore = new CouchDbRestClient(
     imageStoreConfig.protocol,
     imageStoreConfig.host,
     imageStoreConfig.port,
     imageStoreConfig.username,
     imageStoreConfig.password,
-    "fn-dev-pg2_imagemonitor")
+    imageMonitorDbName)
 
-  private val imageMonitor = new ImageMonitor(0, instance.instance, instance.uniqueName, imageStore)
+  private lazy val imageMonitor =
+    new ImageMonitor(imageMonitorCluster, instance.instance, instance.uniqueName, imageMonitorStaleTime, imageStore)
 
   private val rootfs = "/"
   private val logsfs = "/logs"
@@ -200,10 +219,8 @@ class InvokerReactive(
         s"prewarmedPoolSize: ${poolState.prewarmed} containers, " +
         s"waiting messages: ${poolState.waiting}")
 
-    if (firstrun) {
-      imageMonitor.read()
-    } else if (epochMinute % 10 == 0) {
-      imageMonitor.write()
+    if (imageMonitorEnabled && (epochMinute % imageMonitorWriteInterval == 0 || firstrun)) {
+      imageMonitor.sync
     }
 
     // run database query at the start of the schedule and every fifth minute
@@ -306,8 +323,8 @@ class InvokerReactive(
             .flatMap { action =>
               action.toExecutableWhiskAction match {
                 case Some(executable) =>
-                  if (executable.exec.pull) {
-                    imageMonitor.add(executable.exec.image.name, action.name.name)
+                  if (imageMonitorEnabled && executable.exec.pull) {
+                    imageMonitor.add(executable.exec.image.resolveImageName(), msg.action.fullPath.toString)
                   }
                   pool ! Run(executable, msg)
                   Future.successful(())
