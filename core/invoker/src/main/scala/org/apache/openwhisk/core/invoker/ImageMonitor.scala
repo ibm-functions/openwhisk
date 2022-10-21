@@ -49,20 +49,25 @@ class ImageMonitor(cluster: Int,
                                                   materializer: ActorMaterializer,
                                                   ec: ExecutionContext) {
 
+  // epoch time in days to check for stale images
+  private val epochStaleTime: Long = 24 * 60 * 60 * 1000 * staleTime
+
   private val id = s"$cluster/$invoker"
   private var rev = ""
 
   private var images: Map[String, Image] = Map.empty
-  // one-time synced (initialized at the beginning) with image store
-  private var initialized = false
+  // initially synced at the beginning with image store
+  private var initsync = false
   // image hash code used to check for pending changes not yet written back to image store
   private var ihash = System.identityHashCode(images)
 
-  private def toJson() =
+  private def toJson = {
+    val now = System.currentTimeMillis
     JsObject(
       "invoker" -> invoker.toJson,
       "ip" -> uniqueName.getOrElse(s"$invoker").toJson,
-      "images" -> images.toList.map {
+      // filter out images not used for stale time in days
+      "images" -> images.filter(i => i._2.lru > now - epochStaleTime).toList.map {
         case (name, image) =>
           JsObject(
             "name" -> name.toJson,
@@ -73,6 +78,7 @@ class ImageMonitor(cluster: Int,
                 JsObject("name" -> name.toJson, "lru" -> action.lru.toJson, "count" -> action.count.toJson)
             }.toJson)
       }.toJson)
+  }
 
   private def fromJson(response: JsObject) = {
     response
@@ -102,7 +108,7 @@ class ImageMonitor(cluster: Int,
   }
 
   def add(iname: String, aname: String) = this.synchronized {
-    if (initialized) {
+    if (initsync) {
       val now = System.currentTimeMillis
       images = images.get(iname) match {
         case None =>
@@ -125,41 +131,49 @@ class ImageMonitor(cluster: Int,
   }
 
   def sync: Future[Unit] = {
-    if (!initialized) {
-      read
-    } else {
+    if (initsync) {
       write
+    } else {
+      read
     }
   }
 
   private def read: Future[Unit] = {
-    logging.warn(this, s"read for $id")
+    logging.warn(this, s"read $id")
     imageStore
       .getDoc(id)
       .flatMap {
-        case Right(res) =>
-          rev = res.fields("rev").convertTo[String]
-          images = fromJson(res)
+        case Right(doc) =>
+          logging.warn(this, s"@StR doc: $doc")
+          rev = doc.fields("_rev").convertTo[String]
+          logging.warn(this, s"@StR rev: $rev")
+          images = fromJson(doc)
+          logging.warn(this, s"@StR images: $images")
           ihash = System.identityHashCode(images)
-          logging.warn(this, s"read for $id($rev), json: $res, images: $images($ihash)")
-          initialized = true
+          logging.warn(this, s"read $id($rev), doc: $doc, images: $images($ihash)")
+          initsync = true
           Future.successful(())
         case Left(StatusCodes.NotFound) =>
-          logging.warn(this, s"read for $id: not found")
-          val json = toJson()
-          logging.warn(this, s"write for $id, images: $images($ihash), json: $json")
-          imageStore.putDoc(id, json).flatMap {
+          logging.warn(this, s"read $id, not found")
+          val doc = toJson
+          logging.warn(this, s"write $id, images: $images($ihash), doc: $doc")
+          imageStore.putDoc(id, doc).flatMap {
             case Right(res) =>
-              rev = res.fields("rev").convertTo[String]
-              logging.warn(this, s"write for $id($rev)")
-              initialized = true
+              rev = res.fields("_rev").convertTo[String]
+              logging.warn(this, s"written $id($rev)")
+              initsync = true
               Future.successful(())
             case Left(code) =>
-              logging.error(this, s"write for $id: error: $code")
+              logging.error(this, s"write $id, error: $code")
               Future.successful(())
           }
         case Left(code) =>
-          logging.error(this, s"read for $id: error: $code")
+          logging.error(this, s"read $id, error: $code")
+          Future.successful(())
+      }
+      .recoverWith {
+        case t =>
+          logging.error(this, s"failure during read: ${t.getMessage}")
           Future.successful(())
       }
   }
@@ -167,20 +181,20 @@ class ImageMonitor(cluster: Int,
   private def write(): Future[Unit] = {
     val hash = System.identityHashCode(images)
     if (ihash != hash) {
-      val json = toJson()
-      logging.warn(this, s"write for $id($rev): images: $images($hash), json: $json")
-      imageStore.putDoc(id, json).flatMap {
+      val doc = toJson
+      logging.warn(this, s"write $id($rev), images: $images($hash), doc: $doc")
+      imageStore.putDoc(id, rev, doc).flatMap {
         case Right(res) =>
-          rev = res.fields("rev").convertTo[String]
+          rev = res.fields("_rev").convertTo[String]
           ihash = hash // hash code is not guaranteed to be unique
-          logging.warn(this, s"write for $id($rev)")
+          logging.warn(this, s"written $id($rev)")
           Future.successful(())
         case Left(code) =>
-          logging.error(this, s"write for $id($rev), error: $code")
+          logging.error(this, s"write $id($rev), error: $code")
           Future.successful(())
       }
     } else {
-      logging.warn(this, s"write for $id($rev), no pending changes")
+      logging.warn(this, s"write $id($rev), nothing pending")
       Future.successful(())
     }
   }
