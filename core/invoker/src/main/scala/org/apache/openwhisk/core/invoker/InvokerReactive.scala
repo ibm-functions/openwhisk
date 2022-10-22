@@ -157,35 +157,40 @@ class InvokerReactive(
 
   private val namespaceBlacklist = new NamespaceBlacklist(authStore)
 
+  private val imageStoreConfig = loadConfigOrThrow[CouchDbConfig]("whisk.couchdb")
   // config for invoker image monitor
-  case class ImageMonitorConfig(enabled: Boolean, cluster: Int, dbname: String, staleTime: Int, writeInterval: Int)
+  case class ImageMonitorConfig(enabled: Boolean, cluster: Int, staleTime: Int, writeInterval: Int)
   private val imageMonitorConfigNamespace = "whisk.invoker.imagemonitor"
   private val imageMonitorConfig = loadConfig[ImageMonitorConfig](imageMonitorConfigNamespace).toOption
   private val imageMonitorEnabled = imageMonitorConfig.exists(_.enabled)
   private val imageMonitorCluster = imageMonitorConfig.map(_.cluster).getOrElse(-1)
-  private val imageMonitorDbName = imageMonitorConfig.map(_.dbname).getOrElse("")
   private val imageMonitorStaleTime = imageMonitorConfig.map(_.staleTime).getOrElse(-1)
   private val imageMonitorWriteInterval = imageMonitorConfig.map(_.writeInterval).getOrElse(-1)
   logging.warn(
     this,
-    s"imageMonitorConfig : $imageMonitorConfig, " +
+    s"imageStoreConfig : $imageStoreConfig, " +
       s"imageMonitorEnabled: $imageMonitorEnabled, " +
       s"imageMonitorCluster: $imageMonitorCluster, " +
-      s"imageMonitorDbName: $imageMonitorDbName, " +
       s"imageMonitorStaleTime: $imageMonitorStaleTime, " +
       s"imageMonitorWriteInterval: $imageMonitorWriteInterval")
 
-  private val imageStoreConfig = loadConfigOrThrow[CouchDbConfig]("whisk.couchdb")
   private lazy val imageStore = new CouchDbRestClient(
     imageStoreConfig.protocol,
     imageStoreConfig.host,
     imageStoreConfig.port,
     imageStoreConfig.username,
     imageStoreConfig.password,
-    imageMonitorDbName)
+    imageStoreConfig.databaseFor[ImageMonitor])
 
   private lazy val imageMonitor =
-    new ImageMonitor(imageMonitorCluster, instance.instance, instance.uniqueName, imageMonitorStaleTime, imageStore)
+    new ImageMonitor(
+      imageMonitorCluster,
+      instance.instance,
+      instance.uniqueName,
+      instance.displayedName,
+      instance.toString,
+      imageMonitorStaleTime,
+      imageStore)
 
   private val rootfs = "/"
   private val logsfs = "/logs"

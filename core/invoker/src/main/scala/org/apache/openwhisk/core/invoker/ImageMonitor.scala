@@ -37,19 +37,24 @@ case class Image(lru: Long, count: Long, actions: Map[String, Action] = Map.empt
  *
  * @param cluster cluster instance.
  * @param invoker invoker instance
- * @param uniqueName unique name (ip).
+ * @param ip ip (unique name).
+ * @param pod invoker pod name.
+ * @param fqname full qualified name.
+ * @param staleTime days after which to consider images as stale.
  * @param imageStore images database.
  */
 class ImageMonitor(cluster: Int,
                    invoker: Int,
-                   uniqueName: Option[String] = None,
+                   ip: Option[String],
+                   pod: Option[String],
+                   fqname: String,
                    staleTime: Int,
                    imageStore: CouchDbRestClient)(implicit actorSystem: ActorSystem,
                                                   logging: Logging,
                                                   materializer: ActorMaterializer,
                                                   ec: ExecutionContext) {
 
-  // epoch time in days to check for stale images
+  // epoch time after which to consider images as stale
   private val epochStaleTime: Long = 24 * 60 * 60 * 1000 * staleTime
 
   private val id = s"$cluster/$invoker"
@@ -65,22 +70,29 @@ class ImageMonitor(cluster: Int,
     val now = System.currentTimeMillis
     JsObject(
       "invoker" -> invoker.toJson,
-      "ip" -> uniqueName.getOrElse(s"$invoker").toJson,
-      // filter out images not used for stale time in days
-      "images" -> images.filter(i => i._2.lru > now - epochStaleTime).toList.map {
-        case (name, image) =>
-          JsObject(
-            "name" -> name.toJson,
-            "lru" -> image.lru.toJson,
-            "count" -> image.count.toJson,
-            "actions" -> image.actions.toList.map {
-              case (name, action) =>
-                JsObject("name" -> name.toJson, "lru" -> action.lru.toJson, "count" -> action.count.toJson)
-            }.toJson)
-      }.toJson)
+      "ip" -> ip.getOrElse("").toJson,
+      "pod" -> pod.getOrElse("").toJson,
+      "fqname" -> fqname.toJson,
+      "updated" -> now.toJson,
+      "images" -> images
+        .filter(i => i._2.lru > now - epochStaleTime) // filter out stale images
+        .toList
+        .map {
+          case (name, image) =>
+            JsObject(
+              "name" -> name.toJson,
+              "lru" -> image.lru.toJson,
+              "count" -> image.count.toJson,
+              "actions" -> image.actions.toList.map {
+                case (name, action) =>
+                  JsObject("name" -> name.toJson, "lru" -> action.lru.toJson, "count" -> action.count.toJson)
+              }.toJson)
+        }
+        .toJson)
   }
 
   private def fromJson(response: JsObject) = {
+    val now = System.currentTimeMillis
     response
       .fields("images")
       .convertTo[List[JsObject]]
@@ -105,23 +117,24 @@ class ImageMonitor(cluster: Int,
       }
       .flatten
       .toMap
+      .filter(i => i._2.lru > now - epochStaleTime) // filter out stale images
   }
 
   def add(iname: String, aname: String) = this.synchronized {
     if (initsync) {
       val now = System.currentTimeMillis
-      images = images.get(iname) match {
+      images.get(iname) match {
         case None =>
           // new image/action
-          images + (iname -> Image(now, 1, Map(aname -> Action(now, 1))))
+          images += (iname -> Image(now, 1, Map(aname -> Action(now, 1))))
         case image =>
           image.get.actions.get(aname) match {
             case None =>
               // existing image/new action
-              images + (iname -> Image(now, image.get.count + 1, image.get.actions + (aname -> Action(now, 1))))
+              images += (iname -> Image(now, image.get.count + 1, image.get.actions + (aname -> Action(now, 1))))
             case action =>
               // existing image/action
-              images + (iname -> Image(
+              images += (iname -> Image(
                 now,
                 image.get.count + 1,
                 image.get.actions + (aname -> Action(now, action.get.count + 1))))
@@ -131,24 +144,22 @@ class ImageMonitor(cluster: Int,
   }
 
   def sync: Future[Unit] = {
-    if (initsync) {
-      write
-    } else {
-      read
-    }
+    if (initsync) { write } else { read }
+      .recoverWith {
+        case t =>
+          logging.error(this, s"failure during sync: ${t.getMessage}")
+          Future.successful(())
+      }
   }
 
-  private def read: Future[Unit] = {
+  private def read = {
     logging.warn(this, s"read $id")
     imageStore
       .getDoc(id)
       .flatMap {
         case Right(doc) =>
-          logging.warn(this, s"@StR doc: $doc")
           rev = doc.fields("_rev").convertTo[String]
-          logging.warn(this, s"@StR rev: $rev")
           images = fromJson(doc)
-          logging.warn(this, s"@StR images: $images")
           ihash = System.identityHashCode(images)
           logging.warn(this, s"read $id($rev), doc: $doc, images: $images($ihash)")
           initsync = true
@@ -156,7 +167,7 @@ class ImageMonitor(cluster: Int,
         case Left(StatusCodes.NotFound) =>
           logging.warn(this, s"read $id, not found")
           val doc = toJson
-          logging.warn(this, s"write $id, images: $images($ihash), doc: $doc")
+          logging.warn(this, s"write $id, doc: $doc, images: $images($ihash)")
           imageStore.putDoc(id, doc).flatMap {
             case Right(res) =>
               rev = res.fields("_rev").convertTo[String]
@@ -171,24 +182,31 @@ class ImageMonitor(cluster: Int,
           logging.error(this, s"read $id, error: $code")
           Future.successful(())
       }
-      .recoverWith {
-        case t =>
-          logging.error(this, s"failure during read: ${t.getMessage}")
-          Future.successful(())
-      }
   }
 
-  private def write(): Future[Unit] = {
+  private def write = {
     val hash = System.identityHashCode(images)
     if (ihash != hash) {
       val doc = toJson
-      logging.warn(this, s"write $id($rev), images: $images($hash), doc: $doc")
+      logging.warn(this, s"write $id($rev), doc: $doc, images: $images($hash)")
       imageStore.putDoc(id, rev, doc).flatMap {
         case Right(res) =>
           rev = res.fields("_rev").convertTo[String]
           ihash = hash // hash code is not guaranteed to be unique
           logging.warn(this, s"written $id($rev)")
           Future.successful(())
+        case Left(StatusCodes.Conflict) =>
+          // edge case (invalid revision), try to recover by read again from db
+          logging.warn(this, s"write $id, conflict, try to recover by read $id")
+          imageStore.getDoc(id).flatMap {
+            case Right(res) =>
+              rev = res.fields("_rev").convertTo[String]
+              logging.warn(this, s"read $id($rev)")
+              Future.successful(())
+            case Left(code) =>
+              logging.error(this, s"read $id, error: $code")
+              Future.successful(())
+          }
         case Left(code) =>
           logging.error(this, s"write $id($rev), error: $code")
           Future.successful(())
