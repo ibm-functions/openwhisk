@@ -20,6 +20,7 @@ package org.apache.openwhisk.core.invoker
 import akka.actor.{ActorRefFactory, ActorSystem}
 import akka.http.scaladsl.model.{StatusCode, StatusCodes}
 import akka.stream.ActorMaterializer
+import java.time.Instant
 import org.apache.openwhisk.common.{Logging}
 import org.apache.openwhisk.core.database.{CouchDbRestClient}
 
@@ -66,7 +67,21 @@ class ImageMonitor(cluster: Int,
   // image hash code used to check for pending changes not yet written back to image store
   private var ihash = System.identityHashCode(images)
 
-  private def toJson = {
+  private def toJsonLog(logLevel: String, method: String, msg: String, doc: JsObject) = {
+    val now = System.currentTimeMillis
+    JsObject(
+      "level" -> logLevel.toJson,
+      "ts" -> Instant.EPOCH.toString.toJson,
+      "caller" -> method.toJson,
+      "msg" -> msg.toJson,
+      "invoker" -> invoker.toJson,
+      "ip" -> ip.getOrElse("").toJson,
+      "pod" -> pod.getOrElse("").toJson,
+      "fqname" -> fqname.toJson,
+      "images" -> doc.fields("images").toJson)
+  }
+
+  private def toJson(images: Map[String, Image]) = {
     val now = System.currentTimeMillis
     JsObject(
       "invoker" -> invoker.toJson,
@@ -121,35 +136,32 @@ class ImageMonitor(cluster: Int,
   }
 
   def add(iname: String, aname: String) = this.synchronized {
-    if (initsync) {
+    if (initsync && iname.length > 0) {
       val now = System.currentTimeMillis
-      images.get(iname) match {
+      val newImages = images.get(iname) match {
         case None =>
           // new image/action
-          images += (iname -> Image(now, 1, Map(aname -> Action(now, 1))))
+          images + (iname -> Image(now, 1, Map(aname -> Action(now, 1))))
         case image =>
           image.get.actions.get(aname) match {
             case None =>
               // existing image/new action
-              images += (iname -> Image(now, image.get.count + 1, image.get.actions + (aname -> Action(now, 1))))
+              images + (iname -> Image(now, image.get.count + 1, image.get.actions + (aname -> Action(now, 1))))
             case action =>
               // existing image/action
-              images += (iname -> Image(
+              images + (iname -> Image(
                 now,
                 image.get.count + 1,
                 image.get.actions + (aname -> Action(now, action.get.count + 1))))
           }
       }
+      images = newImages
     }
+    images
   }
 
-  def sync: Future[Unit] = {
+  def sync = {
     if (initsync) { write } else { read }
-      .recoverWith {
-        case t =>
-          logging.error(this, s"failure during sync: ${t.getMessage}")
-          Future.successful(())
-      }
   }
 
   private def read = {
@@ -162,15 +174,18 @@ class ImageMonitor(cluster: Int,
           images = fromJson(doc)
           ihash = System.identityHashCode(images)
           logging.warn(this, s"read $id($rev), doc: $doc, images: $images($ihash)")
+          // write structured log line that can be queried in logdna
+          println(toJsonLog("warn", "read", "images from db", doc))
+          //println(s"{${'"'}level${'"'}:${'"'}warn${'"'}}")
           initsync = true
           Future.successful(())
         case Left(StatusCodes.NotFound) =>
           logging.warn(this, s"read $id, not found")
-          val doc = toJson
+          val doc = toJson(add("", ""))
           logging.warn(this, s"write $id, doc: $doc, images: $images($ihash)")
           imageStore.putDoc(id, doc).flatMap {
             case Right(res) =>
-              rev = res.fields("_rev").convertTo[String]
+              rev = res.fields("rev").convertTo[String]
               logging.warn(this, s"written $id($rev)")
               initsync = true
               Future.successful(())
@@ -182,35 +197,50 @@ class ImageMonitor(cluster: Int,
           logging.error(this, s"read $id, error: $code")
           Future.successful(())
       }
+      .recoverWith {
+        case t =>
+          logging.error(this, s"read $id, throwable: ${t.getMessage}")
+          Future.successful(())
+      }
   }
 
   private def write = {
     val hash = System.identityHashCode(images)
     if (ihash != hash) {
-      val doc = toJson
+      val images = add("", "")
+      val doc = toJson(images)
       logging.warn(this, s"write $id($rev), doc: $doc, images: $images($hash)")
-      imageStore.putDoc(id, rev, doc).flatMap {
-        case Right(res) =>
-          rev = res.fields("_rev").convertTo[String]
-          ihash = hash // hash code is not guaranteed to be unique
-          logging.warn(this, s"written $id($rev)")
-          Future.successful(())
-        case Left(StatusCodes.Conflict) =>
-          // edge case (invalid revision), try to recover by read again from db
-          logging.warn(this, s"write $id, conflict, try to recover by read $id")
-          imageStore.getDoc(id).flatMap {
-            case Right(res) =>
-              rev = res.fields("_rev").convertTo[String]
-              logging.warn(this, s"read $id($rev)")
-              Future.successful(())
-            case Left(code) =>
-              logging.error(this, s"read $id, error: $code")
-              Future.successful(())
-          }
-        case Left(code) =>
-          logging.error(this, s"write $id($rev), error: $code")
-          Future.successful(())
-      }
+      // write struct log line that can be queried in logdna
+      println(toJsonLog("warn", "write", "images to db", doc))
+      imageStore
+        .putDoc(id, rev, doc)
+        .flatMap {
+          case Right(res) =>
+            rev = res.fields("rev").convertTo[String]
+            ihash = hash // hash code is not guaranteed to be unique
+            logging.warn(this, s"written $id($rev)")
+            Future.successful(())
+          case Left(StatusCodes.Conflict) =>
+            // edge case (invalid revision), try to recover by read again from db
+            logging.warn(this, s"write $id, conflict, try to recover by read $id")
+            imageStore.getDoc(id).flatMap {
+              case Right(doc) =>
+                rev = doc.fields("_rev").convertTo[String]
+                logging.warn(this, s"read $id($rev)")
+                Future.successful(())
+              case Left(code) =>
+                logging.error(this, s"read $id, error: $code")
+                Future.successful(())
+            }
+          case Left(code) =>
+            logging.error(this, s"write $id($rev), error: $code")
+            Future.successful(())
+        }
+        .recoverWith {
+          case t =>
+            logging.error(this, s"write $id($rev), throwable: ${t.getMessage}")
+            Future.successful(())
+        }
     } else {
       logging.warn(this, s"write $id($rev), nothing pending")
       Future.successful(())
