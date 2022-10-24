@@ -167,6 +167,8 @@ object Invoker {
       case e: Exception => abort(s"Failed to initialize reactive invoker: ${e.getMessage}")
     }
 
+    logger.warn(this, s"imageMonitorConfig: ${invoker.asInstanceOf[InvokerReactive].imageMonitorConfig}")
+
     val port = config.servicePort.toInt
     val httpsConfig =
       if (Invoker.protocol == "https") Some(loadConfigOrThrow[HttpsConfig]("whisk.invoker.https")) else None

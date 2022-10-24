@@ -161,7 +161,7 @@ class InvokerReactive(
   // config for invoker image monitor
   case class ImageMonitorConfig(enabled: Boolean, cluster: Int, staleTime: Int, writeInterval: Int, buildNo: String, deployDate: String)
   private val imageMonitorConfigNamespace = "whisk.invoker.imagemonitor"
-  private val imageMonitorConfig = loadConfig[ImageMonitorConfig](imageMonitorConfigNamespace).toOption
+  val imageMonitorConfig = loadConfig[ImageMonitorConfig](imageMonitorConfigNamespace).toOption
   private val imageMonitorEnabled = imageMonitorConfig.exists(_.enabled)
   private val imageMonitorCluster = imageMonitorConfig.map(_.cluster).getOrElse(-1)
   private val imageMonitorStaleTime = imageMonitorConfig.map(_.staleTime).getOrElse(-1)
