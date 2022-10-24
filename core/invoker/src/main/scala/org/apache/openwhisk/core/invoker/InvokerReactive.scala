@@ -159,20 +159,24 @@ class InvokerReactive(
 
   private val imageStoreConfig = loadConfigOrThrow[CouchDbConfig]("whisk.couchdb")
   // config for invoker image monitor
-  case class ImageMonitorConfig(enabled: Boolean, cluster: Int, staleTime: Int, writeInterval: Int)
+  case class ImageMonitorConfig(enabled: Boolean, cluster: Int, staleTime: Int, writeInterval: Int, buildNo: String, deployDate: String)
   private val imageMonitorConfigNamespace = "whisk.invoker.imagemonitor"
   private val imageMonitorConfig = loadConfig[ImageMonitorConfig](imageMonitorConfigNamespace).toOption
   private val imageMonitorEnabled = imageMonitorConfig.exists(_.enabled)
   private val imageMonitorCluster = imageMonitorConfig.map(_.cluster).getOrElse(-1)
   private val imageMonitorStaleTime = imageMonitorConfig.map(_.staleTime).getOrElse(-1)
   private val imageMonitorWriteInterval = imageMonitorConfig.map(_.writeInterval).getOrElse(-1)
+  private val imageMonitorBuildNo = imageMonitorConfig.map(_.buildNo).getOrElse("")
+  private val imageMonitorDeployDate = imageMonitorConfig.map(_.deployDate).getOrElse("")
   logging.warn(
     this,
     s"imageStoreConfig : $imageStoreConfig, " +
       s"imageMonitorEnabled: $imageMonitorEnabled, " +
       s"imageMonitorCluster: $imageMonitorCluster, " +
       s"imageMonitorStaleTime: $imageMonitorStaleTime, " +
-      s"imageMonitorWriteInterval: $imageMonitorWriteInterval")
+      s"imageMonitorWriteInterval: $imageMonitorWriteInterval, " +
+      s"imageMonitorBuildNo: $imageMonitorBuildNo, " +
+      s"imageMonitorDeployDate: $imageMonitorDeployDate")
 
   private lazy val imageStore = new CouchDbRestClient(
     imageStoreConfig.protocol,
@@ -190,6 +194,8 @@ class InvokerReactive(
       instance.displayedName,
       instance.toString,
       imageMonitorStaleTime,
+      imageMonitorBuildNo,
+      imageMonitorDeployDate,
       imageStore)
 
   private val rootfs = "/"

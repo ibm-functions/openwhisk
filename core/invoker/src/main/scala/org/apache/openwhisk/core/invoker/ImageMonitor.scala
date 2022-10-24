@@ -42,6 +42,7 @@ case class Image(lru: Long, count: Long, actions: Map[String, Action] = Map.empt
  * @param pod invoker pod name.
  * @param fqname full qualified name.
  * @param staleTime days after which to consider images as stale.
+ * @param buildNo functions build notafter which to consider images as stale.
  * @param imageStore images database.
  */
 class ImageMonitor(cluster: Int,
@@ -50,13 +51,16 @@ class ImageMonitor(cluster: Int,
                    pod: Option[String],
                    fqname: String,
                    staleTime: Int,
+                   buildNo: String,
+                   deployDate: String,
                    imageStore: CouchDbRestClient)(implicit actorSystem: ActorSystem,
                                                   logging: Logging,
                                                   materializer: ActorMaterializer,
                                                   ec: ExecutionContext) {
 
   // epoch time after which to consider images as stale
-  private val epochStaleTime: Long = 24 * 60 * 60 * 1000 * staleTime
+  private val epochDay: Long = 24 * 60 * 60 * 1000
+  private val epochStaleTime: Long = epochDay * staleTime
 
   private val id = s"$cluster/$invoker"
   private var rev = ""
@@ -71,14 +75,16 @@ class ImageMonitor(cluster: Int,
     val now = System.currentTimeMillis
     JsObject(
       "level" -> logLevel.toJson,
-      "ts" -> Instant.EPOCH.toString.toJson,
+      "ts" -> Instant.ofEpochMilli(now).toString.toJson,
       "caller" -> method.toJson,
       "msg" -> msg.toJson,
       "invoker" -> invoker.toJson,
       "ip" -> ip.getOrElse("").toJson,
       "pod" -> pod.getOrElse("").toJson,
       "fqname" -> fqname.toJson,
-      "images" -> doc.fields("images").toJson)
+      "buildno" -> buildNo.toJson,
+      "build" -> deployDate.toJson,
+      "images" -> doc.fields("images"))
   }
 
   private def toJson(images: Map[String, Image]) = {
@@ -88,6 +94,8 @@ class ImageMonitor(cluster: Int,
       "ip" -> ip.getOrElse("").toJson,
       "pod" -> pod.getOrElse("").toJson,
       "fqname" -> fqname.toJson,
+      "buildno" -> buildNo.toJson,
+      "build" -> deployDate.toJson,
       "updated" -> now.toJson,
       "images" -> images
         .filter(i => i._2.lru > now - epochStaleTime) // filter out stale images
@@ -175,7 +183,7 @@ class ImageMonitor(cluster: Int,
           ihash = System.identityHashCode(images)
           logging.warn(this, s"read $id($rev), doc: $doc, images: $images($ihash)")
           // write structured log line that can be queried in logdna
-          println(toJsonLog("warn", "read", "images from db", doc))
+          println(toJsonLog("warn", "ImageMonitor", "read images from db", doc))
           //println(s"{${'"'}level${'"'}:${'"'}warn${'"'}}")
           initsync = true
           Future.successful(())
@@ -211,7 +219,7 @@ class ImageMonitor(cluster: Int,
       val doc = toJson(images)
       logging.warn(this, s"write $id($rev), doc: $doc, images: $images($hash)")
       // write struct log line that can be queried in logdna
-      println(toJsonLog("warn", "write", "images to db", doc))
+      println(toJsonLog("warn", "ImageMonitor", "write images to db", doc))
       imageStore
         .putDoc(id, rev, doc)
         .flatMap {
@@ -242,7 +250,7 @@ class ImageMonitor(cluster: Int,
             Future.successful(())
         }
     } else {
-      logging.warn(this, s"write $id($rev), nothing pending")
+      logging.warn(this, s"write $id($rev), no changes")
       Future.successful(())
     }
   }
