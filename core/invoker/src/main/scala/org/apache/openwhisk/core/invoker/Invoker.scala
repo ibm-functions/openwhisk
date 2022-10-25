@@ -167,7 +167,15 @@ object Invoker {
       case e: Exception => abort(s"Failed to initialize reactive invoker: ${e.getMessage}")
     }
 
-    logger.warn(this, s"imageMonitorConfig: ${invoker.asInstanceOf[InvokerReactive].imageMonitorConfig}")
+    // Ensure images preload was able to run by checking if invoker config has changed
+    // and enforce invoker restart if changed
+    invoker
+      .asInstanceOf[InvokerReactive]
+      .ensureImagePreload
+      .recoverWith {
+        case t =>
+          abort(s"failure during ensureImagePreload: ${t.getMessage}")
+      }
 
     val port = config.servicePort.toInt
     val httpsConfig =
