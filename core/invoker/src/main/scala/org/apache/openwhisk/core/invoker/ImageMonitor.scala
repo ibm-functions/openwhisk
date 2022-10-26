@@ -132,7 +132,6 @@ class ImageMonitor(cluster: String,
         "fqname" -> fqname.toJson,
         "build" -> build.toJson,
         "buildno" -> buildNo.toJson,
-        "updated" -> System.currentTimeMillis.toJson,
         "images" -> doc.fields("images")))
   }
 
@@ -154,6 +153,7 @@ class ImageMonitor(cluster: String,
       "build" -> build.toJson,
       "buildno" -> buildNo.toJson,
       "updated" -> now.toJson,
+      "updated_at" -> Instant.ofEpochMilli(now).toString.toJson,
       "images" -> (if (filter) images.filter(i => i._2.lru > now - epochStaleTime) else images).toList.map {
         case (name, image) =>
           JsObject(
