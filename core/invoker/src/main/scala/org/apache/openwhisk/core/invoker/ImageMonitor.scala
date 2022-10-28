@@ -70,7 +70,7 @@ class ImageMonitor(cluster: String,
   private var images: Map[String, Image] = Map.empty
   // ready for monitoring, requires initial sync with image store
   private var ready = false
-  // image hash code used to check for pending changes not yet written to image store
+  // hash code used to check for changes of in-memory image map not yet written to image store
   private var ihash = System.identityHashCode(images)
 
   def isReady = ready
@@ -126,10 +126,10 @@ class ImageMonitor(cluster: String,
         "caller" -> method.toJson,
         "msg" -> msg.toJson,
         "cluster" -> cluster.toJson,
-        "invoker" -> invoker.toJson,
-        "ip" -> ip.toJson,
-        "pod" -> pod.toJson,
-        "fqname" -> fqname.toJson,
+        "invokerinstance" -> invoker.toJson,
+        "invokerip" -> ip.toJson,
+        "invokerpod" -> pod.toJson,
+        "invokerfqname" -> fqname.toJson,
         "build" -> build.toJson,
         "buildno" -> buildNo.toJson,
         "images" -> doc.fields("images")))
@@ -146,10 +146,10 @@ class ImageMonitor(cluster: String,
     val now = System.currentTimeMillis
     JsObject(
       "cluster" -> cluster.toJson,
-      "invoker" -> invoker.toJson,
-      "ip" -> ip.toJson,
-      "pod" -> pod.toJson,
-      "fqname" -> fqname.toJson,
+      "invokerinstance" -> invoker.toJson,
+      "invokerip" -> ip.toJson,
+      "invokerpod" -> pod.toJson,
+      "invokerfqname" -> fqname.toJson,
       "build" -> build.toJson,
       "buildno" -> buildNo.toJson,
       "updated" -> now.toJson,
@@ -210,14 +210,18 @@ class ImageMonitor(cluster: String,
           val docbuildno = doc.fields("buildno").convertTo[String]
           images = fromJson(doc)
           ihash = System.identityHashCode(images)
-          logging.warn(this, s"read $id($rev), doc: $doc, images: $images($ihash)")
+          logging.warn(this, s"read $id($rev), doc: $doc, ihash: $ihash, images: $images")
           logJson("warn", "ImageMonitor", "read images from db", doc)
-          // write doc to image store to update metadata
+          // write doc to image store to update metadata (eg invoker ip). after a new deployment
+          // zookeeper persistent store is deleted and each invoker will most likely get a new identity (ip)
           imageStore.putDoc(id, rev, toJson(images)).map {
             case Right(res) =>
               rev = res.fields("rev").convertTo[String]
               logging.warn(this, s"written $id($rev)")
               if (ip != docip || build != docbuild) {
+                // throw exception if invoker config has changed to enforce a controlled shutdown of the invoker
+                // invoker pod will be restarted by kubernetes means and pull runtimes init container is able to
+                // preload custom images using the couchdb view showing all images by invoker ip
                 throw new Exception(
                   s"invoker config updated for $fqname: $ip($docip), $build($docbuild), $buildNo($docbuildno)")
               }
@@ -230,7 +234,7 @@ class ImageMonitor(cluster: String,
         case Left(StatusCodes.NotFound) =>
           logging.warn(this, s"read $id, not found")
           val doc = toJson(images)
-          logging.warn(this, s"write $id, doc: $doc, images: $images($ihash)")
+          logging.warn(this, s"write $id, doc: $doc, ihash: $ihash, images: $images")
           // write new doc to image store
           imageStore.putDoc(id, doc).map {
             case Right(res) =>
@@ -255,8 +259,9 @@ class ImageMonitor(cluster: String,
     val imgs = images
     val hash = System.identityHashCode(imgs)
     if (ihash != hash) {
+      // image map hash did change, write image map back to store
       val doc = toJson(imgs, true)
-      logging.warn(this, s"write $id($rev), doc: $doc, images: $imgs($hash)")
+      logging.warn(this, s"write $id($rev), doc: $doc, ihash: $hash, images: $imgs($hash)")
       logJson("warn", "ImageMonitor", "write images to db", doc)
       imageStore
         .putDoc(id, rev, doc)
@@ -267,7 +272,8 @@ class ImageMonitor(cluster: String,
             logging.warn(this, s"written $id($rev)")
             Future.successful(())
           case Left(StatusCodes.Conflict) =>
-            // edge case (invalid revision), try to recover by read again from store
+            // invalid revision (edge case), try to recover by read again from store to get the valid revision,
+            // however image map will not written back before next schedule
             logging.warn(this, s"write $id, conflict, try to recover by read $id")
             imageStore.getDoc(id).map {
               case Right(doc) =>
