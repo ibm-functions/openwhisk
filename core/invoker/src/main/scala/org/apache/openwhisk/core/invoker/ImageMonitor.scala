@@ -125,13 +125,13 @@ class ImageMonitor(cluster: String,
         "ts" -> Instant.ofEpochMilli(System.currentTimeMillis).toString.toJson,
         "caller" -> method.toJson,
         "msg" -> msg.toJson,
+        "build" -> build.toJson,
+        "buildno" -> buildNo.toJson,
         "cluster" -> cluster.toJson,
+        "invokerfqname" -> fqname.toJson,
         "invokerinstance" -> invoker.toJson,
         "invokerip" -> ip.toJson,
         "invokerpod" -> pod.toJson,
-        "invokerfqname" -> fqname.toJson,
-        "build" -> build.toJson,
-        "buildno" -> buildNo.toJson,
         "images" -> doc.fields("images")))
   }
 
@@ -139,22 +139,33 @@ class ImageMonitor(cluster: String,
    * Transform images map to JSON and prepare document for database update.
    *
    * @param images map containing images.
-   * @param filter filter out stale images if set.
+   * @param filter filter out stale images and actions.
    * @return JSONfied images
    */
   private def toJson(images: Map[String, Image], filter: Boolean = false) = {
     val now = System.currentTimeMillis
     JsObject(
+      "build" -> build.toJson,
+      "buildno" -> buildNo.toJson,
       "cluster" -> cluster.toJson,
+      "invokerfqname" -> fqname.toJson,
       "invokerinstance" -> invoker.toJson,
       "invokerip" -> ip.toJson,
       "invokerpod" -> pod.toJson,
-      "invokerfqname" -> fqname.toJson,
-      "build" -> build.toJson,
-      "buildno" -> buildNo.toJson,
       "updated" -> now.toJson,
       "updated_at" -> Instant.ofEpochMilli(now).toString.toJson,
-      "images" -> (if (filter) images.filter(i => i._2.lru > now - epochStaleTime) else images).toList.map {
+      "images" -> (
+        if (filter)
+          images
+            .filter(i => i._2.lru > now - epochStaleTime)
+            .toList
+            .map {
+              case (iname, i) =>
+                iname -> Image(i.lru, i.count, i.actions.filter(a => a._2.lru > now - epochStaleTime))
+            }
+            .toMap
+        else images
+      ).toList.map {
         case (name, image) =>
           JsObject(
             "name" -> name.toJson,
@@ -205,7 +216,7 @@ class ImageMonitor(cluster: String,
       .flatMap {
         case Right(doc) =>
           rev = doc.fields("_rev").convertTo[String]
-          val docip = doc.fields("ip").convertTo[String]
+          val docip = doc.fields("invokerip").convertTo[String]
           val docbuild = doc.fields("build").convertTo[String]
           val docbuildno = doc.fields("buildno").convertTo[String]
           images = fromJson(doc)
@@ -223,7 +234,7 @@ class ImageMonitor(cluster: String,
                 // invoker pod will be restarted by kubernetes means and pull runtimes init container is able to
                 // preload custom images using the couchdb view showing all images by invoker ip
                 throw new Exception(
-                  s"invoker config updated for $fqname: $ip($docip), $build($docbuild), $buildNo($docbuildno)")
+                  s"invoker config changed for $fqname: $ip($docip), $build($docbuild), $buildNo($docbuildno)")
               }
               ready = true
               ready
