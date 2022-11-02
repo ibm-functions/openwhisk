@@ -17,16 +17,20 @@
 
 package org.apache.openwhisk.core.invoker
 
-import akka.actor.{ActorRefFactory, ActorSystem}
+import akka.actor.ActorSystem
 import akka.http.scaladsl.model.StatusCodes
 import akka.stream.ActorMaterializer
 import java.time.Instant
+
 import org.apache.openwhisk.common.Logging
 import org.apache.openwhisk.core.database.CouchDbRestClient
 
 import scala.concurrent.{ExecutionContext, Future}
 import spray.json.DefaultJsonProtocol._
 import spray.json._
+
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+import scala.util.{Failure, Success}
 
 case class Action(lru: Long, count: Long)
 case class Image(lru: Long, count: Long, actions: Map[String, Action])
@@ -45,6 +49,10 @@ case class Image(lru: Long, count: Long, actions: Map[String, Action])
  * @param build functions deploy date (ansible_date_time.iso8601).
  * @param buildNo functions build number (docker tag).
  * @param imageStore images database.
+ * @param ddoc images database design doc
+ * @param view images database view name
+ * @param imageStoreSuccessfulViewCalls how many successfully image store view calls are required.
+ * @param retryDuration for how long in minutes retry image store view call.
  */
 class ImageMonitor(cluster: String,
                    invoker: Int,
@@ -54,10 +62,14 @@ class ImageMonitor(cluster: String,
                    staleTime: Int,
                    build: String,
                    buildNo: String,
-                   imageStore: CouchDbRestClient)(implicit actorSystem: ActorSystem,
-                                                  logging: Logging,
-                                                  materializer: ActorMaterializer,
-                                                  ec: ExecutionContext) {
+                   imageStore: CouchDbRestClient,
+                   ddoc: String = "imageMonitor",
+                   view: String = "images",
+                   imageStoreSuccessfulViewCalls: Int = 5,
+                   retryDuration: Duration = 5 * 1.minute)(implicit actorSystem: ActorSystem,
+                                                           logging: Logging,
+                                                           materializer: ActorMaterializer,
+                                                           ec: ExecutionContext) {
 
   // epoch time after which to consider images as stale
   private val epochDay: Long = 24 * 60 * 60 * 1000
@@ -74,6 +86,135 @@ class ImageMonitor(cluster: String,
   private var ihash = System.identityHashCode(images)
 
   def isReady = ready
+
+  /**
+   * Get changes made to documents in the database and store last change update sequence.
+   *
+   * @return ids of changed documents
+   */
+  def getViewCount(startKey: List[Any], endKey: List[Any]) = {
+    logging.warn(this, s"check on $ddoc/$view?startkey=$startKey&endkey=$endKey&descending=true&reduce=true")
+    imageStore
+      .executeView(ddoc, view)(startKey, endKey, descending = true, reduce = true)
+      .map {
+        case Right(res) =>
+          logging.warn(this, s"res: $res")
+          // {
+          //  "rows": [
+          //    {
+          //      "key": null,
+          //      "value": 5
+          //    }
+          //  ]
+          //}
+          val count = res.fields("rows").convertTo[List[JsObject]].head.fields("value").convertTo[Int]
+          logging.warn(this, s"count: $count")
+          count
+        case Left(code) if code.intValue() >= 500 =>
+          logging.warn(this, s"code: $code")
+          // swallow 5xx response codes and return -1 as view count instead to retry on these codes
+          logging.warn(this, s"unexpected http response code: $code, return -1 for view count")
+          -1
+        case Left(code) =>
+          logging.warn(this, s"code: $code")
+          throw new Exception("unexpected http response code: " + code)
+      }
+  }
+
+  private val initGraceBeforeRetry = 250.milliseconds
+
+  private def waitForEntriesToAppearInView(
+    startKey: List[Any],
+    endKey: List[Any],
+    expectedCount: Int,
+    succViewCalls: Int = 0,
+    graceBeforeRetry: FiniteDuration = initGraceBeforeRetry,
+    start: Instant = Instant.ofEpochMilli(System.currentTimeMillis)): Future[Int] = {
+    logging.warn(
+      this,
+      s"expectedCount: $expectedCount, succViewCalls: $succViewCalls, graceBeforeRetry: $graceBeforeRetry")
+    getViewCount(startKey, endKey).flatMap {
+      case count if count != expectedCount =>
+        logging.warn(
+          this,
+          s"case Success(count) if count != expectedCount: count: $count, expectedCount: $expectedCount")
+        val duration = java.time.Duration.between(start, Instant.ofEpochMilli(System.currentTimeMillis))
+        if (duration.toMinutes > retryDuration.toMinutes) {
+          val msg =
+            s"view rows length: $count, expected: $expectedCount, successful view calls: $succViewCalls, passed duration: ${duration.toMinutes} minutes, retry duration: ${retryDuration.toMinutes}"
+          logging.warn(this, msg)
+          throw new Exception(s"$msg")
+        }
+        logging.warn(
+          this,
+          s"view rows length: $count, expected: $expectedCount, successful view calls: $succViewCalls, expected: $imageStoreSuccessfulViewCalls, wait $graceBeforeRetry millis before retry")
+        Thread.sleep(graceBeforeRetry.toMillis)
+        waitForEntriesToAppearInView(
+          startKey = startKey,
+          endKey = endKey,
+          expectedCount = expectedCount,
+          succViewCalls = succViewCalls,
+          graceBeforeRetry = Math.min((graceBeforeRetry * 2).toMillis, 30.seconds.toMillis) * 1.millisecond,
+          start = start)
+      case count if succViewCalls < imageStoreSuccessfulViewCalls =>
+        logging.warn(
+          this,
+          s"case Success(count) if succViewCalls < imageStoreSuccessfulViewCalls: count: $count, expectedCount: $expectedCount, succViewCalls: $succViewCalls, graceBeforeRetry: $graceBeforeRetry")
+        waitForEntriesToAppearInView(
+          startKey = startKey,
+          endKey = endKey,
+          expectedCount = expectedCount,
+          succViewCalls = succViewCalls + 1,
+          start = start)
+      case count =>
+        logging.warn(
+          this,
+          s"case Success(count): count: $count, expected: $expectedCount, succViewCalls: $succViewCalls, expected: $imageStoreSuccessfulViewCalls")
+        Future(count)
+    }
+    /*getViewCount(startKey, endKey).andThen {
+      case Success(count) if count != expectedCount =>
+        logging.warn(
+          this,
+          s"case Success(count) if count != expectedCount: count: $count, expectedCount: $expectedCount")
+        val duration = java.time.Duration.between(start, Instant.ofEpochMilli(System.currentTimeMillis))
+        if (duration.toMinutes > retryDuration.toMinutes) {
+          val msg =
+            s"view rows length: $count, expected: $expectedCount, successful view calls: $succViewCalls, passed duration: ${duration.toMinutes} minutes, retry duration: ${retryDuration.toMinutes}"
+          logging.warn(this, msg)
+          throw new Exception(s"$msg")
+        }
+        logging.warn(
+          this,
+          s"view rows length: $count, expected: $expectedCount, successful view calls: $succViewCalls, expected: $imageStoreSuccessfulViewCalls, wait $graceBeforeRetry millis before retry")
+        Thread.sleep(graceBeforeRetry.toMillis)
+        waitForEntriesToAppearInView(
+          startKey = startKey,
+          endKey = endKey,
+          expectedCount = expectedCount,
+          succViewCalls = succViewCalls,
+          graceBeforeRetry = Math.min((graceBeforeRetry * 2).toMillis, 30.seconds.toMillis) * 1.millisecond,
+          start = start)
+      case Success(count) if succViewCalls < imageStoreSuccessfulViewCalls =>
+        logging.warn(
+          this,
+          s"case Success(count) if succViewCalls < imageStoreSuccessfulViewCalls: count: $count, expectedCount: $expectedCount, succViewCalls: $succViewCalls, graceBeforeRetry: $graceBeforeRetry")
+        waitForEntriesToAppearInView(
+          startKey = startKey,
+          endKey = endKey,
+          expectedCount = expectedCount,
+          succViewCalls = succViewCalls + 1,
+          start = start)
+      case Success(count) =>
+        logging.warn(
+          this,
+          s"case Success(count): count: $count, expected: $expectedCount, succViewCalls: $succViewCalls, expected: $imageStoreSuccessfulViewCalls")
+        count
+      case Failure(t) =>
+        logging.error(this, s"error on check entries to appear in view: ${t.getMessage}")
+        t
+    }*/
+  }
 
   /**
    * Transform images in document read from db to map.
@@ -216,43 +357,55 @@ class ImageMonitor(cluster: String,
       .flatMap {
         case Right(doc) =>
           rev = doc.fields("_rev").convertTo[String]
-          val docip = doc.fields("invokerip").convertTo[String]
           val docbuild = doc.fields("build").convertTo[String]
           val docbuildno = doc.fields("buildno").convertTo[String]
+          val docip = doc.fields("invokerip").convertTo[String]
+          val docpod = doc.fields("invokerpod").convertTo[String]
           images = fromJson(doc)
           ihash = System.identityHashCode(images)
           logging.warn(this, s"read $id($rev), doc: $doc, ihash: $ihash, images: $images")
           logJson("warn", "ImageMonitor", "read images from db", doc)
-          // write doc to image store to update metadata (eg invoker ip). after a new deployment
-          // zookeeper persistent store is deleted and each invoker will most likely get a new identity (ip)
-          imageStore.putDoc(id, rev, toJson(images)).map {
-            case Right(res) =>
-              rev = res.fields("rev").convertTo[String]
-              logging.warn(this, s"written $id($rev)")
-              if (ip != docip || build != docbuild) {
-                // throw exception if invoker config has changed to enforce a controlled shutdown of the invoker
-                // invoker pod will be restarted by kubernetes means and pull runtimes init container is able to
-                // preload custom images using the couchdb view showing all images by invoker ip
-                throw new Exception(
-                  s"invoker config changed for $fqname: $ip($docip), $build($docbuild), $buildNo($docbuildno)")
-              }
-              ready = true
-              ready
-            case Left(code) =>
-              logging.error(this, s"write $id($rev), error: $code")
-              throw new Exception(s"write $id($rev), error: $code")
+          if (build != docbuild || ip != docip || pod != docpod) {
+            // write doc to image store to update metadata (eg invoker ip) if changed. after a new deployment
+            // zookeeper persistent store is deleted and each invoker will most likely get a new identity (ip)
+            imageStore.putDoc(id, rev, toJson(images)).flatMap {
+              case Right(res) =>
+                rev = res.fields("rev").convertTo[String]
+                logging.warn(this, s"written $id($rev)")
+                waitForEntriesToAppearInView(
+                  List(cluster, ip, build, Instant.now.toEpochMilli),
+                  List(cluster, ip, build),
+                  images.size).flatMap {
+                  case _ =>
+                    if (ip != docip || build != docbuild) {
+                      // throw exception if invoker config has changed to enforce a controlled shutdown of the invoker
+                      // invoker pod will be restarted by kubernetes means and pull runtimes init container is able to
+                      // preload custom images using the couchdb view showing all images by invoker ip
+                      throw new Exception(
+                        s"invoker config changed for $fqname: $ip($docip), $build($docbuild), $buildNo($docbuildno)")
+                    }
+                    ready = true
+                    Future(ready)
+                }
+              case Left(code) =>
+                logging.error(this, s"write $id($rev), error: $code")
+                throw new Exception(s"write $id($rev), error: $code")
+            }
+          } else {
+            ready = true
+            Future(ready)
           }
         case Left(StatusCodes.NotFound) =>
           logging.warn(this, s"read $id, not found")
           val doc = toJson(images)
           logging.warn(this, s"write $id, doc: $doc, ihash: $ihash, images: $images")
           // write new doc to image store
-          imageStore.putDoc(id, doc).map {
+          imageStore.putDoc(id, doc).flatMap {
             case Right(res) =>
               rev = res.fields("rev").convertTo[String]
               logging.warn(this, s"written $id($rev)")
               ready = true
-              ready
+              Future(ready)
             case Left(code) =>
               logging.error(this, s"write $id, error: $code")
               throw new Exception(s"write $id, error: $code")
@@ -260,6 +413,11 @@ class ImageMonitor(cluster: String,
         case Left(code) =>
           logging.error(this, s"read $id, error: $code")
           throw new Exception(s"read $id, error: $code")
+      }
+      .recoverWith {
+        case t =>
+          logging.error(this, s"sync $id, throwable: ${t.getMessage}")
+          throw t
       }
   }
 
