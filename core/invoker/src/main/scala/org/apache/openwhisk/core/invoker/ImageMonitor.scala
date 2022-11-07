@@ -30,10 +30,6 @@ import spray.json.DefaultJsonProtocol._
 import spray.json._
 
 import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
-import scala.util.{Failure, Success}
-
-case class Action(lru: Long, count: Long)
-case class Image(lru: Long, count: Long, actions: Map[String, Action])
 
 /**
  * The image monitor records all invoked docker images and related actions and stores them in the database.
@@ -45,13 +41,13 @@ case class Image(lru: Long, count: Long, actions: Map[String, Action])
  * @param ip invoker ip.
  * @param pod invoker pod name.
  * @param fqname invoker full qualified name (triple).
- * @param staleTime days after which to consider images as stale.
+ * @param staleTime duration in days after which to consider images as stale.
  * @param build functions deploy date (ansible_date_time.iso8601).
  * @param buildNo functions build number (docker tag).
  * @param imageStore images database.
  * @param ddoc images database design doc
  * @param view images database view name
- * @param imageStoreSuccessfulViewCalls how many successfully image store view calls are required.
+ * @param reqSuccViewCalls how many successfully image store view calls are required.
  * @param retryDuration for how long in minutes retry image store view call.
  */
 class ImageMonitor(cluster: String,
@@ -59,24 +55,23 @@ class ImageMonitor(cluster: String,
                    ip: String,
                    pod: String,
                    fqname: String,
-                   staleTime: Int,
+                   staleTime: Duration,
                    build: String,
                    buildNo: String,
                    imageStore: CouchDbRestClient,
-                   ddoc: String = "imageMonitor",
-                   view: String = "images",
-                   imageStoreSuccessfulViewCalls: Int = 5,
-                   retryDuration: Duration = 5 * 1.minute)(implicit actorSystem: ActorSystem,
-                                                           logging: Logging,
-                                                           materializer: ActorMaterializer,
-                                                           ec: ExecutionContext) {
-
-  // epoch time after which to consider images as stale
-  private val epochDay: Long = 24 * 60 * 60 * 1000
-  private val epochStaleTime: Long = epochDay * staleTime
+                   ddoc: String,
+                   view: String,
+                   reqSuccViewCalls: Int,
+                   retryDuration: Duration)(implicit actorSystem: ActorSystem,
+                                            logging: Logging,
+                                            materializer: ActorMaterializer,
+                                            ec: ExecutionContext) {
 
   private val id = s"$cluster/$invoker"
   private var rev = ""
+
+  case class Action(lru: Long, count: Long)
+  case class Image(lru: Long, count: Long, actions: Map[String, Action])
 
   // docker images used by invoked actions
   private var images: Map[String, Image] = Map.empty
@@ -88,41 +83,40 @@ class ImageMonitor(cluster: String,
   def isReady = ready
 
   /**
-   * Get changes made to documents in the database and store last change update sequence.
+   * Get count on view filtered by start/end key.
    *
-   * @return ids of changed documents
+   * @return count of rows that satisfy start/end key
    */
   def getViewCount(startKey: List[Any], endKey: List[Any]) = {
-    logging.warn(this, s"check on $ddoc/$view?startkey=$startKey&endkey=$endKey&descending=true&reduce=true")
     imageStore
       .executeView(ddoc, view)(startKey, endKey, descending = true, reduce = true)
-      .map {
-        case Right(res) =>
-          logging.warn(this, s"res: $res")
-          // {
-          //  "rows": [
-          //    {
-          //      "key": null,
-          //      "value": 5
-          //    }
-          //  ]
-          //}
-          val count = res.fields("rows").convertTo[List[JsObject]].head.fields("value").convertTo[Int]
-          logging.warn(this, s"count: $count")
-          count
-        case Left(code) if code.intValue() >= 500 =>
-          logging.warn(this, s"code: $code")
-          // swallow 5xx response codes and return -1 as view count instead to retry on these codes
-          logging.warn(this, s"unexpected http response code: $code, return -1 for view count")
-          -1
-        case Left(code) =>
-          logging.warn(this, s"code: $code")
-          throw new Exception("unexpected http response code: " + code)
+      .map { res =>
+        logging.warn(
+          this,
+          s"check on $ddoc/$view?startkey=$startKey&endkey=$endKey&descending=true&reduce=true returned $res")
+        res match {
+          case Right(res) =>
+            // { "rows": [{ "key": null, "value": 5 }]}
+            res.fields("rows").convertTo[List[JsObject]].head.fields("value").convertTo[Int]
+          case Left(code) if code.intValue() >= 500 =>
+            logging.warn(this, s"code: $code")
+            // swallow 5xx response codes and return -1 as view count instead to retry on these codes
+            logging.warn(this, s"unexpected http response code: $code, return -1 for view count")
+            -1
+          case Left(code) =>
+            logging.warn(this, s"code: $code")
+            throw new Exception("unexpected http response code: " + code)
+        }
       }
   }
 
   private val initGraceBeforeRetry = 250.milliseconds
 
+  /**
+   * Wait for entries to appear in view and retry for some time.
+   *
+   * @return count of rows that satisfy start/end key
+   */
   private def waitForEntriesToAppearInView(
     startKey: List[Any],
     endKey: List[Any],
@@ -130,90 +124,38 @@ class ImageMonitor(cluster: String,
     succViewCalls: Int = 0,
     graceBeforeRetry: FiniteDuration = initGraceBeforeRetry,
     start: Instant = Instant.ofEpochMilli(System.currentTimeMillis)): Future[Int] = {
-    logging.warn(
-      this,
-      s"expectedCount: $expectedCount, succViewCalls: $succViewCalls, graceBeforeRetry: $graceBeforeRetry")
-    getViewCount(startKey, endKey).flatMap {
-      case count if count != expectedCount =>
-        logging.warn(
-          this,
-          s"case Success(count) if count != expectedCount: count: $count, expectedCount: $expectedCount")
-        val duration = java.time.Duration.between(start, Instant.ofEpochMilli(System.currentTimeMillis))
-        if (duration.toMinutes > retryDuration.toMinutes) {
-          val msg =
-            s"view rows length: $count, expected: $expectedCount, successful view calls: $succViewCalls, passed duration: ${duration.toMinutes} minutes, retry duration: ${retryDuration.toMinutes}"
-          logging.warn(this, msg)
-          throw new Exception(s"$msg")
-        }
-        logging.warn(
-          this,
-          s"view rows length: $count, expected: $expectedCount, successful view calls: $succViewCalls, expected: $imageStoreSuccessfulViewCalls, wait $graceBeforeRetry millis before retry")
-        Thread.sleep(graceBeforeRetry.toMillis)
-        waitForEntriesToAppearInView(
-          startKey = startKey,
-          endKey = endKey,
-          expectedCount = expectedCount,
-          succViewCalls = succViewCalls,
-          graceBeforeRetry = Math.min((graceBeforeRetry * 2).toMillis, 30.seconds.toMillis) * 1.millisecond,
-          start = start)
-      case count if succViewCalls < imageStoreSuccessfulViewCalls =>
-        logging.warn(
-          this,
-          s"case Success(count) if succViewCalls < imageStoreSuccessfulViewCalls: count: $count, expectedCount: $expectedCount, succViewCalls: $succViewCalls, graceBeforeRetry: $graceBeforeRetry")
-        waitForEntriesToAppearInView(
-          startKey = startKey,
-          endKey = endKey,
-          expectedCount = expectedCount,
-          succViewCalls = succViewCalls + 1,
-          start = start)
-      case count =>
-        logging.warn(
-          this,
-          s"case Success(count): count: $count, expected: $expectedCount, succViewCalls: $succViewCalls, expected: $imageStoreSuccessfulViewCalls")
-        Future(count)
+    getViewCount(startKey, endKey).flatMap { count =>
+      val duration = java.time.Duration.between(start, Instant.ofEpochMilli(System.currentTimeMillis))
+      logging.warn(
+        this,
+        s"count: $count($expectedCount), succViewCalls: $succViewCalls($reqSuccViewCalls), duration in mins: ${duration.toMinutes}(${retryDuration.toMinutes}), graceBeforeRetry: $graceBeforeRetry")
+      count match {
+        case count if count != expectedCount =>
+          if (duration.toMinutes > retryDuration.toMinutes) {
+            val msg =
+              s"view rows length: $count($expectedCount), successful view calls: $succViewCalls($reqSuccViewCalls), duration: $duration(${duration.toMinutes}/${retryDuration.toMinutes})"
+            logging.warn(this, msg)
+            throw new Exception(s"$msg")
+          }
+          Thread.sleep(graceBeforeRetry.toMillis)
+          waitForEntriesToAppearInView(
+            startKey = startKey,
+            endKey = endKey,
+            expectedCount = expectedCount,
+            succViewCalls = succViewCalls,
+            graceBeforeRetry = Math.min((graceBeforeRetry * 2).toMillis, 30.seconds.toMillis) * 1.millisecond,
+            start = start)
+        case count if succViewCalls < reqSuccViewCalls =>
+          waitForEntriesToAppearInView(
+            startKey = startKey,
+            endKey = endKey,
+            expectedCount = expectedCount,
+            succViewCalls = succViewCalls + 1,
+            start = start)
+        case count =>
+          Future(count)
+      }
     }
-    /*getViewCount(startKey, endKey).andThen {
-      case Success(count) if count != expectedCount =>
-        logging.warn(
-          this,
-          s"case Success(count) if count != expectedCount: count: $count, expectedCount: $expectedCount")
-        val duration = java.time.Duration.between(start, Instant.ofEpochMilli(System.currentTimeMillis))
-        if (duration.toMinutes > retryDuration.toMinutes) {
-          val msg =
-            s"view rows length: $count, expected: $expectedCount, successful view calls: $succViewCalls, passed duration: ${duration.toMinutes} minutes, retry duration: ${retryDuration.toMinutes}"
-          logging.warn(this, msg)
-          throw new Exception(s"$msg")
-        }
-        logging.warn(
-          this,
-          s"view rows length: $count, expected: $expectedCount, successful view calls: $succViewCalls, expected: $imageStoreSuccessfulViewCalls, wait $graceBeforeRetry millis before retry")
-        Thread.sleep(graceBeforeRetry.toMillis)
-        waitForEntriesToAppearInView(
-          startKey = startKey,
-          endKey = endKey,
-          expectedCount = expectedCount,
-          succViewCalls = succViewCalls,
-          graceBeforeRetry = Math.min((graceBeforeRetry * 2).toMillis, 30.seconds.toMillis) * 1.millisecond,
-          start = start)
-      case Success(count) if succViewCalls < imageStoreSuccessfulViewCalls =>
-        logging.warn(
-          this,
-          s"case Success(count) if succViewCalls < imageStoreSuccessfulViewCalls: count: $count, expectedCount: $expectedCount, succViewCalls: $succViewCalls, graceBeforeRetry: $graceBeforeRetry")
-        waitForEntriesToAppearInView(
-          startKey = startKey,
-          endKey = endKey,
-          expectedCount = expectedCount,
-          succViewCalls = succViewCalls + 1,
-          start = start)
-      case Success(count) =>
-        logging.warn(
-          this,
-          s"case Success(count): count: $count, expected: $expectedCount, succViewCalls: $succViewCalls, expected: $imageStoreSuccessfulViewCalls")
-        count
-      case Failure(t) =>
-        logging.error(this, s"error on check entries to appear in view: ${t.getMessage}")
-        t
-    }*/
   }
 
   /**
@@ -298,11 +240,11 @@ class ImageMonitor(cluster: String,
       "images" -> (
         if (filter)
           images
-            .filter(i => i._2.lru > now - epochStaleTime)
+            .filter(i => i._2.lru > now - staleTime.toMillis)
             .toList
             .map {
               case (iname, i) =>
-                iname -> Image(i.lru, i.count, i.actions.filter(a => a._2.lru > now - epochStaleTime))
+                iname -> Image(i.lru, i.count, i.actions.filter(a => a._2.lru > now - staleTime.toMillis))
             }
             .toMap
         else images

@@ -164,7 +164,11 @@ class InvokerReactive(
                                 staleTime: Int,
                                 writeInterval: Int,
                                 buildNo: String,
-                                deployDate: String)
+                                deployDate: String,
+                                ddoc: String,
+                                view: String,
+                                reqSuccViewCalls: Int,
+                                retryDuration: Int)
   private val imageMonitorConfigNamespace = "whisk.invoker.imagemonitor"
   val imageMonitorConfig = loadConfig[ImageMonitorConfig](imageMonitorConfigNamespace).toOption
   private val imageMonitorEnabled = imageMonitorConfig.exists(_.enabled)
@@ -173,15 +177,23 @@ class InvokerReactive(
   private val imageMonitorWriteInterval = imageMonitorConfig.map(_.writeInterval).getOrElse(-1)
   private val imageMonitorBuildNo = imageMonitorConfig.map(_.buildNo).getOrElse("")
   private val imageMonitorDeployDate = imageMonitorConfig.map(_.deployDate).getOrElse("")
+  private val imageMonitorDDoc = imageMonitorConfig.map(_.ddoc).getOrElse("")
+  private val imageMonitorView = imageMonitorConfig.map(_.view).getOrElse("")
+  private val imageMonitorReqSuccViewCalls = imageMonitorConfig.map(_.reqSuccViewCalls).getOrElse(-1)
+  private val imageMonitorRetryDuration = imageMonitorConfig.map(_.retryDuration).getOrElse(-1)
   logging.warn(
     this,
     s"imageStoreConfig : $imageStoreConfig, " +
       s"imageMonitorEnabled: $imageMonitorEnabled, " +
       s"imageMonitorCluster: $imageMonitorCluster, " +
-      s"imageMonitorStaleTime: $imageMonitorStaleTime, " +
+      s"imageMonitorStaleTime: $imageMonitorStaleTime (${imageMonitorStaleTime * 1.day}), " +
       s"imageMonitorWriteInterval: $imageMonitorWriteInterval, " +
       s"imageMonitorBuildNo: $imageMonitorBuildNo, " +
-      s"imageMonitorDeployDate: $imageMonitorDeployDate")
+      s"imageMonitorDeployDate: $imageMonitorDeployDate, " +
+      s"imageMonitorDDoc: $imageMonitorDDoc, " +
+      s"imageMonitorView: $imageMonitorView, " +
+      s"imageMonitorReqSuccViewCalls: $imageMonitorReqSuccViewCalls, " +
+      s"imageMonitorRetryDuration: $imageMonitorRetryDuration (${imageMonitorRetryDuration * 1.minute}(${(imageMonitorRetryDuration * 1.minute).toMillis}))")
 
   private lazy val imageStore = new CouchDbRestClient(
     imageStoreConfig.protocol,
@@ -198,10 +210,14 @@ class InvokerReactive(
       ip = instance.uniqueName.getOrElse(""),
       pod = instance.displayedName.getOrElse(""),
       fqname = instance.toString,
-      staleTime = imageMonitorStaleTime,
+      staleTime = imageMonitorStaleTime * 1.day,
       build = imageMonitorDeployDate,
       buildNo = imageMonitorBuildNo,
-      imageStore = imageStore)
+      imageStore = imageStore,
+      ddoc = imageMonitorDDoc,
+      view = imageMonitorView,
+      reqSuccViewCalls = imageMonitorReqSuccViewCalls,
+      retryDuration = imageMonitorRetryDuration * 1.minute)
 
   /** Ensure images preload was able to run by checking if invoker config has changed. */
   def ensureImagePreload = if (imageMonitorEnabled) imageMonitor.sync else Future((true))
