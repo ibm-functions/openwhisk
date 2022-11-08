@@ -87,17 +87,22 @@ class ImageMonitor(cluster: String,
    *
    * @return count of rows that satisfy start/end key
    */
-  def getViewCount(startKey: List[Any], endKey: List[Any]) = {
+  def getViewCount(start: Instant) = {
+    // start/end key to filter all images by cluster, ip, build and timestamp in reverse/descending order
+    val startKey = List(cluster, ip, build, start.toEpochMilli)
+    val endKey = List(cluster, ip, build)
     imageStore
-      .executeView(ddoc, view)(startKey, endKey, descending = true, reduce = true)
+      .executeView(ddoc, view)(startKey, endKey, descending = true, reduce = false)
       .map { res =>
         logging.warn(
           this,
-          s"check on $ddoc/$view?startkey=$startKey&endkey=$endKey&descending=true&reduce=true returned $res")
+          s"check on $ddoc/$view?startkey=$startKey&endkey=$endKey&descending=true&reduce=false returned $res")
         res match {
           case Right(res) =>
             // { "rows": [{ "key": null, "value": 5 }]}
-            res.fields("rows").convertTo[List[JsObject]].head.fields("value").convertTo[Int]
+            //res.fields("rows").convertTo[List[JsObject]].head.fields("value").convertTo[Int]
+            // { "rows": [{"id": "cluster/2", "key": ["cluster","10.x","2022-11-07T15:26:21Z",1667840304832],"value": "openwhisk/dockerskeleton"}]}
+            res.fields("rows").convertTo[List[JsObject]].size
           case Left(code) if code.intValue() >= 500 =>
             logging.warn(this, s"code: $code")
             // swallow 5xx response codes and return -1 as view count instead to retry on these codes
@@ -118,40 +123,27 @@ class ImageMonitor(cluster: String,
    * @return count of rows that satisfy start/end key
    */
   private def waitForEntriesToAppearInView(
-    startKey: List[Any],
-    endKey: List[Any],
     expectedCount: Int,
     succViewCalls: Int = 0,
     graceBeforeRetry: FiniteDuration = initGraceBeforeRetry,
     start: Instant = Instant.ofEpochMilli(System.currentTimeMillis)): Future[Int] = {
-    getViewCount(startKey, endKey).flatMap { count =>
+    getViewCount(start).flatMap { count =>
       val duration = java.time.Duration.between(start, Instant.ofEpochMilli(System.currentTimeMillis))
-      logging.warn(
-        this,
-        s"count: $count($expectedCount), succViewCalls: $succViewCalls($reqSuccViewCalls), duration in mins: ${duration.toMinutes}(${retryDuration.toMinutes}), graceBeforeRetry: $graceBeforeRetry")
+      val msg =
+        s"count: $count($expectedCount), successful view calls: $succViewCalls($reqSuccViewCalls), duration in mins: ${duration.toMinutes}(${retryDuration.toMinutes}), graceBeforeRetry: $graceBeforeRetry"
+      logging.warn(this, msg)
       count match {
+        case count if count != expectedCount && duration.toMinutes > retryDuration.toMinutes =>
+          throw new Exception(msg)
         case count if count != expectedCount =>
-          if (duration.toMinutes > retryDuration.toMinutes) {
-            val msg =
-              s"view rows length: $count($expectedCount), successful view calls: $succViewCalls($reqSuccViewCalls), duration: $duration(${duration.toMinutes}/${retryDuration.toMinutes})"
-            logging.warn(this, msg)
-            throw new Exception(s"$msg")
-          }
           Thread.sleep(graceBeforeRetry.toMillis)
           waitForEntriesToAppearInView(
-            startKey = startKey,
-            endKey = endKey,
             expectedCount = expectedCount,
             succViewCalls = succViewCalls,
             graceBeforeRetry = Math.min((graceBeforeRetry * 2).toMillis, 30.seconds.toMillis) * 1.millisecond,
             start = start)
         case count if succViewCalls < reqSuccViewCalls =>
-          waitForEntriesToAppearInView(
-            startKey = startKey,
-            endKey = endKey,
-            expectedCount = expectedCount,
-            succViewCalls = succViewCalls + 1,
-            start = start)
+          waitForEntriesToAppearInView(expectedCount = expectedCount, succViewCalls = succViewCalls + 1, start = start)
         case count =>
           Future(count)
       }
@@ -311,24 +303,20 @@ class ImageMonitor(cluster: String,
             // write doc to image store to update metadata (eg invoker ip) if changed. after a new deployment
             // zookeeper persistent store is deleted and each invoker will most likely get a new identity (ip)
             imageStore.putDoc(id, rev, toJson(images)).flatMap {
+              case Right(res) if (ip != docip || build != docbuild) =>
+                waitForEntriesToAppearInView(images.size).flatMap {
+                  case count =>
+                    // throw exception if invoker config has changed to enforce a controlled shutdown of the invoker
+                    // invoker pod will be restarted by kubernetes means and pull runtimes init container is able to
+                    // preload custom images using the couchdb view showing all images by invoker ip
+                    throw new Exception(
+                      s"invoker config changed for $fqname: $ip($docip), $build($docbuild), $buildNo($docbuildno), $count images")
+                }
               case Right(res) =>
                 rev = res.fields("rev").convertTo[String]
                 logging.warn(this, s"written $id($rev)")
-                waitForEntriesToAppearInView(
-                  List(cluster, ip, build, Instant.now.toEpochMilli),
-                  List(cluster, ip, build),
-                  images.size).flatMap {
-                  case _ =>
-                    if (ip != docip || build != docbuild) {
-                      // throw exception if invoker config has changed to enforce a controlled shutdown of the invoker
-                      // invoker pod will be restarted by kubernetes means and pull runtimes init container is able to
-                      // preload custom images using the couchdb view showing all images by invoker ip
-                      throw new Exception(
-                        s"invoker config changed for $fqname: $ip($docip), $build($docbuild), $buildNo($docbuildno)")
-                    }
-                    ready = true
-                    Future(ready)
-                }
+                ready = true
+                Future(ready)
               case Left(code) =>
                 logging.error(this, s"write $id($rev), error: $code")
                 throw new Exception(s"write $id($rev), error: $code")
