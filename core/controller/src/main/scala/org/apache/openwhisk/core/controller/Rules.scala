@@ -58,10 +58,13 @@ trait WhiskRulesApi extends WhiskCollectionAPI with ReferencedEntities {
   /** Path to Rules REST API. */
   protected val rulesPath = "rules"
 
-  /** Allowed rule request payload field names. */
+  /** enforce valid request put payload on allowed payload fields. */
+  protected[core] val ENFORCE_VALID_PUT_PAYLOAD =
+    sys.env.get("CRUDCONTROLLER_ENFORCE_VALID_PUT_PAYLOAD").getOrElse("false").equals("true")
   protected[core] val ALLOWED_FIELDS = classOf[WhiskRule].getDeclaredFields.map(_.getName).toList ++ List(
     "name",
     "status") // status is set in request playload by test code
+  logging.info(this, s"ENFORCE_VALID_PUT_PAYLOAD: $ENFORCE_VALID_PUT_PAYLOAD, ALLOWED_FIELDS: $ALLOWED_FIELDS")
 
   /**
    * Creates or updates rule if it already exists. The PUT content is deserialized into a WhiskRulePut
@@ -92,42 +95,48 @@ trait WhiskRulesApi extends WhiskCollectionAPI with ReferencedEntities {
         val invalidFields = payload
           .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
           .getOrElse(List())
-        if (invalidFields.size > 0) {
-          logging.warn(
-            this,
-            s"[PUT] ${invalidFields.size} invalid fields in rule request payload: ${invalidFields.slice(0, invalidFields.size min 100).mkString(",")}")
-        }
-        entity(as[WhiskRulePut]) { content =>
-          val request = content.resolve(entityName.namespace)
-          onComplete(entitlementProvider.check(user, Privilege.READ, referencedEntities(request))) {
-            case Success(_) =>
-              putEntity(
-                WhiskRule,
-                entityStore,
-                entityName.toDocId,
-                overwrite,
-                update(request) _,
-                () => {
-                  create(request, entityName)
-                },
-                postProcess = Some { rule: WhiskRule =>
-                  if (overwrite == true) {
-                    val getRuleWithStatus = getTrigger(rule.trigger) map { trigger =>
-                      getStatus(trigger, FullyQualifiedEntityName(rule.namespace, rule.name))
-                    } map { status =>
-                      rule.withStatus(status)
-                    }
+        if (invalidFields.size > 0 && ENFORCE_VALID_PUT_PAYLOAD) {
+          logging.error(this, s"[PUT] reject ${invalidFields.size} invalid fields in payload: ${invalidFields
+            .slice(0, invalidFields.size min 100)
+            .mkString(",")}")
+          terminate(BadRequest, errorExtractingRequestBody)
+        } else {
+          if (invalidFields.size > 0)
+            logging.warn(this, s"[PUT] ignore ${invalidFields.size} invalid fields in payload: ${invalidFields
+              .slice(0, invalidFields.size min 100)
+              .mkString(",")}")
+          entity(as[WhiskRulePut]) { content =>
+            val request = content.resolve(entityName.namespace)
+            onComplete(entitlementProvider.check(user, Privilege.READ, referencedEntities(request))) {
+              case Success(_) =>
+                putEntity(
+                  WhiskRule,
+                  entityStore,
+                  entityName.toDocId,
+                  overwrite,
+                  update(request) _,
+                  () => {
+                    create(request, entityName)
+                  },
+                  postProcess = Some { rule: WhiskRule =>
+                    if (overwrite == true) {
+                      val getRuleWithStatus = getTrigger(rule.trigger) map { trigger =>
+                        getStatus(trigger, FullyQualifiedEntityName(rule.namespace, rule.name))
+                      } map { status =>
+                        rule.withStatus(status)
+                      }
 
-                    onComplete(getRuleWithStatus) {
-                      case Success(r) => completeAsRuleResponse(rule, r.status)
-                      case Failure(t) => terminate(InternalServerError)
+                      onComplete(getRuleWithStatus) {
+                        case Success(r) => completeAsRuleResponse(rule, r.status)
+                        case Failure(t) => terminate(InternalServerError)
+                      }
+                    } else {
+                      completeAsRuleResponse(rule, Status.ACTIVE)
                     }
-                  } else {
-                    completeAsRuleResponse(rule, Status.ACTIVE)
-                  }
-                })
-            case Failure(f) =>
-              handleEntitlementFailure(f)
+                  })
+              case Failure(f) =>
+                handleEntitlementFailure(f)
+            }
           }
         }
       }

@@ -108,8 +108,14 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
   /** JSON response formatter. */
   import RestApiCommons.jsonDefaultResponsePrinter
 
-  /** Allowed action request payload field names. */
-  protected[core] val ALLOWED_FIELDS = classOf[WhiskAction].getDeclaredFields.map(_.getName).toList ++ List("name")
+  /** enforce valid request put payload on allowed payload fields. */
+  protected[core] val ENFORCE_VALID_PUT_PAYLOAD =
+    sys.env.get("CRUDCONTROLLER_ENFORCE_VALID_PUT_PAYLOAD").getOrElse("false").equals("true")
+  // delAnnotations is set in payload by cli ("http_user_agent": "CloudFunctions-Plugin/1.0) when flag --del-annotation is specified for action update
+  protected[core] val ALLOWED_FIELDS = classOf[WhiskAction].getDeclaredFields.map(_.getName).toList ++ List(
+    "name",
+    "delAnnotations")
+  logging.info(this, s"ENFORCE_VALID_PUT_PAYLOAD: $ENFORCE_VALID_PUT_PAYLOAD, ALLOWED_FIELDS: $ALLOWED_FIELDS")
 
   /**
    * Handles operations on action resources, which encompass these cases:
@@ -212,24 +218,29 @@ trait WhiskActionsApi extends WhiskCollectionAPI with PostActionActivation with 
         val invalidFields = payload
           .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
           .getOrElse(List())
-        if (invalidFields.size > 0) {
-          logging.warn(
-            this,
-            s"[PUT] ${invalidFields.size} invalid fields in action request payload: ${invalidFields.slice(0, invalidFields.size min 100).mkString(",")}")
-        }
-        entity(as[WhiskActionPut]) { content =>
-          val request = content.resolve(user.namespace)
-          val checkAdditionalPrivileges = entitleReferencedEntities(user, Privilege.READ, request.exec).flatMap {
-            case _ => entitlementProvider.check(user, content.exec)
-          }
-
-          onComplete(checkAdditionalPrivileges) {
-            case Success(_) =>
-              putEntity(WhiskAction, entityStore, entityName.toDocId, overwrite, update(user, request) _, () => {
-                make(user, entityName, request)
-              })
-            case Failure(f) =>
-              super.handleEntitlementFailure(f)
+        if (invalidFields.size > 0 && ENFORCE_VALID_PUT_PAYLOAD) {
+          logging.error(this, s"[PUT] reject ${invalidFields.size} invalid fields in payload: ${invalidFields
+            .slice(0, invalidFields.size min 100)
+            .mkString(",")}")
+          terminate(BadRequest, Messages.errorExtractingRequestBody)
+        } else {
+          if (invalidFields.size > 0)
+            logging.warn(
+              this,
+              s"[PUT] ignore ${invalidFields.size} invalid fields in payload: ${invalidFields.slice(0, invalidFields.size min 100).mkString(",")}")
+          entity(as[WhiskActionPut]) { content =>
+            val request = content.resolve(user.namespace)
+            val checkAdditionalPrivileges = entitleReferencedEntities(user, Privilege.READ, request.exec).flatMap {
+              case _ => entitlementProvider.check(user, content.exec)
+            }
+            onComplete(checkAdditionalPrivileges) {
+              case Success(_) =>
+                putEntity(WhiskAction, entityStore, entityName.toDocId, overwrite, update(user, request) _, () => {
+                  make(user, entityName, request)
+                })
+              case Failure(f) =>
+                super.handleEntitlementFailure(f)
+            }
           }
         }
       }

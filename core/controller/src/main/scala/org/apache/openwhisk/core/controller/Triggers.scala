@@ -48,6 +48,8 @@ import org.apache.openwhisk.core.entity.types.EntityStore
 import org.apache.openwhisk.http.ErrorResponse
 import org.apache.openwhisk.http.Messages
 import org.apache.openwhisk.core.database.UserContext
+import org.apache.openwhisk.http.ErrorResponse.terminate
+import org.apache.openwhisk.http.Messages.errorExtractingRequestBody
 
 /** A trait implementing the triggers API. */
 trait WhiskTriggersApi extends WhiskCollectionAPI {
@@ -99,8 +101,11 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
   protected val triggersPath = "triggers"
   protected val url = Uri(s"${controllerProtocol}://localhost:${whiskConfig.servicePort}")
 
-  /** Allowed trigger request payload field names. */
+  /** enforce valid request put payload on allowed payload fields. */
+  protected[core] val ENFORCE_VALID_PUT_PAYLOAD =
+    sys.env.get("CRUDCONTROLLER_ENFORCE_VALID_PUT_PAYLOAD").getOrElse("false").equals("true")
   protected[core] val ALLOWED_FIELDS = classOf[WhiskTrigger].getDeclaredFields.map(_.getName).toList ++ List("name")
+  logging.info(this, s"ENFORCE_VALID_PUT_PAYLOAD: $ENFORCE_VALID_PUT_PAYLOAD, ALLOWED_FIELDS: $ALLOWED_FIELDS")
 
   protected implicit val materializer: ActorMaterializer
 
@@ -125,17 +130,23 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
         val invalidFields = payload
           .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
           .getOrElse(List())
-        if (invalidFields.size > 0) {
-          logging.warn(
-            this,
-            s"[PUT] ${invalidFields.size} invalid fields in trigger request payload: ${invalidFields.slice(0, invalidFields.size min 100).mkString(",")}")
-        }
-        entity(as[WhiskTriggerPut]) { content =>
-          putEntity(WhiskTrigger, entityStore, entityName.toDocId, overwrite, update(content) _, () => {
-            create(content, entityName)
-          }, postProcess = Some { trigger =>
-            completeAsTriggerResponse(trigger)
-          })
+        if (invalidFields.size > 0 && ENFORCE_VALID_PUT_PAYLOAD) {
+          logging.error(this, s"[PUT] reject ${invalidFields.size} invalid fields in payload: ${invalidFields
+            .slice(0, invalidFields.size min 100)
+            .mkString(",")}")
+          terminate(BadRequest, errorExtractingRequestBody)
+        } else {
+          if (invalidFields.size > 0)
+            logging.warn(this, s"[PUT] ignore ${invalidFields.size} invalid fields in payload: ${invalidFields
+              .slice(0, invalidFields.size min 100)
+              .mkString(",")}")
+          entity(as[WhiskTriggerPut]) { content =>
+            putEntity(WhiskTrigger, entityStore, entityName.toDocId, overwrite, update(content) _, () => {
+              create(content, entityName)
+            }, postProcess = Some { trigger =>
+              completeAsTriggerResponse(trigger)
+            })
+          }
         }
       }
     }

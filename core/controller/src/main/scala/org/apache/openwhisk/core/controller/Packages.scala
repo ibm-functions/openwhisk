@@ -54,8 +54,15 @@ trait WhiskPackagesApi extends WhiskCollectionAPI with ReferencedEntities {
   /** Reserved package names. */
   protected[core] val RESERVED_NAMES = Set("default")
 
-  /** Allowed package request payload field names. */
-  protected[core] val ALLOWED_FIELDS = classOf[WhiskPackage].getDeclaredFields.map(_.getName).toList ++ List("name")
+  /** enforce valid request put payload on allowed payload fields. */
+  protected[core] val ENFORCE_VALID_PUT_PAYLOAD =
+    sys.env.get("CRUDCONTROLLER_ENFORCE_VALID_PUT_PAYLOAD").getOrElse("false").equals("true")
+  // actions and feeds are occasionally set in payload by cli ("http_user_agent": "CloudFunctions-Plugin/1.0)
+  protected[core] val ALLOWED_FIELDS = classOf[WhiskPackage].getDeclaredFields.map(_.getName).toList ++ List(
+    "name",
+    "actions",
+    "feeds")
+  logging.info(this, s"ENFORCE_VALID_PUT_PAYLOAD: $ENFORCE_VALID_PUT_PAYLOAD, ALLOWED_FIELDS: $ALLOWED_FIELDS")
 
   /**
    * Creates or updates package/binding if it already exists. The PUT content is deserialized into a
@@ -80,29 +87,35 @@ trait WhiskPackagesApi extends WhiskCollectionAPI with ReferencedEntities {
           val invalidFields = payload
             .map(_.fields.keySet.filter(key => !ALLOWED_FIELDS.contains(key)))
             .getOrElse(List())
-          if (invalidFields.size > 0) {
-            logging.warn(
-              this,
-              s"[PUT] ${invalidFields.size} invalid fields in package request payload: ${invalidFields.slice(0, invalidFields.size min 100).mkString(",")}")
-          }
-          entity(as[WhiskPackagePut]) { content =>
-            val request = content.resolve(entityName.namespace)
-            request.binding.map { b =>
-              logging.debug(this, "checking if package is accessible")
-            }
-            val referencedentities = referencedEntities(request)
+          if (invalidFields.size > 0 && ENFORCE_VALID_PUT_PAYLOAD) {
+            logging.error(this, s"[PUT] reject ${invalidFields.size} invalid fields in payload: ${invalidFields
+              .slice(0, invalidFields.size min 100)
+              .mkString(",")}")
+            terminate(BadRequest, Messages.errorExtractingRequestBody)
+          } else {
+            if (invalidFields.size > 0)
+              logging.warn(this, s"[PUT] ignore ${invalidFields.size} invalid fields in payload: ${invalidFields
+                .slice(0, invalidFields.size min 100)
+                .mkString(",")}")
+            entity(as[WhiskPackagePut]) { content =>
+              val request = content.resolve(entityName.namespace)
+              request.binding.map { b =>
+                logging.debug(this, "checking if package is accessible")
+              }
+              val referencedentities = referencedEntities(request)
 
-            onComplete(entitlementProvider.check(user, Privilege.READ, referencedentities)) {
-              case Success(_) =>
-                putEntity(
-                  WhiskPackage,
-                  entityStore,
-                  entityName.toDocId,
-                  overwrite,
-                  update(request) _,
-                  () => create(request, entityName))
-              case Failure(f) =>
-                rewriteEntitlementFailure(f)
+              onComplete(entitlementProvider.check(user, Privilege.READ, referencedentities)) {
+                case Success(_) =>
+                  putEntity(
+                    WhiskPackage,
+                    entityStore,
+                    entityName.toDocId,
+                    overwrite,
+                    update(request) _,
+                    () => create(request, entityName))
+                case Failure(f) =>
+                  rewriteEntitlementFailure(f)
+              }
             }
           }
         }
