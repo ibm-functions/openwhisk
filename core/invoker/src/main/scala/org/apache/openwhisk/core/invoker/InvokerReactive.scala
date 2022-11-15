@@ -347,7 +347,7 @@ class InvokerReactive(
           val actionid = FullyQualifiedEntityName(namespace, name).toDocId.asDocInfo(msg.revision)
           val subject = msg.user.subject
 
-          logging.debug(this, s"${actionid.id} $subject ${msg.activationId}")
+          logging.warn(this, s"read from kafka activation ${msg.activationId}, action ${actionid.id}, ns $subject")
 
           // caching is enabled since actions have revision id and an updated
           // action will not hit in the cache due to change in the revision id;
