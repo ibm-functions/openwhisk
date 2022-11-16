@@ -22,14 +22,20 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
 
       - name: install
         run: ./tools/travis/setup.sh
 
-      - name: script -> Unit Tests
-        run: ./tools/travis/runUnitTests.sh && ./tools/travis/checkAndUploadLogs.sh unit db
+      - name: Run Unit Tests
+        run: ./tools/travis/runUnitTests.sh
+
+      - name: Check And Upload Logs unit db
+        run: ./tools/travis/checkAndUploadLogs.sh unit db
 
   system-tests:
 
@@ -39,16 +45,21 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2        
+
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
 
       - name: install
         run: ./tools/travis/setup.sh
 
-      - name: script -> System Tests
-        run: ./tools/travis/runSystemTests.sh && ./tools/travis/checkAndUploadLogs.sh system
+      - name: Run System Tests
+        run: ./tools/travis/runSystemTests.sh 
 
-      
+      - name: Check And Upload Logs system
+        run: ./tools/travis/checkAndUploadLogs.sh system        
+
   multi-runtime-tests:
 
     runs-on: ubuntu-latest
@@ -57,14 +68,20 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
+      - name: Setup Gradle
+        uses: gradle/gradle-build-action@v2
+
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
 
       - name: install
         run: ./tools/travis/setup.sh
 
-      - name: Multi-Runtime Tests
-        run: ./tools/travis/runMultiRuntimeTests.sh && ./tools/travis/checkAndUploadLogs.sh multi-runtime
+      - name: Run Multi Runtime Tests
+        run: ./tools/travis/runMultiRuntimeTests.sh
+      
+      - name: Check And Upload Logs multi-runtime
+        run: ./tools/travis/checkAndUploadLogs.sh multi-runtime
 
   performance-tests:
 
