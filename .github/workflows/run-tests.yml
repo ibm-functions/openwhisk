@@ -14,7 +14,7 @@ on:
 
 jobs:
 
-  build:
+  unit-tests:
 
     runs-on: ubuntu-latest
 
@@ -22,17 +22,8 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
-      - name: befor install -> docker.sh
-        run:  ./tools/travis/docker.sh
-
-      - name: befor install -> install python3-pip
-        run:  sudo apt-get install -y python3-pip
-
-      - name: befor install -> upgrade pip setuptools six
-        run:  pip install --user --upgrade pip setuptools six
-
-      - name: befor install -> install setuptools six
-        run:  pip3 install --user setuptools six
+      - name: befor install 
+        run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
 
       - name: install
         run: ./tools/travis/setup.sh
@@ -40,11 +31,54 @@ jobs:
       - name: script -> Unit Tests
         run: ./tools/travis/runUnitTests.sh && ./tools/travis/checkAndUploadLogs.sh unit db
 
+  system-tests:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: befor install 
+        run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
+
+      - name: install
+        run: ./tools/travis/setup.sh
+
       - name: script -> System Tests
         run: ./tools/travis/runSystemTests.sh && ./tools/travis/checkAndUploadLogs.sh system
 
-      - name: script -> Multi-Runtime Tests
+      
+  multi-runtime-tests:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: befor install 
+        run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
+
+      - name: install
+        run: ./tools/travis/setup.sh
+
+      - name: Multi-Runtime Tests
         run: ./tools/travis/runMultiRuntimeTests.sh && ./tools/travis/checkAndUploadLogs.sh multi-runtime
+
+  performance-tests:
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out the repo
+        uses: actions/checkout@v2
+
+      - name: befor install 
+        run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
+
+      - name: install
+        run: ./tools/travis/setup.sh
 
       - name: script -> Performance Tests (deploy)
         run: ./tests/performance/preparation/deploy.sh
