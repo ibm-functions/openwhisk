@@ -45,8 +45,8 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2        
+      - name: ANSIBLE
+        uses: apt update && apt install software-properties-common && add-apt-repository --yes --update ppa:ansible/ansible && apt install ansible -y
 
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
