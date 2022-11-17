@@ -22,8 +22,8 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
+      - name: Set global vars
+        run:  export ANSIBLE_CMD="ansible-playbook -i environments/local -e docker_image_prefix=testing" && export GRADLE_PROJS_SKIP=""
 
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
@@ -45,8 +45,8 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
-      - name: ANSIBLE
-        run: sudo apt update && sudo apt install software-properties-common && sudo add-apt-repository --yes --update ppa:ansible/ansible && sudo apt install ansible -y
+      - name: Set global vars
+        run:  export ANSIBLE_CMD="ansible-playbook -i environments/local -e docker_image_prefix=testing" && export GRADLE_PROJS_SKIP=""
 
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
@@ -68,8 +68,8 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
-      - name: Setup Gradle
-        uses: gradle/gradle-build-action@v2
+      - name: Set global vars
+        run:  export ANSIBLE_CMD="ansible-playbook -i environments/local -e docker_image_prefix=testing" && export GRADLE_PROJS_SKIP=""
 
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
@@ -90,6 +90,10 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
+      
+      - name: Set global vars
+        run:  export ANSIBLE_CMD="ansible-playbook -i environments/local -e docker_image_prefix=testing" && export GRADLE_PROJS_SKIP=""
+
 
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
