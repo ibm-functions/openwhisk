@@ -12,6 +12,10 @@ on:
 
   workflow_dispatch:
 
+env:
+  ANSIBLE_CMD: "ansible-playbook -i environments/local -e docker_image_prefix=testing" 
+  GRADLE_PROJS_SKIP: ""
+
 jobs:
 
   unit-tests:
@@ -21,9 +25,6 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
-
-      - name: Set global vars
-        run:  export ANSIBLE_CMD="ansible-playbook -i environments/local -e docker_image_prefix=testing" && export GRADLE_PROJS_SKIP=""
 
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
@@ -45,9 +46,6 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
 
-      - name: Set global vars
-        run:  export ANSIBLE_CMD="ansible-playbook -i environments/local -e docker_image_prefix=testing" && export GRADLE_PROJS_SKIP=""
-
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
 
@@ -67,9 +65,6 @@ jobs:
     steps:
       - name: Check out the repo
         uses: actions/checkout@v2
-
-      - name: Set global vars
-        run:  export ANSIBLE_CMD="ansible-playbook -i environments/local -e docker_image_prefix=testing" && export GRADLE_PROJS_SKIP=""
 
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
@@ -91,10 +86,6 @@ jobs:
       - name: Check out the repo
         uses: actions/checkout@v2
       
-      - name: Set global vars
-        run:  export ANSIBLE_CMD="ansible-playbook -i environments/local -e docker_image_prefix=testing" && export GRADLE_PROJS_SKIP=""
-
-
       - name: befor install 
         run:  ./tools/travis/docker.sh && sudo apt-get install -y python3-pip && pip install --user --upgrade pip setuptools six && pip3 install --user setuptools six
 
