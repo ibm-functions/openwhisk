@@ -20,6 +20,7 @@
 # Disable abort script at first error as we require the logs to be uploaded
 # even if check and log collection fails
 # set -e
+set -x
 
 SECONDS=0
 SCRIPTDIR=$(cd $(dirname "$0") && pwd)
