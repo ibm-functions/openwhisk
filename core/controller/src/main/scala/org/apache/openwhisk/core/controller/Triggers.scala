@@ -51,6 +51,8 @@ import org.apache.openwhisk.core.database.UserContext
 import org.apache.openwhisk.http.ErrorResponse.terminate
 import org.apache.openwhisk.http.Messages.errorExtractingRequestBody
 
+import scala.concurrent.duration.{Duration, DurationInt, FiniteDuration}
+
 /** A trait implementing the triggers API. */
 trait WhiskTriggersApi extends WhiskCollectionAPI {
   services: WhiskServices =>
@@ -411,6 +413,13 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
     Future.sequence(ruleResults)
   }
 
+  private def singleRequest4Test(request: HttpRequest, retries: Int): Future[HttpResponse] = {
+    if (retries == 0)
+      singleRequest(request)
+    else
+      Future.failed(new akka.stream.scaladsl.TcpIdleTimeoutException("TCP idle-timeout encountered on connection to [localhost:8080]", 60 seconds))
+  }
+
   /**
    * Posts an action activation. Currently done by posting internally to the controller.
    * TODO: use a proper path that does not route through HTTP.
@@ -419,7 +428,7 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
    * @param args the arguments to post to the action
    * @return a future with the HTTP response from the action activation
    */
-  private def postActivation(user: Identity, rule: ReducedRule, args: JsObject)(
+  private def postActivation(user: Identity, rule: ReducedRule, args: JsObject, retries: Int = 3)(
     implicit transid: TransactionId): Future[HttpResponse] = {
     // Build the url to invoke an action mapped to the rule
     val actionUrl = baseControllerPath / rule.action.path.root.asString / "actions"
@@ -436,7 +445,11 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
           headers = List(Authorization(creds), transid.toHeader),
           entity = HttpEntity(MediaTypes.`application/json`, args.compactPrint))
 
-        singleRequest(request)
+        singleRequest4Test(request, retries).recoverWith {
+          case t if retries > 0 =>
+            logging.warn(this, s"trigger-fired action '${rule.action}' failed to invoke with $t, retry ($retries retries left)..")
+            postActivation(user, rule, args, retries - 1)
+        }
       }
       .getOrElse(Future.failed(new NoCredentialsAvailable()))
   }
