@@ -439,7 +439,9 @@ trait WhiskTriggersApi extends WhiskCollectionAPI {
 
         singleRequest(request).recoverWith {
           case t if retries > 0 =>
-            logging.warn(this, s"trigger-fired action '${rule.action}' failed to invoke with $t, retry ($retries retries left)..")
+            logging.warn(
+              this,
+              s"trigger-fired action '${rule.action}' failed to invoke with $t, retry ($retries retries left)..")
             postActivation(user, rule, args, retries - 1)
         }
       }
