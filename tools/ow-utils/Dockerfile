@@ -42,7 +42,7 @@ ENV LANG='en_US.UTF-8' LANGUAGE='en_US:en' LC_ALL='en_US.UTF-8'
 RUN pip install --upgrade pip
 RUN pip install --upgrade setuptools
 RUN pip install cryptography==2.5 && \
-    pip install ansible==2.5.2 && \
+    pip install ansible==2.8.18 && \
     pip install jinja2==2.9.6 && \
     pip install docker
 

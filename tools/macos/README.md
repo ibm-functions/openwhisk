@@ -29,7 +29,7 @@ The following are required to build and deploy OpenWhisk from a Mac host:
 - [Docker 18.06.3](https://docs.docker.com/docker-for-mac/install/)
 - [Java 8](http://www.oracle.com/technetwork/java/javase/downloads/index.html) or [Open JDK 8](https://adoptopenjdk.net/releases.html#x64_mac)
 - [Scala 2.11](http://scala-lang.org/download/)
-- [Ansible 2.5.2](http://docs.ansible.com/ansible/intro_installation.html)
+- [Ansible 2.8.18](http://docs.ansible.com/ansible/intro_installation.html)
 
 **Tips:**
  1. Versions of Docker and Ansible are lower than the latest released versions, the versions used in OpenWhisk are pinned to have stability during continuous integration and deployment.<br>
@@ -55,7 +55,7 @@ brew install gnu-tar
 # install pip
 sudo easy_install pip
 # install script prerequisites
-sudo -H pip install docker==2.2.1 ansible==2.5.2 jinja2==2.9.6 couchdb==1.1 httplib2==0.9.2 requests==2.10.0' | bash
+sudo -H pip install docker==2.2.1 ansible==2.8.18 jinja2==2.9.6 couchdb==1.1 httplib2==0.9.2 requests==2.10.0' | bash
 ```
 
 The above section of command installs Oracle JDK 8 as the default Java environment. If you would like to install Open JDK 8 instead of Oracle JDK 8, please run the following section:

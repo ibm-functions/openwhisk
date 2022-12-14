@@ -27,14 +27,14 @@ If you want to deploy OpenWhisk locally using Ansible, you first need to install
 #### Ubuntu users
 ```
 sudo apt-get install python-pip
-sudo pip install ansible==2.5.2
+sudo pip install ansible==2.8.18
 sudo pip install jinja2==2.9.6
 ```
 
 #### Docker for Mac users
 ```
 sudo easy_install pip
-sudo pip install ansible==2.5.2
+sudo pip install ansible==2.8.18
 pip install jinja2==2.9.6
 ```
 Docker for Mac does not provide any official ways to meet some requirements for OpenWhisk.
