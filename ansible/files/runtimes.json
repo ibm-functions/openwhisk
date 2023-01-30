@@ -116,7 +116,7 @@
                     "name": "action-swift-v4.2",
                     "tag": "nightly"
                 },
-                "deprecated": false,
+                "deprecated": true,
                 "attached": {
                     "attachmentName": "codefile",
                     "attachmentType": "text/plain"
@@ -130,7 +130,7 @@
                     "name": "action-swift-v5.1",
                     "tag": "nightly"
                 },
-                "deprecated": false,
+                "deprecated": true,
                 "attached": {
                     "attachmentName": "codefile",
                     "attachmentType": "text/plain"

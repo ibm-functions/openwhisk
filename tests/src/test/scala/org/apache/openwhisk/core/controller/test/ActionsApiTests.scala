@@ -897,9 +897,8 @@ class ActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
         javaDefault(nonInlinedCode(entityStore), Some("hello")),
         annotations = Parameters("exec", "java"))
     val nodeAction = WhiskAction(namespace, aname(), jsDefault(nonInlinedCode(entityStore)), Parameters("x", "b"))
-    val swiftAction = WhiskAction(namespace, aname(), swift(nonInlinedCode(entityStore)), Parameters("x", "b"))
     val bbAction = WhiskAction(namespace, aname(), bb("bb", nonInlinedCode(entityStore), Some("bbMain")))
-    val actions = Seq((javaAction, JAVA_DEFAULT), (nodeAction, NODEJS10), (swiftAction, SWIFT4), (bbAction, BLACKBOX))
+    val actions = Seq((javaAction, JAVA_DEFAULT), (nodeAction, NODEJS10), (bbAction, BLACKBOX))
 
     actions.foreach {
       case (action, kind) =>
@@ -1074,9 +1073,8 @@ class ActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
   it should "get an action with attachment that is not cached" in {
     implicit val tid = transid()
     val nodeAction = WhiskAction(namespace, aname(), jsDefault(nonInlinedCode(entityStore)), Parameters("x", "b"))
-    val swiftAction = WhiskAction(namespace, aname(), swift(nonInlinedCode(entityStore)), Parameters("x", "b"))
     val bbAction = WhiskAction(namespace, aname(), bb("bb", nonInlinedCode(entityStore), Some("bbMain")))
-    val actions = Seq((nodeAction, NODEJS10), (swiftAction, SWIFT4), (bbAction, BLACKBOX))
+    val actions = Seq((nodeAction, NODEJS10), (bbAction, BLACKBOX))
 
     actions.foreach {
       case (action, kind) =>
@@ -1181,9 +1179,8 @@ class ActionsApiTests extends ControllerTestCommon with WhiskActionsApi {
   it should "update an existing action with attachment that is not cached" in {
     implicit val tid = transid()
     val nodeAction = WhiskAction(namespace, aname(), jsDefault(nonInlinedCode(entityStore)), Parameters("x", "b"))
-    val swiftAction = WhiskAction(namespace, aname(), swift(nonInlinedCode(entityStore)), Parameters("x", "b"))
     val bbAction = WhiskAction(namespace, aname(), bb("bb", nonInlinedCode(entityStore), Some("bbMain")))
-    val actions = Seq((nodeAction, NODEJS10), (swiftAction, SWIFT4), (bbAction, BLACKBOX))
+    val actions = Seq((nodeAction, NODEJS10), (bbAction, BLACKBOX))
 
     actions.foreach {
       case (action, kind) =>
