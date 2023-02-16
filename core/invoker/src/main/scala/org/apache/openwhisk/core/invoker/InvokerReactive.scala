@@ -45,6 +45,9 @@ import scala.language.postfixOps
 import scala.sys.process._
 import scala.util.{Failure, Success, Try}
 
+import spray.json.DefaultJsonProtocol._
+import spray.json._
+
 object InvokerReactive extends InvokerProvider {
 
   /**
@@ -327,6 +330,41 @@ class InvokerReactive(
   private val pool =
     actorSystem.actorOf(ContainerPool.props(childFactory, poolConfig, activationFeed, prewarmingConfigs, poolState))
 
+  /**
+   * Write struct log line for read from kafka and cloudant as part of the activation message processing
+   *
+   * @param logLevel log level.
+   * @param method method.
+   * @param msg message.
+   * @param tskafka timestamp read from kafka.
+   * @param action action document read from cloudant.
+   * @param tscloudant timestamp read from cloudant.
+   */
+  private def logJson(logLevel: String,
+                      method: String,
+                      msg: String,
+                      amsg: ActivationMessage,
+                      action: WhiskAction,
+                      tskafka: Instant,
+                      tscloudant: Instant) = {
+    println(
+      JsObject(
+        "level" -> logLevel.toJson,
+        "ts" -> Instant.ofEpochMilli(System.currentTimeMillis).toString.toJson,
+        "caller" -> method.toJson,
+        "msg" -> msg.toJson,
+        "activation" -> amsg.activationId.toJson,
+        "duration" -> java.time.Duration.between(tskafka, tscloudant).toMillis.toJson,
+        "name" -> amsg.action.name.toJson,
+        "namespace" -> amsg.action.path.toJson,
+        "path" -> amsg.action.fullPath.toJson,
+        "rev" -> action.rev.toJson,
+        "subject" -> amsg.user.subject.toJson,
+        "tskafka" -> tskafka.toString.toJson,
+        "tscloudant" -> tscloudant.toString.toJson,
+        "transId" -> amsg.transid.id.toJson))
+  }
+
   /** Is called when an ActivationMessage is read from Kafka */
   def processActivationMessage(bytes: Array[Byte]): Future[Unit] = {
     Future(ActivationMessage.parse(new String(bytes, StandardCharsets.UTF_8)))
@@ -347,7 +385,7 @@ class InvokerReactive(
           val actionid = FullyQualifiedEntityName(namespace, name).toDocId.asDocInfo(msg.revision)
           val subject = msg.user.subject
 
-          logging.warn(this, s"read from kafka activation ${msg.activationId}, action ${actionid.id}, ns $subject")
+          val tskafka = Instant.ofEpochMilli(System.currentTimeMillis) // timestamp read from kafka
 
           // caching is enabled since actions have revision id and an updated
           // action will not hit in the cache due to change in the revision id;
@@ -357,6 +395,14 @@ class InvokerReactive(
           WhiskAction
             .get(entityStore, actionid.id, actionid.rev, fromCache = actionid.rev != DocRevision.empty)
             .flatMap { action =>
+              logJson(
+                "warn",
+                "processActivationMessage",
+                "read from kafka/cloudant",
+                msg,
+                action,
+                tskafka,
+                Instant.ofEpochMilli(System.currentTimeMillis))
               action.toExecutableWhiskAction match {
                 case Some(executable) =>
                   if (imageMonitorEnabled && imageMonitor.isReady && executable.exec.pull) {
