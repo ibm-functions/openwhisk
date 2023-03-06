@@ -15,7 +15,7 @@
 # limitations under the License.
 #
 
-FROM ibm-semeru-runtimes:open-8u362-b09-jdk-focal
+FROM adoptopenjdk/openjdk8:jdk8u191-b12
 
 ENV DOCKER_VERSION 1.12.0
 ENV KUBECTL_VERSION v1.16.3
