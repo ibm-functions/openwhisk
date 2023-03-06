@@ -166,6 +166,9 @@ class ShardingContainerPoolBalancer(
     None
   }
 
+  /** State needed for scheduling. */
+  val schedulingState = ShardingContainerPoolBalancerState()(lbConfig)
+
   override protected def emitMetrics() = {
     super.emitMetrics()
     MetricEmitter.emitGaugeMetric(
@@ -186,7 +189,8 @@ class ShardingContainerPoolBalancer(
           total
         }
       })
-    MetricEmitter.emitGaugeMetric(HEALTHY_INVOKER_MANAGED, schedulingState.managedInvokers.count(_.status == Healthy))
+    val countHealthyInvokerManaged = schedulingState.managedInvokers.count(_.status == Healthy)
+    MetricEmitter.emitGaugeMetric(HEALTHY_INVOKER_MANAGED, countHealthyInvokerManaged)
     MetricEmitter.emitGaugeMetric(
       UNHEALTHY_INVOKER_MANAGED,
       schedulingState.managedInvokers.count(_.status == Unhealthy))
@@ -204,10 +208,13 @@ class ShardingContainerPoolBalancer(
     MetricEmitter.emitGaugeMetric(
       OFFLINE_INVOKER_BLACKBOX,
       schedulingState.blackboxInvokers.count(_.status == Offline()))
-  }
 
-  /** State needed for scheduling. */
-  val schedulingState = ShardingContainerPoolBalancerState()(lbConfig)
+    val epochSecond = System.currentTimeMillis / 1000
+    if (config.controllerName.equals("controller") && (epochSecond / 60)  % 10 == 0 && epochSecond % 60 < 15) {
+      // log that we still emit controller metrics once every 10th minute
+      logging.info(this, s"emitted metrics (eg totalHealthyInvokerManaged=$countHealthyInvokerManaged")
+    }
+  }
 
   /**
    * Monitors invoker supervision and the cluster to update the state sequentially
