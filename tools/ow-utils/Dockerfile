@@ -29,7 +29,7 @@ RUN apt-get update && apt-get install -y \
   nodejs \
   npm \
   python \
-  python-pip \
+  python3-pip \
   wget \
   zip \
   locales \
