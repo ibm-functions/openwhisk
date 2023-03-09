@@ -46,6 +46,9 @@ jobs:
       - name: install
         run: ./tools/travis/setup.sh
 
+      - name: check code formating
+        run: ./tools/travis/scan.sh
+
       #- name: script -> Unit Tests
       #  run: ./tools/travis/runUnitTests.sh && ./tools/travis/checkAndUploadLogs.sh unit db
 

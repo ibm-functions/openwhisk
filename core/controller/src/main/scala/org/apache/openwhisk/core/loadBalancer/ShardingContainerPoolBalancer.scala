@@ -210,7 +210,7 @@ class ShardingContainerPoolBalancer(
       schedulingState.blackboxInvokers.count(_.status == Offline()))
 
     val epochSecond = System.currentTimeMillis / 1000
-    if (config.controllerName.equals("controller") && (epochSecond / 60)  % 10 == 0 && epochSecond % 60 < 15) {
+    if (config.controllerName.equals("controller") && (epochSecond / 60) % 10 == 0 && epochSecond % 60 < 15) {
       // log that we still emit controller metrics once every 10th minute
       logging.info(this, s"emitted metrics (eg totalHealthyInvokerManaged=$countHealthyInvokerManaged")
     }
