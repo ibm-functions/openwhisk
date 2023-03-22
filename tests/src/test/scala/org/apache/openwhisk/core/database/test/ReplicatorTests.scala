@@ -460,11 +460,23 @@ class ReplicatorTests
           try {
             // Create a database that is already expired
             val expiredClient = createDatabase(expiredName, Some(designDocPath))
-            replicatorClient.putDoc(expiredName, JsObject("source" -> "".toJson, "target" -> "".toJson)).futureValue
+            replicatorClient
+              .putDoc(
+                expiredName,
+                JsObject(
+                  "source" -> "https://account.cloudant.com".toJson,
+                  "target" -> "https://account.cloudant.com".toJson))
+              .futureValue
 
             // Create a database that is not yet expired
             val notExpiredClient = createDatabase(notExpiredName, Some(designDocPath))
-            replicatorClient.putDoc(notExpiredName, JsObject("source" -> "".toJson, "target" -> "".toJson)).futureValue
+            replicatorClient
+              .putDoc(
+                notExpiredName,
+                JsObject(
+                  "source" -> "https://account.cloudant.com".toJson,
+                  "target" -> "https://account.cloudant.com".toJson))
+              .futureValue
 
             // Trigger replication and verify the expired database is deleted while the unexpired one is kept
             val (createdDatabases, deletedReplicationDocs, deletedDatabases) =
@@ -515,12 +527,22 @@ class ReplicatorTests
             // Create a database that is expired with correct prefix
             val correctPrefixClient = createDatabase(correctPrefixName, Some(designDocPath))
             replicatorClient
-              .putDoc(correctPrefixName, JsObject("source" -> "".toJson, "target" -> "".toJson))
+              .putDoc(
+                correctPrefixName,
+                JsObject(
+                  "source" -> "https://account.cloudant.com".toJson,
+                  "target" -> "https://account.cloudant.com".toJson))
               .futureValue
 
             // Create a database that is expired with wrong prefix
             val wrongPrefixClient = createDatabase(wrongPrefixName, Some(designDocPath))
-            replicatorClient.putDoc(wrongPrefixName, JsObject("source" -> "".toJson, "target" -> "".toJson)).futureValue
+            replicatorClient
+              .putDoc(
+                wrongPrefixName,
+                JsObject(
+                  "source" -> "https://account.cloudant.com".toJson,
+                  "target" -> "https://account.cloudant.com".toJson))
+              .futureValue
 
             // Trigger replication and verify the expired database with correct prefix is deleted while the db with the wrong prefix is kept
             val (createdDatabases, deletedReplicationDocs, deletedDatabases) =
