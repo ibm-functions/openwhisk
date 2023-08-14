@@ -17,6 +17,7 @@
 #
 
 set -e
+set -x
 
 # Build script for Travis-CI.
 
@@ -26,7 +27,21 @@ ROOTDIR="$SCRIPTDIR/../.."
 
 cd $ROOTDIR
 cat whisk.properties
-TERM=dumb ./gradlew :tests:testCoverageLean :tests:reportCoverage :tests:testSwaggerCodegen
+( # run this in a subshell to get the result code but not terminating the process to print the logs.
+  set +e
+  TERM=dumb ./gradlew :tests:testCoverageLean :tests:reportCoverage :tests:testSwaggerCodegen
+
+  if [[ "$?" != "0" ]]; then
+    # debugging notes
+    # || true;  set -x; docker ps -a; for i in $(docker ps -a --format="{{.Names}}"); do  docker logs $i || true; done; ls -alhR /tmp/wsklogs;
+    # || true;  set -x; docker ps -a; ls -R /tmp/wsklogs ;cat /tmp/wsklogs/invoker0/invoker0_logs.log; cat /tmp/wsklogs/controller0/controller0_logs.log;
+
+    set -x # show the following commands in the output
+    cat /tmp/wsklogs/invoker0/invoker0_logs.log
+    cat /tmp/wsklogs/controller0/controller0_logs.log
+    exit 1
+  fi
+)
 
 bash <(curl -s https://codecov.io/bash)
 echo "Time taken for ${0##*/} is $SECONDS secs"

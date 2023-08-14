@@ -31,6 +31,13 @@ jobs:
           distribution: 'temurin'
           java-version: 8
 
+      - name: Docker Images Cleanup
+        run: |
+          df -h
+          docker image ls
+          docker image rm $(docker image ls -q) -f
+          df -h
+
       - name: befor install -> docker.sh
         run:  ./tools/travis/docker.sh
 
@@ -53,7 +60,11 @@ jobs:
       #  run: ./tools/travis/runUnitTests.sh && ./tools/travis/checkAndUploadLogs.sh unit db
 
       - name: script -> System Tests
-        run: ./tools/travis/runSystemTests.sh && ./tools/travis/checkAndUploadLogs.sh system
+        run: |
+          df -h \
+          && ./tools/travis/runSystemTests.sh \
+          && df -h \
+          && ./tools/travis/checkAndUploadLogs.sh system
 
       #- name: script -> Multi-Runtime Tests
       #  run: ./tools/travis/runMultiRuntimeTests.sh && ./tools/travis/checkAndUploadLogs.sh multi-runtime
