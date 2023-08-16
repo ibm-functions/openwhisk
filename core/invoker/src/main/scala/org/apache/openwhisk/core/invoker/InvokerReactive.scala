@@ -227,7 +227,8 @@ class InvokerReactive(
 
   private val rootfs = "/"
   private val logsfs = "/logs"
-  private val fspcentmax = 85
+  private val rootfspcentmax = sys.env.getOrElse("ROOT_FS_MAX", "98").toInt
+  private val logfspcentmax = sys.env.getOrElse("LOG_FS_MAX", "98").toInt
   private var rootfspcent = 0
   private var logsfspcent = 0
 
@@ -249,8 +250,8 @@ class InvokerReactive(
     logging.warn(
       this,
       s"invoker fs space: " +
-        s"'$rootfsraw ($rootfspcentraw($rootfspcent($fspcentmax)))', " +
-        s"'$logsfsraw ($logsfspcentraw($logsfspcent($fspcentmax)))', " +
+        s"'$rootfsraw ($rootfspcentraw($rootfspcent($rootfspcentmax)))', " +
+        s"'$logsfsraw ($logsfspcentraw($logsfspcent($logfspcentmax)))', " +
         s"invoker container pool: " +
         s"freePoolSize: ${poolState.free} containers, " +
         s"busyPoolSize: ${poolState.busy} containers, " +
@@ -503,6 +504,7 @@ class InvokerReactive(
   }
 
   private val healthProducer = msgProvider.getProducer(config)
+  rootfspcentmax
   Scheduler.scheduleWaitAtMost(1.seconds)(() => {
     // ping only if monitor is ready when enabled
     if (!imageMonitorEnabled || imageMonitor.isReady) {
@@ -512,7 +514,7 @@ class InvokerReactive(
           PingMessage(
             instance = instance,
             isBlacklisted = namespaceBlacklist.isBlacklisted(instance.displayedName.getOrElse("")),
-            hasDiskPressure = rootfspcent >= fspcentmax || logsfspcent >= fspcentmax,
+            hasDiskPressure = rootfspcent >= rootfspcentmax || logsfspcent >= logfspcentmax,
             rootfspcent = rootfspcent,
             logsfspcent = logsfspcent,
             running = poolState.busy + poolState.waiting))
