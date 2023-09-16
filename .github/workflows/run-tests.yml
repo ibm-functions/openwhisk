@@ -38,8 +38,9 @@ jobs:
           docker image rm $(docker image ls -q) -f
           df -h
 
-      - name: befor install -> docker.sh
-        run:  ./tools/travis/docker.sh
+      # We use the built in docker of the github action environment.
+      #- name: befor install -> docker.sh
+      #  run:  ./tools/travis/docker.sh
 
       - name: befor install -> install python3-pip
         run:  sudo apt-get install -y python3-pip

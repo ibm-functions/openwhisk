@@ -26,7 +26,8 @@ RUNTIMES_MANIFEST=${1:-"/ansible/files/runtimes.json"}
 
 cd $ROOTDIR/ansible
 
-$ANSIBLE_CMD setup.yml -e mode=HA
+# For the github actions we do not use HA mode to reduce memory and disk requirements.
+$ANSIBLE_CMD setup.yml      # -e mode=HA
 $ANSIBLE_CMD prereq.yml
 $ANSIBLE_CMD couchdb.yml
 $ANSIBLE_CMD initdb.yml
