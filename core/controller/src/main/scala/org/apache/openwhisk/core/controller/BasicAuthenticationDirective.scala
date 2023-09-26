@@ -37,7 +37,11 @@ import spray.json.JsString
 
 object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
 
+  private val systemUsers = sys.env.getOrElse("SYSTEM_USERS", "").split(",").toList
+  private val allAccounts = sys.env.getOrElse("ALL_ACCOUNTS", "")
+  private val wlAccountPfx = sys.env.getOrElse("WL_ACCOUNT_PFX", "??")
   var namespaceBlacklist: Option[NamespaceBlacklist] = None
+
   def getOrCreateBlacklist()(implicit transid: TransactionId,
                              system: ActorSystem,
                              ec: ExecutionContext,
@@ -50,15 +54,16 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
         val authStore = WhiskAuthStore.datastore()(system, logging, ActorMaterializer())
         val namespaceBlacklist = new NamespaceBlacklist(authStore)
         if (!sys.env.get("CONTROLLER_NAME").getOrElse("").equals("crudcontroller")) {
-          logging.info(this, "create background job to update blacklist..")
+          logging.info(
+            this,
+            s"create background job to update blacklist, systemUsers: $systemUsers, allAccounts: $allAccounts, wlAccountPfx: $wlAccountPfx")
           Scheduler.scheduleWaitAtMost(loadConfigOrThrow[NamespaceBlacklistConfig](ConfigKeys.blacklist).pollInterval) {
             () =>
               logging.debug(this, "running background job to update blacklist")
               namespaceBlacklist.refreshBlacklist()(authStore.executionContext, transid).andThen {
                 case Success(set) => {
-                  logging.info(
-                    this,
-                    s"updated blacklist to ${set.size} items (accounts: ${set.filter(i => i matches "[0-9a-z]{32}")})")
+                  logging.info(this, s"updated blacklist to ${set.size} items (accounts: ${set.filter(i =>
+                    (i matches "[0-9a-z]{32}") || (i matches wlAccountPfx + ".*"))})")
                 }
                 case Failure(t) => logging.error(this, s"error on updating the blacklist: ${t.getMessage}")
               }
@@ -81,10 +86,23 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
         val authkey = BasicAuthenticationAuthKey(UUID(pw.username), Secret(pw.password))
         logging.info(this, s"authenticate: ${authkey.uuid}")
         val future = Identity.get(authStore, authkey) map { result =>
+          val account = Try(result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account).getOrElse("")
           val blacklist = getOrCreateBlacklist
+          val isSystemUser = systemUsers.exists(_.equals(result.subject.asString))
+          logging.debug(
+            this,
+            s"authenticate: account: $account, blacklist: $blacklist, isSystemUser: $isSystemUser, result: ${result.toString}")
           val identity =
-            if (!blacklist.isEmpty && blacklist.isBlacklisted(
-                  Try(result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account).getOrElse(""))) {
+            if (!isSystemUser && blacklist.isBlacklisted(allAccounts) && !blacklist.isBlacklisted(
+                  wlAccountPfx + account)) {
+              Identity(
+                subject = result.subject,
+                namespace = result.namespace,
+                authkey = result.authkey,
+                rights = result.rights,
+                limits =
+                  UserLimits(invocationsPerMinute = Some(0), concurrentInvocations = Some(0), firesPerMinute = Some(0)))
+            } else if (blacklist.isBlacklisted(account)) {
               Identity(
                 subject = result.subject,
                 namespace = result.namespace,
@@ -142,10 +160,23 @@ object BasicAuthenticationDirective extends AuthenticationDirectiveProvider {
     //Identity.get(authStore, namespace)
     implicit val ec = authStore.executionContext
     implicit val logging = authStore.logging
+    logging.info(this, s"identify by namespace: $namespace")
     Identity.get(authStore, namespace) map { result =>
+      val account = Try(result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account).getOrElse("")
       val blacklist = getOrCreateBlacklist
-      if (!blacklist.isEmpty && blacklist.isBlacklisted(
-            Try(result.authkey.asInstanceOf[BasicAuthenticationAuthKey].account).getOrElse(""))) {
+      val isSystemUser = systemUsers.exists(_.equals(result.subject.asString))
+      logging.debug(
+        this,
+        s"identify by namespace: account: $account, blacklist: ${blacklist.toString}, isSystemUser: $isSystemUser, namespace: $namespace, result: $result")
+      if (!isSystemUser && blacklist.isBlacklisted(allAccounts) && !blacklist
+            .isBlacklisted(wlAccountPfx + account)) {
+        Identity(
+          subject = result.subject,
+          namespace = result.namespace,
+          authkey = result.authkey,
+          rights = result.rights,
+          limits = UserLimits(invocationsPerMinute = Some(0), concurrentInvocations = Some(0), firesPerMinute = Some(0)))
+      } else if (blacklist.isBlacklisted(account)) {
         Identity(
           subject = result.subject,
           namespace = result.namespace,

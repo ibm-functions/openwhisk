@@ -81,6 +81,9 @@ class NamespaceBlacklist(authStore: AuthStore) {
         newBlacklist
       }
   }
+
+  /** This is so that we can easily log the blacklist for debugging. */
+  override def toString() = blacklist.toString()
 }
 
 object NamespaceBlacklist {
