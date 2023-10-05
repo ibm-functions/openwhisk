@@ -33,14 +33,31 @@ jobs:
 
       - name: Docker Images Cleanup
         run: |
+          set -x
+          docker version
           df -h
           docker image ls
           docker image rm $(docker image ls -q) -f
           df -h
 
       # We use the built in docker of the github action environment.
+      # Therefore the docker install step below is commented.
+      #
+      # With newer github action runners, the ./tools/travis/docker.sh does not
+      # work anymore. Switched to 'setup a pinned docker version' instead.
       #- name: befor install -> docker.sh
       #  run:  ./tools/travis/docker.sh
+      #- name: setup a pinned docker version
+      #  run: |
+      #    set -x
+      #    cat /etc/docker/daemon.json || true
+      #    curl -fsSL https://download.docker.com/linux/ubuntu/gpg | sudo apt-key add -
+      #    sudo add-apt-repository "deb [arch=amd64] https://download.docker.com/linux/ubuntu  $(lsb_release -cs)  stable"
+      #    sudo apt-get update
+      #    apt list -a docker-ce
+      #    sudo apt-get -y --allow-downgrades install docker-ce=5:20.10.14~3-0~ubuntu-jammy
+      #    docker version
+      #    cat /etc/docker/daemon.json || true
 
       - name: befor install -> install python3-pip
         run:  sudo apt-get install -y python3-pip

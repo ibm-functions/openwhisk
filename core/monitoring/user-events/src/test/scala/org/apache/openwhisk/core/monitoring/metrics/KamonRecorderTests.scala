@@ -63,7 +63,7 @@ class KamonRecorderTests extends KafkaSpecBase with BeforeAndAfterEach with Kamo
   val namespaceGuest = "guest"
   val actionWithCustomPackage = "apimgmt/createApi"
   val actionWithDefaultPackage = "createApi"
-  val kind = "nodejs:10"
+  val kind = "nodejs:default"
   val memory = 256
 
   it should "push user events to kamon" in {

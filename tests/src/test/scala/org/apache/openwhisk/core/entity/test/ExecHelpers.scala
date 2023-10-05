@@ -35,7 +35,7 @@ trait ExecHelpers extends Matchers with WskActorSystem with StreamLogging {
   private val config = new WhiskConfig(ExecManifest.requiredProperties)
   ExecManifest.initialize(config) should be a 'success
 
-  protected val NODEJS10 = "nodejs:10"
+  protected val NODEJS20 = "nodejs:20"
   protected val SWIFT4 = "swift:4.2"
   protected val BLACKBOX = "blackbox"
   protected val JAVA_DEFAULT = "java:8"
@@ -48,8 +48,8 @@ trait ExecHelpers extends Matchers with WskActorSystem with StreamLogging {
   protected def js10Old(code: String, main: Option[String] = None) = {
     CodeExecAsString(
       RuntimeManifest(
-        NODEJS10,
-        imageName(NODEJS10),
+        NODEJS20,
+        imageName(NODEJS20),
         default = Some(true),
         deprecated = Some(false),
         stemCells = Some(List(StemCell(2, 256.MB)))),
@@ -59,7 +59,7 @@ trait ExecHelpers extends Matchers with WskActorSystem with StreamLogging {
 
   protected def js10(code: String, main: Option[String] = None) = {
     val attachment = attFmt[String].read(code.trim.toJson)
-    val manifest = ExecManifest.runtimesManifest.resolveDefaultRuntime(NODEJS10).get
+    val manifest = ExecManifest.runtimesManifest.resolveDefaultRuntime(NODEJS20).get
 
     CodeExecAsAttachment(manifest, attachment, main.map(_.trim), Exec.isBinaryCode(code))
   }
@@ -71,8 +71,8 @@ trait ExecHelpers extends Matchers with WskActorSystem with StreamLogging {
   protected def js10MetaDataOld(main: Option[String] = None, binary: Boolean) = {
     CodeExecMetaDataAsString(
       RuntimeManifest(
-        NODEJS10,
-        imageName(NODEJS10),
+        NODEJS20,
+        imageName(NODEJS20),
         default = Some(true),
         deprecated = Some(false),
         stemCells = Some(List(StemCell(2, 256.MB)))),
@@ -81,7 +81,7 @@ trait ExecHelpers extends Matchers with WskActorSystem with StreamLogging {
   }
 
   protected def js10MetaData(main: Option[String] = None, binary: Boolean) = {
-    val manifest = ExecManifest.runtimesManifest.resolveDefaultRuntime(NODEJS10).get
+    val manifest = ExecManifest.runtimesManifest.resolveDefaultRuntime(NODEJS20).get
 
     CodeExecMetaDataAsAttachment(manifest, binary, main.map(_.trim))
   }

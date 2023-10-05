@@ -127,7 +127,7 @@ class SequenceActionApiMigrationTests
             deleteAction(action.docid)
             status should be(OK)
             val response = responseAs[WhiskAction]
-            response.exec.kind should be(NODEJS10)
+            response.exec.kind should be(NODEJS20)
             response.parameters should be(Parameters("a", "A"))
           }
         },
@@ -155,7 +155,7 @@ class SequenceActionApiMigrationTests
             deleteAction(action.docid)
             status should be(OK)
             val response = responseAs[WhiskAction]
-            response.exec.kind should be(NODEJS10)
+            response.exec.kind should be(NODEJS20)
             response.parameters shouldBe Parameters()
           }
         },
