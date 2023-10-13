@@ -19,7 +19,7 @@ FROM scala
 
 ENV UID=1001 \
     NOT_ROOT_USER=owuser
-    ENV DOCKER_VERSION=18.06.3-ce
+    
 # If you change the docker version here, it has implications on invoker runc support.
 # Docker server version and the invoker docker version must be the same to enable runc usage.
 # If this cannot be guaranteed, set `invoker_use_runc: false` in the ansible env.
@@ -30,14 +30,6 @@ RUN apt update &&\
     apt upgrade -y --no-install-recommends && \
     apt install -y \
      openssl
-# Uncomment to fetch latest version of docker instead: RUN wget -qO- https://get.docker.com | sh
-# Install docker client
-RUN curl -sSL -o docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz && \
-    tar --strip-components 1 -xvzf docker-${DOCKER_VERSION}.tgz -C /usr/bin docker/docker && \
-    tar --strip-components 1 -xvzf docker-${DOCKER_VERSION}.tgz -C /usr/bin docker/docker-runc && \
-    rm -f docker-${DOCKER_VERSION}.tgz && \
-    chmod +x /usr/bin/docker && \
-    chmod +x /usr/bin/docker-runc
 
 ADD build/distributions/invoker.tar ./
 
