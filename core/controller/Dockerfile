@@ -28,7 +28,7 @@ ENV SWAGGER_UI_DOWNLOAD_SHA256=3d7ef5ddc59e10f132fe99771498f0f1ba7a2cbfb9585f986
 # If you change the docker version here, it has implications on invoker runc support.
 # Docker server version and the invoker docker version must be the same to enable runc usage.
 # If this cannot be guaranteed, set `invoker_use_runc: false` in the ansible env.
-ENV DOCKER_VERSION=18.06.3-ce
+ENV DOCKER_VERSION=24.0.6
 
 RUN apt update &&\
     # Upgrade installed packages to get latest security fixes if the base image does not contain them already.
