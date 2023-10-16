@@ -34,10 +34,8 @@ RUN apt update &&\
 # Install docker client
 RUN curl -sSL -o docker-${DOCKER_VERSION}.tgz https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz && \
     tar --strip-components 1 -xvzf docker-${DOCKER_VERSION}.tgz -C /usr/bin docker/docker && \
-    tar --strip-components 1 -xvzf docker-${DOCKER_VERSION}.tgz -C /usr/bin docker/docker-runc && \
     rm -f docker-${DOCKER_VERSION}.tgz && \
-    chmod +x /usr/bin/docker && \
-    chmod +x /usr/bin/docker-runc
+    chmod +x /usr/bin/docker
 
 ADD build/distributions/invoker.tar ./
 
