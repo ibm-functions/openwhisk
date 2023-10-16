@@ -47,7 +47,8 @@ RUN pip install cryptography==2.5 && \
     pip install docker
 
 # Install docker client
-RUN wget --no-verbose https://get.docker.com/builds/Linux/x86_64/docker-${DOCKER_VERSION}.tgz && \
+
+RUN wget --no-verbose https://download.docker.com/linux/static/stable/x86_64/docker-${DOCKER_VERSION}.tgz && \
   tar --strip-components 1 -xvzf docker-${DOCKER_VERSION}.tgz -C /usr/bin docker/docker && \
   rm -f docker-${DOCKER_VERSION}.tgz && \
   chmod +x /usr/bin/docker
