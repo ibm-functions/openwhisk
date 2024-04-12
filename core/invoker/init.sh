@@ -20,5 +20,5 @@
 
 export INVOKER_OPTS
 INVOKER_OPTS="$INVOKER_OPTS $(./transformEnvironment.sh)"
-
+sleep 30
 exec invoker/bin/invoker "$@"
