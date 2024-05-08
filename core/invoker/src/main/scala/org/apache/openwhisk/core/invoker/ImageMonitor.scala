@@ -302,7 +302,8 @@ class ImageMonitor(cluster: String,
           if (build != docbuild || ip != docip || pod != docpod) {
             // write doc to image store to update metadata (eg invoker ip) if changed. after a new deployment
             // zookeeper persistent store is deleted and each invoker will most likely get a new identity (ip)
-            imageStore.putDoc(id, rev, toJson(images)).flatMap {
+            // filter out outdates images on sync with image store
+            imageStore.putDoc(id, rev, toJson(images, true)).flatMap {
               case Right(res) if (ip != docip || build != docbuild) =>
                 waitForEntriesToAppearInView(images.size).flatMap {
                   case count =>
