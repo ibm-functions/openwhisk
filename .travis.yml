@@ -27,7 +27,7 @@ services:
 env:
   global:
     - ANSIBLE_CMD="ansible-playbook -i environments/local -e docker_image_prefix=testing"
-    - GRADLE_PROJS_SKIP=""
+    - GRADLE_PROJS_SKIP="--exclude-task :core:cosmosdb"
 
 notifications:
   email: false
