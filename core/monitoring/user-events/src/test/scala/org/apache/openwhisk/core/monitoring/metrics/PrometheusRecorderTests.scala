@@ -34,7 +34,7 @@ class PrometheusRecorderTests extends KafkaSpecBase with BeforeAndAfterEach with
   val namespaceGuest = "guest"
   val actionWithCustomPackage = "apimgmt/createApiOne"
   val actionWithDefaultPackage = "createApi"
-  val kind = "nodejs:10"
+  val kind = "nodejs:default"
   val memory = "256"
 
   it should "push user events to kamon" in {

@@ -500,11 +500,11 @@ class SchemaTests extends FlatSpec with BeforeAndAfter with ExecHelpers with Mat
     val b64Body = """ZnVuY3Rpb24gbWFpbihhcmdzKSB7IHJldHVybiBhcmdzOyB9Cg=="""
 
     val json = Seq[JsObject](
-      JsObject("kind" -> "nodejs:10".toJson, "code" -> "js1".toJson, "binary" -> false.toJson),
-      JsObject("kind" -> "nodejs:10".toJson, "code" -> "js2".toJson, "binary" -> false.toJson, "foo" -> "bar".toJson),
+      JsObject("kind" -> "nodejs:20".toJson, "code" -> "js1".toJson, "binary" -> false.toJson),
+      JsObject("kind" -> "nodejs:20".toJson, "code" -> "js2".toJson, "binary" -> false.toJson, "foo" -> "bar".toJson),
       JsObject("kind" -> "swift:4.2".toJson, "code" -> "swift1".toJson, "binary" -> false.toJson),
       JsObject("kind" -> "swift:4.2".toJson, "code" -> b64Body.toJson, "binary" -> true.toJson),
-      JsObject("kind" -> "nodejs:10".toJson, "code" -> b64Body.toJson, "binary" -> true.toJson))
+      JsObject("kind" -> "nodejs:20".toJson, "code" -> b64Body.toJson, "binary" -> true.toJson))
 
     val execs = json.map { e =>
       Exec.serdes.read(e)
@@ -637,8 +637,8 @@ class SchemaTests extends FlatSpec with BeforeAndAfter with ExecHelpers with Mat
       JsObject.empty,
       JsNull,
       JsObject("init" -> "zipfile".toJson),
-      JsObject("kind" -> "nodejs:10".toJson, "code" -> JsNumber(42)),
-      JsObject("kind" -> "nodejs:10".toJson, "init" -> "zipfile".toJson),
+      JsObject("kind" -> "nodejs:20".toJson, "code" -> JsNumber(42)),
+      JsObject("kind" -> "nodejs:20".toJson, "init" -> "zipfile".toJson),
       JsObject("kind" -> "turbopascal".toJson, "code" -> "BEGIN1".toJson),
       JsObject("kind" -> "blackbox".toJson, "code" -> "js".toJson),
       JsObject("kind" -> "swift".toJson, "swiftcode" -> "swift".toJson))
@@ -666,8 +666,8 @@ class SchemaTests extends FlatSpec with BeforeAndAfter with ExecHelpers with Mat
   it should "serialize to json" in {
     val execs = Seq(bb("container"), jsDefault("js"), jsDefault("js"), swift("swift")).map { _.asJson }
     assert(execs(0) == JsObject("kind" -> "blackbox".toJson, "image" -> "container".toJson, "binary" -> false.toJson))
-    assert(execs(1) == JsObject("kind" -> "nodejs:10".toJson, "code" -> "js".toJson, "binary" -> false.toJson))
-    assert(execs(2) == JsObject("kind" -> "nodejs:10".toJson, "code" -> "js".toJson, "binary" -> false.toJson))
+    assert(execs(1) == JsObject("kind" -> "nodejs:20".toJson, "code" -> "js".toJson, "binary" -> false.toJson))
+    assert(execs(2) == JsObject("kind" -> "nodejs:20".toJson, "code" -> "js".toJson, "binary" -> false.toJson))
     assert(execs(3) == JsObject("kind" -> "swift:4.2".toJson, "code" -> "swift".toJson, "binary" -> false.toJson))
   }
 

@@ -3,7 +3,7 @@
         "This file describes the different languages (aka. managed action runtimes) supported by the system",
         "as well as blackbox images that support the runtime specification.",
         "Only actions with runtime families / kinds defined here can be created / read / updated / deleted / invoked.",
-        "Define a list of runtime families (example: 'nodejs') with at least one kind per family (example: 'nodejs:10').",
+        "Define a list of runtime families (example: 'nodejs') with at least one kind per family (example: 'nodejs:20').",
         "Each runtime family needs a default kind (default: true).",
         "When removing or renaming runtime families or runtime kinds from this file, preexisting actions",
         "with the affected kinds can no longer be read / updated / deleted / invoked. In order to remove or rename",
@@ -36,7 +36,7 @@
                     "name": "action-nodejs-v8",
                     "tag": "nightly"
                 },
-                "deprecated": false,
+                "deprecated": true,
                 "attached": {
                     "attachmentName": "codefile",
                     "attachmentType": "text/plain"
@@ -44,23 +44,17 @@
             },
             {
                 "kind": "nodejs:10",
-                "default": true,
+                "default": false,
                 "image": {
                     "prefix": "openwhisk",
                     "name": "action-nodejs-v10",
                     "tag": "nightly"
                 },
-                "deprecated": false,
+                "deprecated": true,
                 "attached": {
                     "attachmentName": "codefile",
                     "attachmentType": "text/plain"
-                },
-                "stemCells": [
-                    {
-                        "count": 2,
-                        "memory": "256 MB"
-                    }
-                ]
+                }
             },
             {
                 "kind": "nodejs:12",
@@ -75,6 +69,26 @@
                     "attachmentName": "codefile",
                     "attachmentType": "text/plain"
                 }
+            },
+            {
+                "kind": "nodejs:20",
+                "default": true,
+                "image": {
+                    "prefix": "openwhisk",
+                    "name": "action-nodejs-v20",
+                    "tag": "nightly"
+                },
+                "deprecated": false,
+                "attached": {
+                    "attachmentName": "codefile",
+                    "attachmentType": "text/plain"
+                },
+                "stemCells": [
+                    {
+                        "count": 2,
+                        "memory": "256 MB"
+                    }
+                ]
             }
         ],
         "python": [

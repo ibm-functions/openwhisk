@@ -75,7 +75,10 @@ class ActionLimitsTests extends TestHelpers with WskTestHelpers with WskActorSys
   // * With the introduction of Node.js 10, this was changed from "openFileLimit - 15" to
   //   "openFileLimit - 20".
   // * With Docker 18.09.3, we observed test failures and changed to "openFileLimit - 24".
-  val minExpectedOpenFiles = openFileLimit - 24
+  // * With github action runner ubuntu-22.04 Version 20231001.1.0
+  //   (https://github.com/actions/runner-images/releases/tag/ubuntu22%2F20231001.1)
+  //   the maximum number of open files changed to "openFileLimit - 26".
+  val minExpectedOpenFiles = openFileLimit - 26
 
   val retriesOnTestFailures = 5
   val waitBeforeRetry = 1.second
