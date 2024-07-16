@@ -19,9 +19,10 @@ buildscript {
     repositories {
         mavenCentral()
     }
-    dependencies {
-        classpath "cz.alenkacz:gradle-scalafmt:${gradle.scalafmt.version}"
-    }
+    // temporary exclude scalafmt plugin because of removed dependency to cz.alenkacz.gradle.scalafmt
+    //dependencies {
+    //    classpath "cz.alenkacz:gradle-scalafmt:${gradle.scalafmt.version}"
+    //}
 }
 
 plugins {
@@ -37,8 +38,9 @@ buildScan {
 }
 
 subprojects {
-    apply plugin: 'scalafmt'
-    scalafmt.configFilePath = gradle.scalafmt.config
+    // temporary exclude scalafmt plugin because of removed dependency to cz.alenkacz.gradle.scalafmt
+    //apply plugin: 'scalafmt'
+    //scalafmt.configFilePath = gradle.scalafmt.config
 
     group 'org.apache.openwhisk'
     version '1.0.0-SNAPSHOT'
