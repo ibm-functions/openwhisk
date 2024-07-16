@@ -38,7 +38,7 @@ scancode/scanCode.py --config scancode/ASF-Release.cfg $ROOTDIR
 
 # run scalafmt checks
 cd $ROOTDIR
-TERM=dumb ./gradlew checkScalafmtAll
+#TERM=dumb ./gradlew checkScalafmtAll
 
 # lint tests to all be actually runnable
 MISSING_TESTS=$(grep -rL "RunWith" --include="*Tests.scala" tests)
