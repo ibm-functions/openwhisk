@@ -15,7 +15,8 @@
 # limitations under the License.
 #
 
-FROM ibm-semeru-runtimes:open-8u412-b08-jdk-focal
+FROM ibm-semeru-runtimes:open-8u422-b05-jdk-focal
+
 ENV LANG en_US.UTF-8
 ENV LANGUAGE en_US:en
 ENV LC_ALL en_US.UTF-8
